@@ -6,6 +6,7 @@ const { promisify } = require('util')
 const { execFile } = require('child_process')
 const axios = require('axios')
 const ssrfFilter = require('ssrf-req-filter')
+const analysisProxy = require('../utils/adAnalysisProxy')
 const { parsePodcastRssFeedXml } = require('../utils/podcastUtils')
 const { normalize, matchesEpisode, PERIOD, DELAY } = require('../utils/daiAlignment')
 const { Worker } = require('worker_threads')
@@ -68,9 +69,10 @@ function publicResult(episode) {
   return structuredClone(json)
 }
 
-// Manual redirects create a fresh SSRF-filtered agent per hop. No proxy, cookies,
-// user headers, credentials, or global SSRF opt-out apply to comparison requests.
+// Redirects revalidate each destination. Only analysis opts into this proxy;
+// cookies, user headers, ambient proxies and global SSRF opt-outs never apply.
 async function request(url, limit = 2 * 1024 * 1024, timeout = 10000, signal, checkpoint) {
+  const proxy = analysisProxy.configuration()
   const deadline = Date.now() + timeout
   const controller = new AbortController()
   const cancel = () => controller.abort()
@@ -85,18 +87,21 @@ async function request(url, limit = 2 * 1024 * 1024, timeout = 10000, signal, ch
     if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('unsafe_url')
     if (Date.now() >= deadline) throw new Error('request_timeout')
     let response
+    let agents
     try {
+      agents = proxy ? await analysisProxy.agents(parsed, proxy, controller.signal) : { httpAgent: ssrfFilter(parsed.href), httpsAgent: ssrfFilter(parsed.href) }
       response = await axios.get(parsed.href, {
         signal: controller.signal, proxy: false, maxRedirects: 0, timeout: deadline - Date.now(), responseType: 'arraybuffer',
         maxContentLength: limit, maxBodyLength: limit, validateStatus: () => true,
-        httpAgent: ssrfFilter(parsed.href), httpsAgent: ssrfFilter(parsed.href),
+        ...agents,
         headers: { 'User-Agent': 'audiobookshelf', 'Accept-Encoding': 'identity' }
       })
     } catch (error) {
       if (controller.signal.aborted || error.code === 'ECONNABORTED') throw new Error('request_timeout')
       if (error.message?.includes('maxContentLength')) throw new Error('response_too_large')
-      throw new Error('request_failed_or_blocked')
-    }
+      if (proxy && error.message === 'unsafe_url') throw error
+      throw new Error(proxy ? 'proxy_failed_or_blocked' : 'request_failed_or_blocked')
+    } finally { agents?.httpAgent.destroy(); agents?.httpsAgent.destroy() }
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       if (!response.headers.location || redirects === 4) throw new Error('redirect_limit')
       url = new URL(response.headers.location, parsed).href
@@ -206,7 +211,8 @@ class AdAnalysisManager {
     const guardedRequest = async (url, limit, timeout) => { await checkpoint(); return request(url, limit, timeout, controller.signal, checkpoint) }
     let hash
     let dir
-    const result = { version: 1, algorithm, status: 'running', reason: null, sourceSignature: job.sourceSignature, sourceSha256: null, segments: [], samples: [], catalogs: [] }
+    const route = process.env.AD_ANALYSIS_PROXY_URL === undefined ? 'direct' : 'vpn_proxy'
+    const result = { version: 1, algorithm, route, status: 'running', reason: null, sourceSignature: job.sourceSignature, sourceSha256: null, segments: [], samples: [], catalogs: [] }
     const save = async () => {
       const current = await load()
       if (!current) return false
@@ -224,7 +230,7 @@ class AdAnalysisManager {
       dir = await fs.promises.mkdtemp(Path.join(os.tmpdir(), 'abs-dai-'))
       await checkpoint()
       const original = await fingerprint(job.path, dir, 'original', initial.episode.duration, controller.signal)
-      result.samples.push({ origin: 'subscribed', fingerprintSha256: crypto.createHash('sha256').update(JSON.stringify(original)).digest('hex') })
+      result.samples.push({ origin: 'subscribed', route: 'direct', fingerprintSha256: crypto.createHash('sha256').update(JSON.stringify(original)).digest('hex') })
       const title = initial.item.media.title
       const author = initial.item.media.author
       if (!normalize(title) || title.length > 200 || (author && author.length > 200) || /https?:|[?=&]/i.test(`${title} ${author || ''}`)) throw new Error('unsafe_public_metadata')
@@ -234,7 +240,7 @@ class AdAnalysisManager {
       let extras = 0
       const fingerprints = new Set([result.samples[0].fingerprintSha256])
       for (const provider of ['apple', 'gpodder']) {
-        const attempt = { provider, status: 'empty' }
+        const attempt = { provider, route, status: 'empty' }
         result.catalogs.push(attempt)
         try {
           const endpoint = provider === 'apple' ? `https://itunes.apple.com/search?media=podcast&entity=podcast&limit=5&term=${query}` : `https://gpodder.net/search.json?q=${query}`
@@ -258,7 +264,7 @@ class AdAnalysisManager {
             if (extras >= 2) break
             const url = matches[0].enclosure.url
             extras++
-            const sample = { origin: provider, requestAttempt: extras, repeatedUrl: audioUrls.has(url), status: 'fetching' }
+            const sample = { origin: provider, route, requestAttempt: extras, repeatedUrl: audioUrls.has(url), status: 'fetching' }
             result.samples.push(sample)
             audioUrls.add(url)
             const response = await guardedRequest(url, MAX_AUDIO, 120000)
@@ -283,7 +289,7 @@ class AdAnalysisManager {
           const pending = result.samples.find((sample) => sample.origin === provider && sample.status === 'fetching')
           if (pending) { pending.status = 'failed'; pending.reason = 'sample_failed' }
           attempt.status = 'failed'
-          attempt.reason = ['http_error', 'response_too_large', 'request_timeout', 'redirect_limit', 'unsafe_url', 'request_failed_or_blocked', 'unsupported_runtime', 'duration_limit', 'incomplete_fingerprint', 'duration_or_decode_mismatch', 'invalid_fingerprint', 'malformed_catalog'].includes(error.message) ? error.message : 'invalid_source'
+          attempt.reason = ['http_error', 'response_too_large', 'request_timeout', 'redirect_limit', 'unsafe_url', 'request_failed_or_blocked', 'proxy_failed_or_blocked', 'invalid_analysis_proxy', 'unsupported_runtime', 'duration_limit', 'incomplete_fingerprint', 'duration_or_decode_mismatch', 'invalid_fingerprint', 'malformed_catalog'].includes(error.message) ? error.message : 'invalid_source'
         }
       }
       result.segments = combineSegments(result.segments)

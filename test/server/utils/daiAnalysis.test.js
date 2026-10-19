@@ -221,6 +221,7 @@ describe('DAI candidate analysis', () => {
           try {
             const worker = new manager.AdAnalysisManager()
             await worker.analyze({ itemId: 'item', episodeId: 'ep', path, sourceSignature: manager.signature(episode.audioFile) })
+            expect(episode.extraData.adAnalysis.route).to.equal('direct')
             expect(audioRequests).to.equal(2)
             expect(episode.extraData.retained).to.equal('yes')
             expect(episode.extraData.adAnalysis.status).to.equal('inconclusive')
@@ -228,6 +229,27 @@ describe('DAI candidate analysis', () => {
             expect(episode.extraData.adAnalysis.diversity.distinctFingerprints).to.equal(1)
             expect(episode.extraData.adAnalysis.samples[2].repeatedUrl).to.equal(true)
             expect(manager.publicResult(episode).segments).to.deep.equal([])
+            const previousProxy = process.env.AD_ANALYSIS_PROXY_URL
+            const proxyAgents = sinon.stub(require('../../../server/utils/adAnalysisProxy'), 'agents').resolves({ httpAgent: { destroy() {} }, httpsAgent: { destroy() {} } })
+            try {
+              process.env.AD_ANALYSIS_PROXY_URL = 'http://gluetun:8888'
+              await worker.analyze({ itemId: 'item', episodeId: 'ep', path, sourceSignature: manager.signature(episode.audioFile) })
+              const result = episode.extraData.adAnalysis
+              expect(result.route).to.equal('vpn_proxy')
+              expect(result.reason).to.equal('insufficient_diversity')
+              expect(result.samples.map((sample) => sample.route)).to.deep.equal(['direct', 'vpn_proxy', 'vpn_proxy'])
+              expect(result.catalogs.every((catalog) => catalog.route === 'vpn_proxy')).to.equal(true)
+              expect(proxyAgents.callCount).to.equal(5) // Two catalogs, one shared feed, two enclosures.
+              expect(await manager.sha256(path)).to.equal(hash)
+              proxyAgents.rejects(new Error('proxy_failed_or_blocked'))
+              await worker.analyze({ itemId: 'item', episodeId: 'ep', path, sourceSignature: manager.signature(episode.audioFile) })
+              expect(episode.extraData.adAnalysis.status).to.equal('inconclusive')
+              expect(episode.extraData.adAnalysis.catalogs.every((catalog) => catalog.reason === 'proxy_failed_or_blocked')).to.equal(true)
+            } finally {
+              proxyAgents.restore()
+              if (previousProxy === undefined) delete process.env.AD_ANALYSIS_PROXY_URL
+              else process.env.AD_ANALYSIS_PROXY_URL = previousProxy
+            }
           } finally { http.restore(); db.restore() }
           // Apple exhausts only its own feed budget; nullable gpodder author still works.
           const fairEpisode = { ...episode, extraData: {}, save: async () => {} }
