@@ -218,6 +218,7 @@ class PodcastEpisode extends Model {
       description: this.description,
       enclosure,
       guid: this.extraData?.guid || null,
+      adAnalysis: require('../managers/AdAnalysisManager').publicResult(this),
       pubDate: this.pubDate,
       chapters: structuredClone(this.chapters),
       audioFile: structuredClone(this.audioFile),

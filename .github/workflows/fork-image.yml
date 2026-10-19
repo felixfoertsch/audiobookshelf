@@ -1,0 +1,88 @@
+name: Publish fork image
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: fork-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: github.repository == 'felixfoertsch/audiobookshelf' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/felixfoertsch/audiobookshelf
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build runtime smoke image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: abs-smoke:local
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check FFmpeg and full-duration Chromaprint runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i --network none --entrypoint node abs-smoke:local <<'NODE'
+          const assert = require('node:assert/strict')
+          const { execFileSync } = require('node:child_process')
+          const fs = require('node:fs')
+          const os = require('node:os')
+          const path = require('node:path')
+          const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'abs-smoke-'))
+          try {
+            assert.match(execFileSync('fpcalc', ['-version'], { encoding: 'utf8', timeout: 5000 }), /fpcalc version 1\.(5|6)\./)
+            const pcm = path.join(dir, 'sample.pcm')
+            execFileSync('ffmpeg', ['-nostdin', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=125', '-ac', '1', '-ar', '11025', '-f', 's16le', pcm], { timeout: 30000 })
+            const data = JSON.parse(execFileSync('fpcalc', ['-format', 's16le', '-rate', '11025', '-channels', '1', '-algorithm', '2', '-length', '0', '-raw', '-json', pcm], { encoding: 'utf8', timeout: 30000 }))
+            assert.ok(Array.isArray(data.fingerprint) && data.fingerprint.length > 0)
+            assert.ok(data.fingerprint.every((n) => Number.isInteger(n) && n >= 0 && n <= 0xffffffff))
+            assert.ok(Math.abs(data.fingerprint.length * 1365 / 11025 + (19 * 1365 + 2731) / 11025 - 125) < 1, 'fingerprint must cover full sample, not default 120 s')
+            console.log('FFmpeg and full-duration Chromaprint smoke passed')
+          } finally {
+            fs.rmSync(dir, { recursive: true, force: true })
+          }
+          NODE
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish multi-platform image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:main
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

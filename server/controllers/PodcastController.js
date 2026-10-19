@@ -557,6 +557,25 @@ class PodcastController {
    * @param {Response} res
    * @param {NextFunction} next
    */
+  async setAdAnalysis(req, res) {
+    if (!req.user.isAdminOrUp) return res.sendStatus(403)
+    if (!req.body || Object.keys(req.body).length !== 1 || typeof req.body.enabled !== 'boolean') return res.sendStatus(400)
+    req.libraryItem.extraData = { ...req.libraryItem.extraData, adAnalysisEnabled: req.body.enabled }
+    await req.libraryItem.save()
+    if (!req.body.enabled) require('../managers/AdAnalysisManager').cancel(req.libraryItem.id)
+    res.json({ enabled: req.body.enabled })
+  }
+
+  async analyzeAds(req, res) {
+    if (!req.user.isAdminOrUp) return res.sendStatus(403)
+    if (!req.body || Array.isArray(req.body) || typeof req.body !== 'object' || Object.keys(req.body).length) return res.sendStatus(400)
+    const episode = req.libraryItem.media.podcastEpisodes.find((ep) => ep.id === req.params.episodeId)
+    if (!episode) return res.sendStatus(404)
+    if (req.libraryItem.extraData?.adAnalysisEnabled !== true) return res.status(409).send('Ad analysis is disabled')
+    const queued = require('../managers/AdAnalysisManager').enqueue(req.libraryItem, episode)
+    res.status(queued ? 202 : 409).json({ queued })
+  }
+
   async middleware(req, res, next) {
     const libraryItem = await Database.libraryItemModel.getExpandedById(req.params.id)
     if (!libraryItem?.media) return res.sendStatus(404)

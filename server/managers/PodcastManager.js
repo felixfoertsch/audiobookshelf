@@ -260,6 +260,8 @@ class PodcastManager {
       NotificationManager.onPodcastEpisodeDownloaded(libraryItem, podcastEpisode)
     }
 
+    // Publication is complete. Analysis owns stable IDs/path, never currentDownload.
+    require('./AdAnalysisManager').enqueue(libraryItem, podcastEpisode)
     return true
   }
 
