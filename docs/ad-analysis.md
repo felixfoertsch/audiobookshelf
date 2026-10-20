@@ -10,7 +10,7 @@ docker pull git.felixfoertsch.de/felixfoertsch/audiobookshelf:main
 
 For a new installation, use the repository's `docker-compose.yml` example and replace only its `image:` value with `git.felixfoertsch.de/felixfoertsch/audiobookshelf:main` (or a commit-specific tag). Keep its `13378:80` port mapping and persistent `/config`, `/metadata`, `/audiobooks`, and `/podcasts` mounts; adjust host paths for your installation. Back up existing config/metadata before choosing to run experimental builds against existing data.
 
-Publication uses the workflow's built-in Gitea token with package-write permission. CI checks FFmpeg and full-duration Chromaprint in the built runtime before publication. This checks runtime compatibility, not inserted-audio detection accuracy. Image publication does not update or restart any deployed ABS service; pulling and deploying remain explicit operator actions.
+Publication uses repository secret `REGISTRY_TOKEN`, sourced from the SOPS-managed Gitea container publisher credential; the built-in workflow token cannot authenticate to the registry. CI checks FFmpeg and full-duration Chromaprint in the built runtime before publication. This checks runtime compatibility, not inserted-audio detection accuracy. Image publication does not update or restart any deployed ABS service; pulling and deploying remain explicit operator actions.
 
 ## Optional analysis VPN proxy
 

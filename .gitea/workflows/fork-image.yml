@@ -66,7 +66,7 @@ jobs:
 
       - name: Publish image
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
           set -euo pipefail
           echo "$TOKEN" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
