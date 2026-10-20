@@ -117,11 +117,30 @@ test('EPUB real rendering, TOC search, CFI save and restore', async ({
 	await settings.getByLabel('Font family').selectOption('sans-serif')
 	await settings.getByLabel('Layout').selectOption('none')
 	await page.getByRole('button', { name: 'Close settings' }).click()
+	// TOC/search already wrote progress; wait for a changed CFI accepted after Next.
+	const previous = writes.at(-1)?.ebookLocation
+	const savedResponse = page.waitForResponse(
+		(response) =>
+			new URL(response.url()).pathname === '/api/me/progress/read-epub' &&
+			response.request().method() === 'PATCH' &&
+			response.request().postDataJSON().ebookLocation !== previous,
+	)
 	await page.getByRole('button', { name: 'Next page', exact: true }).click()
-	await expect.poll(() => writes.length).toBeGreaterThan(1)
-	const saved = writes.at(-1)?.ebookLocation
+	const accepted = await savedResponse
+	expect(accepted.ok()).toBe(true)
+	await accepted.finished()
+	const saved = accepted.request().postDataJSON().ebookLocation
+	expect(saved).toMatch(/^epubcfi\(/)
 	await page.getByRole('button', { name: 'Close reader' }).click()
+	const reads = page.waitForResponse(
+		(response) =>
+			new URL(response.url()).pathname === '/api/me/progress/read-epub' &&
+			response.request().method() === 'GET',
+	)
+	const writesBeforeReopen = writes.length
 	await page.getByRole('button', { name: 'Read ebook', exact: true }).click()
+	expect((await (await reads).json()).ebookLocation).toBe(saved)
+	await expect.poll(() => writes.length).toBeGreaterThan(writesBeforeReopen)
 	await expect
 		.poll(() =>
 			page.frameLocator('iframe').first().locator('body').textContent(),
