@@ -275,6 +275,7 @@ export default class PlayerHandler {
       if (!this.player) return
       const currentTime = this.player.getCurrentTime()
       this.ctx.setCurrentTime(currentTime)
+      if (this.skipInsertedAudio(currentTime)) return
 
       const exactTimeElapsed = (Date.now() - lastTick) / 1000
       lastTick = Date.now()
@@ -284,6 +285,22 @@ export default class PlayerHandler {
         this.sendProgressSync(currentTime)
       }
     }, 1000)
+  }
+
+  // Skips each inserted-audio candidate once per load, so seeking back into one plays it.
+  // ponytail: 1 s interval tick lets up to ~1 s of an ad play; add a precise timer when that matters.
+  skipInsertedAudio(currentTime) {
+    const analysis = this.episode?.adAnalysis
+    if (analysis?.status !== 'candidates' || !Array.isArray(analysis.segments)) return false
+    if (this.skippedFor !== this.episodeId) {
+      this.skippedFor = this.episodeId
+      this.skippedSegments = new Set()
+    }
+    const segment = analysis.segments.find((s, i) => !this.skippedSegments.has(i) && currentTime >= s.start && currentTime < s.end - 0.5)
+    if (!segment) return false
+    this.skippedSegments.add(analysis.segments.indexOf(segment))
+    this.seek(Math.min(segment.end, this.getDuration()))
+    return true
   }
 
   sendCloseSession() {
