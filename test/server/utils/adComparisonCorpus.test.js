@@ -1,0 +1,104 @@
+const { expect } = require('chai')
+const fs = require('fs').promises
+const os = require('os')
+const Path = require('path')
+const sinon = require('sinon')
+const { ComparisonCorpus } = require('../../../server/utils/adComparisonCorpus')
+
+describe('Persistent comparison corpus', () => {
+  let dir, corpus
+  beforeEach(async () => { dir = await fs.mkdtemp(Path.join(os.tmpdir(), 'abs-corpus-test-')); corpus = new ComparisonCorpus(Path.join(dir, 'corpus')) })
+  afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
+  const input = (n = 1) => ({ itemId: 'item', episodeId: 'episode', data: Buffer.from(`audio${n}`), fingerprint: [n, 2, 3], duration: 60, provider: 'apple', route: 'direct' })
+  it('retains audio and raw fingerprints across instances, deduplicates bytes or fingerprints', async () => {
+    const saved = await corpus.retain(input())
+    corpus = new ComparisonCorpus(Path.join(dir, 'corpus'))
+    const loaded = await corpus.load('item', 'episode')
+    expect(loaded.versions[0].fingerprint).to.deep.equal([1, 2, 3])
+    expect(await fs.readFile(Path.join(dir, 'corpus', saved.versionId, 'audio'))).to.deep.equal(input().data)
+    expect((await corpus.retain(input())).status).to.equal('duplicate')
+    expect((await corpus.retain({ ...input(), data: Buffer.from('different') })).status).to.equal('duplicate')
+    expect((await corpus.inventory('item', 'episode')).count).to.equal(1)
+  })
+  it('pauses at five, never evicts, and allows offline reads at capacity', async () => {
+    for (let n = 1; n <= 5; n++) await corpus.retain(input(n))
+    expect((await corpus.retain(input(6))).reason).to.equal('episode_limit')
+    expect((await corpus.load('item', 'episode')).versions).to.have.length(5)
+    expect((await fs.readdir(Path.join(dir, 'corpus'))).length).to.equal(5)
+  })
+  it('counts audio, fingerprint and manifest bytes and rejects excess without replacing old evidence', async () => {
+    await corpus.retain(input())
+    const before = await corpus.inventory('item', 'episode')
+    corpus = new ComparisonCorpus(Path.join(dir, 'corpus'), before.totalBytes + 1)
+    expect((await corpus.retain(input(2))).reason).to.equal('corpus_limit')
+    expect((await corpus.inventory('item', 'episode')).totalBytes).to.equal(before.totalBytes)
+    expect(await fs.readdir(Path.join(dir, 'corpus'))).to.have.length(1)
+  })
+  it('cleans staging after cancelled or failed publication, preserves old evidence', async () => {
+    await corpus.retain(input())
+    let checks = 0
+    try { await corpus.retain(input(2), async () => { if (++checks === 2) throw new Error('cancelled') }); throw new Error('expected rejection') } catch (e) { expect(e.message).to.equal('cancelled') }
+    expect(await fs.readdir(Path.join(dir, 'corpus'))).to.have.length(1)
+    expect((await corpus.load('item', 'episode')).versions).to.have.length(1)
+  })
+  it('syncs metadata parent before publication, retries failed parent sync, preserves post-rename evidence', async () => {
+    const open = fs.open.bind(fs)
+    let parentAttempts = 0
+    const order = []
+    let failRoot = false
+    const stub = sinon.stub(fs, 'open').callsFake(async (path, ...args) => {
+      const handle = await open(path, ...args)
+      const sync = handle.sync.bind(handle)
+      handle.sync = async () => {
+        if (path === dir) {
+          order.push('parent')
+          if (++parentAttempts === 1) throw Object.assign(new Error('parent sync failed'), { code: 'EIO' })
+        }
+        if (path === corpus.root) { order.push('root'); if (failRoot) throw new Error('root sync failed') }
+        return sync()
+      }
+      return handle
+    })
+    try {
+      await expectFailure(() => corpus.retain(input()))
+      expect((await corpus.inventory('item', 'episode')).count).to.equal(0)
+      await corpus.retain(input())
+      expect(parentAttempts).to.equal(2)
+      expect(order).to.deep.equal(['parent', 'parent', 'root'])
+      failRoot = true
+      await expectFailure(() => corpus.retain(input(2)))
+      expect((await corpus.inventory('item', 'episode')).count).to.equal(2)
+      expect((await fs.readdir(corpus.root)).some((name) => name.startsWith('.stage-'))).to.equal(false)
+    } finally { stub.restore() }
+  })
+  it('cleans staging on ENOSPC without touching published versions', async () => {
+    await corpus.retain(input())
+    const open = fs.open.bind(fs)
+    const stub = sinon.stub(fs, 'open').callsFake(async (path, ...args) => {
+      if (String(path).includes('.stage-')) throw Object.assign(new Error('disk full'), { code: 'ENOSPC' })
+      return open(path, ...args)
+    })
+    try { await expectFailure(() => corpus.retain(input(2))) } finally { stub.restore() }
+    expect(await fs.readdir(Path.join(dir, 'corpus'))).to.have.length(1)
+    expect((await corpus.load('item', 'episode')).versions).to.have.length(1)
+  })
+  it('rejects traversal IDs and substituted root or version directories', async () => {
+    await expectFailure(() => corpus.retain({ ...input(), episodeId: '../escape' }))
+    const saved = await corpus.retain(input())
+    const version = Path.join(dir, 'corpus', saved.versionId)
+    await fs.rename(version, Path.join(dir, 'outside'))
+    await fs.symlink(Path.join(dir, 'outside'), version)
+    await expectFailure(() => corpus.load('item', 'episode'))
+  })
+  it('fails closed on malformed manifests and symlinks without deleting evidence', async () => {
+    const saved = await corpus.retain(input())
+    const manifest = Path.join(dir, 'corpus', saved.versionId, 'manifest.json')
+    await fs.writeFile(manifest, '{"audio":"../../outside"}')
+    await expectFailure(() => corpus.inventory('item', 'episode'))
+    expect(await fs.readdir(Path.join(dir, 'corpus'))).to.have.length(1)
+    await fs.rm(manifest)
+    await fs.symlink(Path.join(dir, 'missing'), manifest)
+    await expectFailure(() => corpus.load('item', 'episode'))
+  })
+})
+async function expectFailure(fn) { let failed = false; try { await fn() } catch { failed = true } expect(failed).to.equal(true) }

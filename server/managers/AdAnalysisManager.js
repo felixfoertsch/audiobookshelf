@@ -7,6 +7,7 @@ const { execFile } = require('child_process')
 const axios = require('axios')
 const ssrfFilter = require('ssrf-req-filter')
 const analysisProxy = require('../utils/adAnalysisProxy')
+const { ComparisonCorpus, validId } = require('../utils/adComparisonCorpus')
 const { parsePodcastRssFeedXml } = require('../utils/podcastUtils')
 const { normalize, matchesEpisode, PERIOD, DELAY } = require('../utils/daiAlignment')
 const { Worker } = require('worker_threads')
@@ -133,6 +134,7 @@ async function fingerprint(path, dir, label, duration, signal) {
     const data = JSON.parse(stdout)
     if (!Array.isArray(data.fingerprint) || !data.fingerprint.every((n) => Number.isInteger(n) && n >= 0 && n <= 0xffffffff)) throw new Error('invalid_fingerprint')
     if (Math.abs(data.fingerprint.length * PERIOD + DELAY - size / 22050) > 1) throw new Error('incomplete_fingerprint')
+    Object.defineProperty(data.fingerprint, 'duration', { value: size / 22050 })
     return data.fingerprint
   } finally {
     await fs.promises.rm(pcm, { force: true })
@@ -167,7 +169,7 @@ class AdAnalysisManager {
 
   enqueue(item, episode) {
     const path = episode.audioFile?.metadata?.path
-    if (item.extraData?.adAnalysisEnabled !== true || typeof path !== 'string' || !Path.isAbsolute(path) || typeof item.id !== 'string' || typeof episode.id !== 'string') return false
+    if (item.extraData?.adAnalysisEnabled !== true || typeof path !== 'string' || !Path.isAbsolute(path) || !validId(item.id) || !validId(episode.id)) return false
     const key = `${item.id}:${episode.id}`
     if (this.keys.has(key) || this.keys.size >= 32) return false
     this.keys.add(key)
@@ -231,15 +233,40 @@ class AdAnalysisManager {
       await checkpoint()
       const original = await fingerprint(job.path, dir, 'original', initial.episode.duration, controller.signal)
       result.samples.push({ origin: 'subscribed', route: 'direct', fingerprintSha256: crypto.createHash('sha256').update(JSON.stringify(original)).digest('hex') })
+      const corpus = new ComparisonCorpus()
+      let retained
+      try { retained = await corpus.load(job.itemId, job.episodeId) } catch {
+        result.corpus = { collectionPaused: true, reason: 'corpus_unavailable' }
+        throw new Error('corpus_unavailable')
+      }
+      const refreshInventory = async () => { result.corpus = await corpus.inventory(job.itemId, job.episodeId) }
+      await refreshInventory()
+      const fingerprints = new Set([result.samples[0].fingerprintSha256])
+      const compare = async (variant, sample) => {
+        await checkpoint()
+        const sourceHash = await sha256(job.path)
+        if (sourceHash !== hash) throw new Error('cancelled')
+        result.samples.push(sample)
+        fingerprints.add(sample.fingerprintSha256)
+        const comparison = await alignAsync(original, variant, controller.signal)
+        sample.status = comparison.reason
+        sample.matchedSeconds = comparison.matchedSeconds
+        result.segments.push(...comparison.segments.map((segment) => ({ ...segment, sampleIndex: result.samples.length - 1 })))
+      }
+      for (const saved of retained.versions) {
+        await compare(saved.fingerprint, { origin: saved.provider, route: saved.route, versionId: saved.versionId, sha256: saved.sha256, fingerprintSha256: saved.fingerprintSha256, retained: true })
+      }
       const title = initial.item.media.title
       const author = initial.item.media.author
-      if (!normalize(title) || title.length > 200 || (author && author.length > 200) || /https?:|[?=&]/i.test(`${title} ${author || ''}`)) throw new Error('unsafe_public_metadata')
+      if (!result.corpus.collectionPaused && (!normalize(title) || title.length > 200 || (author && author.length > 200) || /https?:|[?=&]/i.test(`${title} ${author || ''}`))) throw new Error('unsafe_public_metadata')
       const query = encodeURIComponent(`${title} ${author || ''}`.trim())
       const feeds = new Map()
       const audioUrls = new Set()
       let extras = 0
-      const fingerprints = new Set([result.samples[0].fingerprintSha256])
       for (const provider of ['apple', 'gpodder']) {
+        await checkpoint()
+        await refreshInventory()
+        if (result.corpus.collectionPaused) break
         const attempt = { provider, route, status: 'empty' }
         result.catalogs.push(attempt)
         try {
@@ -276,16 +303,31 @@ class AdAnalysisManager {
             const variant = await fingerprint(path, dir, `variant${extras}`, null, controller.signal)
             await checkpoint()
             sample.fingerprintSha256 = crypto.createHash('sha256').update(JSON.stringify(variant)).digest('hex')
-            fingerprints.add(sample.fingerprintSha256)
-            const comparison = await alignAsync(original, variant, controller.signal)
-            sample.status = comparison.reason
-            sample.matchedSeconds = comparison.matchedSeconds
-            result.segments.push(...comparison.segments.map((segment) => ({ ...segment, sampleIndex: result.samples.length - 1 })))
+            sample.sha256 = crypto.createHash('sha256').update(response.data).digest('hex')
+            let publication
+            try { publication = await corpus.retain({ itemId: job.itemId, episodeId: job.episodeId, data: response.data, fingerprint: variant, duration: variant.duration, provider, route }, async () => {
+              await checkpoint()
+              if (await sha256(job.path) !== hash) throw new Error('cancelled')
+              await checkpoint()
+            }) } catch (error) {
+              if (error.message === 'cancelled' || controller.signal.aborted) throw error
+              result.corpus = { collectionPaused: true, reason: 'corpus_unavailable' }
+              throw new Error('corpus_unavailable')
+            }
+            sample.collectionStatus = publication.status
+            sample.versionId = publication.versionId
+            await refreshInventory()
+            if (publication.status === 'paused') { sample.status = 'collection_paused'; sample.reason = publication.reason; break }
+            // Duplicates already compared from durable inventory; never bypass capacity with transient samples.
+            if (publication.status === 'duplicate') { sample.status = 'duplicate'; break }
+            result.samples.pop()
+            await compare(variant, sample)
             attempt.status = 'sampled'
             break
           }
         } catch (error) {
           if (error.message === 'cancelled' || controller.signal.aborted) return
+          if (error.message === 'corpus_unavailable') throw error
           const pending = result.samples.find((sample) => sample.origin === provider && sample.status === 'fetching')
           if (pending) { pending.status = 'failed'; pending.reason = 'sample_failed' }
           attempt.status = 'failed'
@@ -298,7 +340,7 @@ class AdAnalysisManager {
       result.reason = result.segments.length ? 'candidate_insertions_not_advertising_proof' : fingerprints.size < 2 ? 'insufficient_diversity' : 'no_safe_candidates'
     } catch (error) {
       result.status = error.message === 'cancelled' || controller.signal.aborted ? 'cancelled' : error.message === 'unsupported_runtime' ? 'unsupported' : 'failed'
-      result.reason = ['unsupported_runtime', 'duration_limit', 'duration_or_decode_mismatch', 'incomplete_fingerprint', 'unsafe_public_metadata'].includes(error.message) ? error.message : 'analysis_failed'
+      result.reason = ['corpus_unavailable', 'unsupported_runtime', 'duration_limit', 'duration_or_decode_mismatch', 'incomplete_fingerprint', 'unsafe_public_metadata'].includes(error.message) ? error.message : 'analysis_failed'
       result.segments = []
     } finally {
       this.active.delete(job.itemId)

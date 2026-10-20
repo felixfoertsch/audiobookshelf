@@ -566,6 +566,18 @@ class PodcastController {
     res.json({ enabled: req.body.enabled })
   }
 
+  async getAdAnalysisCorpus(req, res) {
+    if (!req.user.isAdminOrUp) return res.sendStatus(403)
+    const episode = req.libraryItem.media.podcastEpisodes.find((ep) => ep.id === req.params.episodeId)
+    if (!episode) return res.sendStatus(404)
+    try {
+      const { ComparisonCorpus } = require('../utils/adComparisonCorpus')
+      res.json(await new ComparisonCorpus().inventory(req.libraryItem.id, episode.id))
+    } catch {
+      res.status(503).json({ collectionPaused: true, reason: 'corpus_unavailable' })
+    }
+  }
+
   async analyzeAds(req, res) {
     if (!req.user.isAdminOrUp) return res.sendStatus(403)
     if (!req.body || Array.isArray(req.body) || typeof req.body !== 'object' || Object.keys(req.body).length) return res.sendStatus(400)

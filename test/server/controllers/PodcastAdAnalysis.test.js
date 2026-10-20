@@ -30,6 +30,21 @@ describe('Podcast ad analysis authorization', () => {
     expect(item.extraData).to.deep.equal({ retained: 1, adAnalysisEnabled: true })
     expect(save.calledOnce).to.equal(true)
   })
+  it('allows admin inventory with consent disabled, denies other users, never enqueues', async () => {
+    const { ComparisonCorpus } = require('../../../server/utils/adComparisonCorpus')
+    const inventory = sinon.stub(ComparisonCorpus.prototype, 'inventory').resolves({ count: 5, collectionPaused: true, reason: 'episode_limit' })
+    const enqueue = sinon.stub(manager, 'enqueue')
+    const req = { user: { isAdminOrUp: false }, params: { episodeId: 'episode' }, libraryItem: { id: 'item', extraData: { adAnalysisEnabled: false }, media: { podcastEpisodes: [{ id: 'episode' }] } } }
+    const res = response()
+    await controller.getAdAnalysisCorpus(req, res)
+    expect(res.code).to.equal(403)
+    expect(inventory.called).to.equal(false)
+    const previousMetadata = global.MetadataPath
+    global.MetadataPath = '/unused-test-metadata'
+    try { await controller.getAdAnalysisCorpus({ ...req, user: { isAdminOrUp: true } }, res) } finally { global.MetadataPath = previousMetadata }
+    expect(res.body.count).to.equal(5)
+    expect(enqueue.called).to.equal(false)
+  })
   it('requires consent, admin, known empty body; reads never enqueue', async () => {
     const enqueue = sinon.stub(manager, 'enqueue').returns(true)
     const episode = { id: 'episode', toOldJSON: () => ({ id: 'episode' }) }

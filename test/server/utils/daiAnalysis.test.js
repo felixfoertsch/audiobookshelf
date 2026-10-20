@@ -176,6 +176,8 @@ describe('DAI candidate analysis', () => {
     this.timeout(120000)
     if (!process.env.FPCALC_PATH || !process.env.FFMPEG_PATH) this.skip()
     const dir = await fs.promises.mkdtemp(Path.join(os.tmpdir(), 'abs-dai-native-'))
+    const previousMetadata = global.MetadataPath
+    global.MetadataPath = dir
     try {
       // Deterministic voiced harmonic bursts with changing pitch/formants. No external audio.
       const rate = 11025
@@ -237,7 +239,7 @@ describe('DAI candidate analysis', () => {
               const result = episode.extraData.adAnalysis
               expect(result.route).to.equal('vpn_proxy')
               expect(result.reason).to.equal('insufficient_diversity')
-              expect(result.samples.map((sample) => sample.route)).to.deep.equal(['direct', 'vpn_proxy', 'vpn_proxy'])
+              expect(result.samples.map((sample) => sample.route)).to.deep.equal(['direct', 'direct', 'vpn_proxy', 'vpn_proxy'])
               expect(result.catalogs.every((catalog) => catalog.route === 'vpn_proxy')).to.equal(true)
               expect(proxyAgents.callCount).to.equal(5) // Two catalogs, one shared feed, two enclosures.
               expect(await manager.sha256(path)).to.equal(hash)
@@ -270,7 +272,7 @@ describe('DAI candidate analysis', () => {
             await new manager.AdAnalysisManager().analyze({ itemId: 'item', episodeId: 'ep', path, sourceSignature: manager.signature(episode.audioFile) })
             expect(fetched.filter((url) => url.includes('/miss'))).to.have.length(2)
             expect(fetched).to.include('https://example.org/hit')
-            expect(fairEpisode.extraData.adAnalysis.samples[1].status).to.equal('failed')
+            expect(fairEpisode.extraData.adAnalysis.samples.find((s) => s.origin === 'gpodder').status).to.equal('failed')
             expect(fairEpisode.extraData.adAnalysis.catalogs[1].status).to.equal('failed')
           } finally { fairHttp.restore(); fairDb.restore() }
           const cancelWorker = new manager.AdAnalysisManager()
@@ -286,6 +288,18 @@ describe('DAI candidate analysis', () => {
             await cancelWorker.analyze({ itemId: 'item', episodeId: 'ep', path, sourceSignature: manager.signature(episode.audioFile) })
             expect(cancelHttp.callCount).to.equal(1)
           } finally { cancelHttp.restore(); cancelDb.restore() }
+          // Full reruns compare all saved versions without catalog/audio traffic.
+          const { ComparisonCorpus } = require('../../../server/utils/adComparisonCorpus')
+          const corpus = new ComparisonCorpus()
+          for (let n = 2; n <= 5; n++) await corpus.retain({ itemId: 'item', episodeId: 'ep', data: Buffer.from(`local fixture ${n}`), fingerprint: [n, 4, 5], duration: 60, provider: 'apple', route: 'direct' })
+          const fullDb = sinon.stub(Database, 'libraryItemModel').get(() => ({ getExpandedById: async () => item }))
+          const fullHttp = sinon.stub(axios, 'get').rejects(new Error('capacity must prevent network'))
+          try {
+            await new manager.AdAnalysisManager().analyze({ itemId: 'item', episodeId: 'ep', path, sourceSignature: manager.signature(episode.audioFile) })
+            expect(fullHttp.called).to.equal(false)
+            expect(episode.extraData.adAnalysis.samples.filter((s) => s.retained)).to.have.length(5)
+            expect(episode.extraData.adAnalysis.corpus.reason).to.equal('episode_limit')
+          } finally { fullHttp.restore(); fullDb.restore() }
           for (const action of ['disable', 'delete', 'replace']) {
             let calls = 0
             let saves = 0
@@ -356,6 +370,6 @@ describe('DAI candidate analysis', () => {
         expect(align(original, prefixPrint).segments).to.deep.equal([])
         expect(await manager.sha256(path)).to.equal(hash)
       }
-    } finally { await fs.promises.rm(dir, { recursive: true, force: true }) }
+    } finally { global.MetadataPath = previousMetadata; await fs.promises.rm(dir, { recursive: true, force: true }) }
   })
 })
