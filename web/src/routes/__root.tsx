@@ -9,7 +9,11 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { getAuthGeneration, logout, useAuth } from '../api'
 import { getLibraries } from '../catalog'
-import { LibraryNav, SearchForm } from '../features/catalog/browse'
+import {
+	LibraryNameContext,
+	LibraryNav,
+	SearchForm,
+} from '../features/catalog/browse'
 import { ServerActivity } from '../features/catalog/server-activity'
 import { Player } from '../player'
 import { Button } from '../shared/components/ui/button'
@@ -27,8 +31,12 @@ import {
 	Sidebar,
 	SidebarContent,
 	SidebarGroup,
+	SidebarGroupLabel,
 	SidebarHeader,
 	SidebarInset,
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
 	SidebarProvider,
 	SidebarTrigger,
 	useSidebar,
@@ -246,13 +254,27 @@ export function Layout({
 						</DropdownMenu>
 					</SidebarHeader>
 					<SidebarContent>
+						{currentLibrary && (
+							<LibraryNav
+								library={currentLibrary.id}
+								podcast={currentLibrary.mediaType === 'podcast'}
+							/>
+						)}
 						<SidebarGroup>
-							{currentLibrary && (
-								<LibraryNav
-									library={currentLibrary.id}
-									podcast={currentLibrary.mediaType === 'podcast'}
-								/>
-							)}
+							<SidebarGroupLabel>Account</SidebarGroupLabel>
+							<SidebarMenu>
+								<SidebarMenuItem>
+									<SidebarMenuButton asChild>
+										<Link to="/account">Account</Link>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							</SidebarMenu>
+						</SidebarGroup>
+						<SidebarGroup>
+							<SidebarGroupLabel>
+								{admin ? 'Administration' : 'About server'}
+							</SidebarGroupLabel>
+							<ServerActivity />
 						</SidebarGroup>
 					</SidebarContent>
 				</Sidebar>
@@ -260,7 +282,6 @@ export function Layout({
 					<AlphaNotice />
 					<header className="flex flex-wrap items-center gap-3 border-b bg-card px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
 						<ShellSidebarTrigger />
-						<ServerActivity />
 						<div className="min-w-0 basis-40 flex-1">
 							{currentLibrary && (
 								<SearchForm
@@ -274,7 +295,7 @@ export function Layout({
 									}
 								/>
 							)}
-						</div>
+						</div>{' '}
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
 								<Button variant="outline" className="max-w-full">
@@ -342,7 +363,9 @@ export function Layout({
 								{error}
 							</p>
 						)}
-						{routeError ? <RouteError {...routeError} /> : <Outlet />}
+						<LibraryNameContext.Provider value={currentLibrary?.name || ''}>
+							{routeError ? <RouteError {...routeError} /> : <Outlet />}
+						</LibraryNameContext.Provider>
 					</div>
 				</SidebarInset>
 			</SidebarProvider>

@@ -18,6 +18,15 @@ const mocks = vi.hoisted(() => ({
 	getItem: vi.fn(),
 	api: vi.fn(),
 }))
+vi.mock('@tanstack/react-router', () => ({
+	Link: ({
+		children,
+		params,
+	}: {
+		children: React.ReactNode
+		params: { id: string }
+	}) => <a href={`/item/${params.id}`}>{children}</a>,
+}))
 vi.mock('../../api', () => ({
 	api: mocks.api,
 	useAuth: Object.assign(
@@ -142,7 +151,7 @@ describe('BookManage private drafts', () => {
 	})
 	it('preserves metadata drafts during cover search and reports queued work honestly', async () => {
 		const view = render(<BookManage id="A" section="edit" />)
-		fireEvent.change(await screen.findByLabelText('title'), {
+		fireEvent.change(await screen.findByLabelText('Title'), {
 			target: { value: 'Unsaved metadata' },
 		})
 		fireEvent.change(screen.getByLabelText('Search cover title'), {
@@ -170,6 +179,32 @@ describe('BookManage private drafts', () => {
 		await screen.findByText('Queue rejected')
 		expect(screen.queryByText('M4B encoding started')).toBeNull()
 	})
+	it('shows contextual book heading and return link, with cover only in edit', async () => {
+		const { rerender } = render(<BookManage id="A" section="chapters" />)
+		expect(
+			await screen.findByRole('heading', { level: 1, name: 'A' }),
+		).toBeTruthy()
+		expect(
+			screen
+				.getByRole('link', { name: /return to audiobook A/i })
+				.getAttribute('href'),
+		).toBe('/item/A')
+		expect(screen.queryByRole('heading', { name: 'Cover' })).toBeNull()
+		expect(screen.queryByAltText('A cover')).toBeNull()
+		rerender(<BookManage id="A" section="edit" />)
+		expect(
+			await screen.findByRole('heading', { level: 1, name: 'A' }),
+		).toBeTruthy()
+		expect(screen.getByRole('heading', { name: 'Cover' })).toBeTruthy()
+	})
+	it('uses human metadata labels and multiline description', async () => {
+		render(<BookManage id="A" section="edit" />)
+		expect(await screen.findByLabelText('Authors')).toBeTruthy()
+		expect(screen.getByLabelText('Published year')).toBeTruthy()
+		expect(screen.getByLabelText('ISBN')).toBeTruthy()
+		expect(screen.getByLabelText('ASIN')).toBeTruthy()
+		expect(screen.getByLabelText('Description').tagName).toBe('TEXTAREA')
+	})
 	it('does not invoke stale owner mutation or reload after old completion', async () => {
 		const pending = deferred<object>()
 		render(<BookManage id="A" section="chapters" />)
@@ -191,7 +226,7 @@ describe('BookManage private drafts', () => {
 	})
 	it('does not send cover token to different origin', async () => {
 		window.__ABS_WEB_CONFIG__ = { apiBasePath: 'https://other.example' }
-		render(<BookManage id="A" section="chapters" />)
+		render(<BookManage id="A" section="edit" />)
 		expect((await screen.findByAltText('A cover')).getAttribute('src')).toBe(
 			'https://other.example/api/items/A/cover',
 		)
@@ -200,11 +235,26 @@ describe('BookManage private drafts', () => {
 		'uses server mount %s and authenticated same-origin cover transport',
 		async (prefix) => {
 			window.__ABS_WEB_CONFIG__ = { apiBasePath: prefix }
-			render(<BookManage id="A" section="chapters" />)
+			render(<BookManage id="A" section="edit" />)
 			const image = await screen.findByAltText('A cover')
 			expect(image.getAttribute('src')).toBe(
 				`${prefix}/api/items/A/cover?token=synthetic-token`,
 			)
 		},
+	)
+})
+
+it('denies management to update-only user and chapter editing to restricted listener', async () => {
+	mocks.user.type = 'user'
+	const view = render(<BookManage id="A" section="manage" />)
+	expect(await screen.findByRole('alert')).toHaveProperty(
+		'textContent',
+		'Administrator permission required.',
+	)
+	mocks.user.permissions.update = false
+	view.rerender(<BookManage id="A" section="chapters" />)
+	expect(screen.getByRole('alert')).toHaveProperty(
+		'textContent',
+		'Update permission required.',
 	)
 })

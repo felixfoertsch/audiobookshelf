@@ -1,7 +1,10 @@
+import { Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Input } from '../../shared/components/ui/input'
+import { NativeSelect } from '../../shared/components/ui/native-select'
 import {
 	audibleChapters,
 	type Chapter,
@@ -164,7 +167,9 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 		)
 	if (item.mediaType !== 'book')
 		return <p role="alert">Audiobook management requires a book item.</p>
-	if (!canUpdate && !(section === 'manage' && isAdmin))
+	if (section === 'manage' && !isAdmin)
+		return <p role="alert">Administrator permission required.</p>
+	if (section !== 'manage' && !canUpdate)
 		return <p role="alert">Update permission required.</p>
 	const duration = item.media.duration ?? 0
 	const coverPath = `${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(id)}/cover`
@@ -186,15 +191,22 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 			;[next[index], next[target]] = [next[target], next[index]]
 			return next
 		})
+	const title = item.media.metadata.title || 'Untitled audiobook'
+	const heading =
+		section === 'chapters'
+			? 'Chapters'
+			: section === 'edit'
+				? 'Tracks and metadata'
+				: 'Encoding and metadata embedding'
 	return (
-		<section className="mx-auto max-w-5xl space-y-5 p-4">
-			<h2 className="text-2xl font-semibold">
-				{section === 'chapters'
-					? 'Chapters'
-					: section === 'edit'
-						? 'Tracks and metadata'
-						: 'Manage audiobook'}
-			</h2>
+		<section className="mx-auto min-w-0 max-w-5xl space-y-5 p-4 [overflow-wrap:anywhere]">
+			<nav aria-label="Audiobook navigation">
+				<Link className="underline" to="/item/$id" params={{ id }}>
+					Return to audiobook {title}
+				</Link>
+			</nav>
+			<h1 className="text-2xl font-semibold">{title}</h1>
+			<h2 className="text-xl font-semibold">{heading}</h2>
 			{error && (
 				<p role="alert" className="text-destructive">
 					{error}
@@ -209,17 +221,19 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 							key={chapter.id ?? index}
 							className="grid gap-2 rounded border p-3 sm:grid-cols-[1fr_9rem_9rem_auto]"
 						>
-							<label>
+							<label htmlFor={`book-input-1-${index}`}>
 								Title
-								<input
+								<Input
+									id={`book-input-1-${index}`}
 									className="block w-full rounded border bg-background p-2"
 									value={chapter.title}
 									onChange={(e) => setChapter(index, { title: e.target.value })}
 								/>
 							</label>
-							<label>
+							<label htmlFor={`book-input-2-${index}`}>
 								Start (seconds)
-								<input
+								<Input
+									id={`book-input-2-${index}`}
 									type="number"
 									min="0"
 									step="0.001"
@@ -230,9 +244,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 									}
 								/>
 							</label>
-							<label>
+							<label htmlFor={`book-input-3-${index}`}>
 								End (seconds)
-								<input
+								<Input
+									id={`book-input-3-${index}`}
 									type="number"
 									min="0"
 									step="0.001"
@@ -258,9 +273,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 						</div>
 					))}
 					<div className="flex flex-wrap items-end gap-2">
-						<label>
+						<label htmlFor={'book-input-4'}>
 							Bulk title prefix
-							<input
+							<Input
+								id={'book-input-4'}
 								className="block rounded border bg-background p-2"
 								value={bulkTitle}
 								onChange={(e) => setBulkTitle(e.target.value)}
@@ -280,9 +296,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 						>
 							Apply titles
 						</Button>
-						<label>
+						<label htmlFor={'book-input-5'}>
 							Shift seconds
-							<input
+							<Input
+								id={'book-input-5'}
 								className="block rounded border bg-background p-2"
 								type="number"
 								step="0.001"
@@ -304,17 +321,19 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 						>
 							Shift all
 						</Button>
-						<label>
+						<label htmlFor={'book-input-6'}>
 							ASIN
-							<input
+							<Input
+								id={'book-input-6'}
 								className="block rounded border bg-background p-2"
 								value={asin}
 								onChange={(e) => setAsin(e.target.value)}
 							/>
 						</label>
-						<label>
+						<label htmlFor="book-control-1">
 							Region
-							<select
+							<NativeSelect
+								id="book-control-1"
 								className="block rounded border bg-background p-2"
 								value={region}
 								onChange={(e) => setRegion(e.target.value)}
@@ -333,7 +352,7 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 								].map((value) => (
 									<option key={value}>{value}</option>
 								))}
-							</select>
+							</NativeSelect>
 						</label>
 						<Button
 							variant="outline"
@@ -392,7 +411,7 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 							</Button>
 						</div>
 					)}
-					<div className="flex gap-2">
+					<div className="flex flex-wrap gap-2">
 						<Button
 							variant="outline"
 							disabled={busy}
@@ -432,9 +451,9 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 					{tracks.map((track, index) => (
 						<div
 							key={track.ino}
-							className="flex items-center gap-3 rounded border p-3"
+							className="flex min-w-0 flex-wrap items-center gap-3 rounded border p-3"
 						>
-							<span className="grow">
+							<span className="min-w-0 grow">
 								{index + 1}. {track.metadata?.filename ?? track.filename}
 							</span>
 							<label>
@@ -518,28 +537,62 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 								'tags',
 							] as const
 						).map((key) => (
-							<label key={key} className="grid gap-1">
-								{key}
-								<input
-									className="rounded border bg-background p-2"
-									value={
-										Array.isArray(metadata[key])
-											? (metadata[key] as string[]).join(', ')
-											: String(metadata[key] ?? '')
+							<div key={key} className="grid gap-1">
+								<label htmlFor={`metadata-${key}`}>
+									{
+										(
+											{
+												title: 'Title',
+												subtitle: 'Subtitle',
+												description: 'Description',
+												authorName: 'Authors',
+												publisher: 'Publisher',
+												publishedYear: 'Published year',
+												isbn: 'ISBN',
+												asin: 'ASIN',
+												language: 'Language',
+												narrators: 'Narrators',
+												genres: 'Genres',
+												tags: 'Tags',
+											} as const
+										)[key]
 									}
-									onChange={(e) =>
-										setMetadata((current) => ({
-											...current,
-											[key]: ['narrators', 'genres', 'tags'].includes(key)
-												? e.target.value
-														.split(',')
-														.map((value) => value.trim())
-														.filter(Boolean)
-												: e.target.value,
-										}))
-									}
-								/>
-							</label>
+								</label>
+								{key === 'description' ? (
+									<textarea
+										id={`metadata-${key}`}
+										className="min-h-32 rounded border bg-background p-2"
+										value={String(metadata[key] ?? '')}
+										onChange={(e) =>
+											setMetadata((current) => ({
+												...current,
+												[key]: e.target.value,
+											}))
+										}
+									/>
+								) : (
+									<Input
+										id={`metadata-${key}`}
+										className="rounded border bg-background p-2"
+										value={
+											Array.isArray(metadata[key])
+												? (metadata[key] as string[]).join(', ')
+												: String(metadata[key] ?? '')
+										}
+										onChange={(e) =>
+											setMetadata((current) => ({
+												...current,
+												[key]: ['narrators', 'genres', 'tags'].includes(key)
+													? e.target.value
+															.split(',')
+															.map((value) => value.trim())
+															.filter(Boolean)
+													: e.target.value,
+											}))
+										}
+									/>
+								)}
+							</div>
 						))}
 						{(['explicit', 'abridged'] as const).map((key) => (
 							<label key={key}>
@@ -553,13 +606,13 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 										}))
 									}
 								/>{' '}
-								{key}
+								{key === 'explicit' ? 'Explicit content' : 'Abridged'}
 							</label>
 						))}
 						<Button disabled={busy}>Save all metadata</Button>
 					</form>
 					<form
-						className="flex gap-2"
+						className="flex flex-wrap gap-2"
 						onSubmit={(e) => {
 							e.preventDefault()
 							void action(() =>
@@ -632,9 +685,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 							>
 								Start metadata embed
 							</Button>
-							<label>
+							<label htmlFor="book-control-2">
 								Codec
-								<select
+								<NativeSelect
+									id="book-control-2"
 									className="rounded border bg-background p-2"
 									value={codec}
 									onChange={(e) => setCodec(e.target.value)}
@@ -642,11 +696,12 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 									{['copy', 'aac', 'opus'].map((value) => (
 										<option key={value}>{value}</option>
 									))}
-								</select>
+								</NativeSelect>
 							</label>
-							<label>
+							<label htmlFor="book-control-3">
 								Bitrate
-								<select
+								<NativeSelect
+									id="book-control-3"
 									className="rounded border bg-background p-2"
 									value={bitrate}
 									onChange={(e) => setBitrate(e.target.value)}
@@ -654,18 +709,19 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 									{['32k', '64k', '128k', '192k'].map((value) => (
 										<option key={value}>{value}</option>
 									))}
-								</select>
+								</NativeSelect>
 							</label>
-							<label>
+							<label htmlFor="book-control-4">
 								Channels
-								<select
+								<NativeSelect
+									id="book-control-4"
 									className="rounded border bg-background p-2"
 									value={channels}
 									onChange={(e) => setChannels(e.target.value)}
 								>
 									<option value="1">1 (mono)</option>
 									<option value="2">2 (stereo)</option>
-								</select>
+								</NativeSelect>
 							</label>
 							<Button
 								disabled={busy}
@@ -706,115 +762,120 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 					)}
 				</>
 			)}
-			<section className="space-y-2 border-t pt-4">
-				<h3 className="font-semibold">Cover</h3>
-				{item.media.coverPath && (
-					<img
-						className="w-32 rounded"
-						src={`${coverPath}${coverToken ? `?token=${encodeURIComponent(coverToken)}` : ''}`}
-						alt={`${item.media.metadata.title ?? 'Audiobook'} cover`}
-					/>
-				)}
-				<form
-					className="flex gap-2"
-					onSubmit={(e) => {
-						e.preventDefault()
-						void action(() => setCoverUrl(id, coverUrl))
-					}}
-				>
-					<label className="grow">
-						Cover URL
-						<input
-							type="url"
-							className="block w-full rounded border bg-background p-2"
-							value={coverUrl}
-							onChange={(e) => setCover(e.target.value)}
+			{section === 'edit' && (
+				<section className="space-y-2 border-t pt-4">
+					<h3 className="font-semibold">Cover</h3>
+					{item.media.coverPath && (
+						<img
+							className="w-32 rounded"
+							src={`${coverPath}${coverToken ? `?token=${encodeURIComponent(coverToken)}` : ''}`}
+							alt={`${item.media.metadata.title ?? 'Audiobook'} cover`}
 						/>
-					</label>
-					<Button disabled={busy}>Set cover URL</Button>
-				</form>
-				<label>
-					Search cover title
-					<input
-						className="block w-full rounded border bg-background p-2"
-						value={searchTerm}
-						onChange={(e) => setSearchTerm(e.target.value)}
-					/>
-				</label>
-				<Button
-					variant="outline"
-					disabled={busy || !searchTerm.trim()}
-					onClick={() =>
-						void action(
-							async () => {
-								const result = await searchCovers(
-									'best',
-									searchTerm.trim(),
-									String(metadata.authorName ?? ''),
-								)
-								if (currentOwner()) setCoverResults(result.results)
-							},
-							false,
-							'Cover search loaded',
-						)
-					}
-				>
-					Search covers
-				</Button>
-				{coverResults.map((url) => (
-					<button
-						type="button"
-						key={url}
-						className="rounded border p-2"
-						onClick={() => void action(() => setCoverUrl(id, url))}
-					>
-						<img className="h-24" src={url} alt="Cover search result" />
-					</button>
-				))}
-				{item.libraryFiles
-					?.filter((file) => file.fileType === 'image')
-					.map((file) => (
-						<Button
-							key={file.ino}
-							variant="outline"
-							onClick={() => {
-								const path = (
-									file as typeof file & { metadata?: { path?: string } }
-								).metadata?.path
-								if (path) void action(() => setLocalCover(id, path))
-							}}
-						>
-							Use local cover {file.metadata?.filename}
-						</Button>
-					))}
-				{canUpload && (
-					<label>
-						Upload cover
-						<input
-							type="file"
-							accept="image/*"
-							disabled={busy}
-							onChange={(e) => {
-								const file = e.target.files?.[0]
-								if (file) void action(() => uploadCover(id, file))
-								e.currentTarget.value = ''
-							}}
-						/>
-					</label>
-				)}
-				{canDelete && item.media.coverPath && (
-					<Button
-						variant="destructive"
-						disabled={busy}
-						onClick={() => {
-							if (window.confirm('Remove audiobook cover?'))
-								void action(() => removeCover(id))
+					)}
+					<form
+						className="flex flex-wrap gap-2"
+						onSubmit={(e) => {
+							e.preventDefault()
+							void action(() => setCoverUrl(id, coverUrl))
 						}}
 					>
-						Remove cover
+						<label className="min-w-0 grow" htmlFor={'book-input-7'}>
+							Cover URL
+							<Input
+								id={'book-input-7'}
+								type="url"
+								className="block w-full rounded border bg-background p-2"
+								value={coverUrl}
+								onChange={(e) => setCover(e.target.value)}
+							/>
+						</label>
+						<Button disabled={busy}>Set cover URL</Button>
+					</form>
+					<label htmlFor={'book-input-8'}>
+						Search cover title
+						<Input
+							id={'book-input-8'}
+							className="block w-full rounded border bg-background p-2"
+							value={searchTerm}
+							onChange={(e) => setSearchTerm(e.target.value)}
+						/>
+					</label>
+					<Button
+						variant="outline"
+						disabled={busy || !searchTerm.trim()}
+						onClick={() =>
+							void action(
+								async () => {
+									const result = await searchCovers(
+										'best',
+										searchTerm.trim(),
+										String(metadata.authorName ?? ''),
+									)
+									if (currentOwner()) setCoverResults(result.results)
+								},
+								false,
+								'Cover search loaded',
+							)
+						}
+					>
+						Search covers
 					</Button>
-				)}
-			</section>
+					{coverResults.map((url) => (
+						<button
+							type="button"
+							key={url}
+							className="rounded border p-2"
+							onClick={() => void action(() => setCoverUrl(id, url))}
+						>
+							<img className="h-24" src={url} alt="Cover search result" />
+						</button>
+					))}
+					{item.libraryFiles
+						?.filter((file) => file.fileType === 'image')
+						.map((file) => (
+							<Button
+								key={file.ino}
+								variant="outline"
+								onClick={() => {
+									const path = (
+										file as typeof file & { metadata?: { path?: string } }
+									).metadata?.path
+									if (path) void action(() => setLocalCover(id, path))
+								}}
+							>
+								Use local cover {file.metadata?.filename}
+							</Button>
+						))}
+					{canUpload && (
+						<label htmlFor={'book-input-9'}>
+							Upload cover
+							<Input
+								id={'book-input-9'}
+								type="file"
+								accept="image/*"
+								disabled={busy}
+								onChange={(e) => {
+									const file = e.target.files?.[0]
+									if (file) void action(() => uploadCover(id, file))
+									e.currentTarget.value = ''
+								}}
+							/>
+						</label>
+					)}
+					{canDelete && item.media.coverPath && (
+						<Button
+							variant="destructive"
+							disabled={busy}
+							onClick={() => {
+								if (window.confirm('Remove audiobook cover?'))
+									void action(() => removeCover(id))
+							}}
+						>
+							Remove cover
+						</Button>
+					)}
+				</section>
+			)}
 		</section>
 	)
 }

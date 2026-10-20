@@ -105,6 +105,12 @@ it.each(['home', 'bookshelf', 'search', 'error'])(
 		expect(
 			screen.getAllByRole('searchbox', { name: 'Search library' }),
 		).toHaveLength(1)
+		if (view !== 'error')
+			expect(screen.getByRole('heading', { level: 1 }).textContent).toContain(
+				'Books · ',
+			)
+		expect(screen.getByText('Discover')).toBeTruthy()
+		expect(screen.getByText('Administration')).toBeTruthy()
 		expect(screen.getAllByText('Protected player')).toHaveLength(1)
 		expect(screen.getAllByRole('main')).toHaveLength(1)
 		expect(

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { api } from '../../api'
-import { itemSchema } from '../../catalog'
+import { episodeSchema, itemSchema } from '../../catalog'
 
 export const browseSearch = z.object({
 	q: z.string().max(200).default(''),
@@ -40,13 +40,7 @@ export const entitySchema = z
 	.refine((value) => !('media' in value), 'Invalid catalog entity')
 export const entrySchema = z.union([
 	itemSchema.extend({
-		recentEpisode: z
-			.object({
-				id: z.string(),
-				title: z.string().nullish(),
-				duration: z.number().nullish(),
-			})
-			.nullish(),
+		recentEpisode: episodeSchema.nullish(),
 		collapsedSeries: z
 			.object({
 				id: z.string(),

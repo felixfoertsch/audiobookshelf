@@ -1,8 +1,10 @@
 import { Link } from '@tanstack/react-router'
-import { useCallback, useEffect, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api, getAuthGeneration, useAuth } from '../../api'
 import { enqueueEpisode, playEpisode } from '../../player'
+import { IsoDateTimeField } from '../../shared/components/IsoDateTimeField'
+import { RichText } from '../../shared/components/RichText'
 import { Button } from '../../shared/components/ui/button'
 import { OpmlImport } from './opml'
 
@@ -485,6 +487,21 @@ export function PodcastSearch({ libraryId }: { libraryId: string }) {
 	)
 }
 
+function EpisodeDescription({ text }: { text: string }) {
+	const [open, setOpen] = useState(false)
+	return (
+		<details
+			className="mt-2"
+			onToggle={(event) => setOpen(event.currentTarget.open)}
+		>
+			<summary className="cursor-pointer text-sm underline">
+				Read description
+			</summary>
+			{open && <RichText text={text} />}
+		</details>
+	)
+}
+
 export function PodcastLatest({ libraryId }: { libraryId: string }) {
 	const [episodes, setEpisodes] = useState<
 		z.infer<typeof latestSchema>['episodes']
@@ -519,7 +536,7 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 			{!busy && !episodes.length && !error && <p>No episodes found.</p>}
 			<ul className="divide-y">
 				{episodes.map((e) => (
-					<li key={e.id} className="py-4">
+					<li key={e.id} className="min-w-0 py-3 [overflow-wrap:anywhere]">
 						<h2 className="font-semibold">{e.title || 'Untitled episode'}</h2>
 						<p className="text-sm text-muted-foreground">
 							<Link
@@ -530,8 +547,10 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 								{e.podcast.metadata.title}
 							</Link>
 						</p>
-						<p>{e.subtitle || e.description}</p>
-						<div className="mt-2 flex gap-2">
+						{(e.subtitle || e.description) && (
+							<EpisodeDescription text={e.subtitle || e.description || ''} />
+						)}
+						<div className="mt-2 flex flex-wrap gap-2">
 							<Button
 								onClick={() =>
 									void playEpisode(e.libraryItemId, e.id).catch((error) =>
@@ -570,28 +589,33 @@ export function PodcastDownloadQueue({ libraryId }: { libraryId: string }) {
 	const [queue, setQueue] = useState<z.infer<typeof queueSchema>['queue']>([])
 	const [error, setError] = useState('')
 	const [busy, setBusy] = useState(false)
+	const [loading, setLoading] = useState(true)
 	const load = useCallback(
-		async (active = true) => {
+		async (isActive: () => boolean = () => true) => {
+			setLoading(true)
+			setError('')
 			try {
 				const data = await api(
 					`/api/libraries/${encodeURIComponent(libraryId)}/episode-downloads`,
 					queueSchema,
 				)
-				if (active)
+				if (isActive())
 					setQueue([
 						...data.queue,
 						...(data.currentDownload ? [data.currentDownload] : []),
 					])
 			} catch (e) {
-				if (active)
+				if (isActive())
 					setError(e instanceof Error ? e.message : 'Could not load queue')
+			} finally {
+				if (isActive()) setLoading(false)
 			}
 		},
 		[libraryId],
 	)
 	useEffect(() => {
 		let active = true
-		void load(active)
+		void load(() => active)
 		const receive = (event: Event) => {
 			const detail = (event as CustomEvent<{ event: string; payload: unknown }>)
 				.detail
@@ -603,7 +627,7 @@ export function PodcastDownloadQueue({ libraryId }: { libraryId: string }) {
 					'episode_download_queue_cleared',
 				].includes(detail?.event)
 			)
-				void load(active)
+				void load(() => active)
 		}
 		window.addEventListener('abs:socket', receive)
 		return () => {
@@ -627,15 +651,21 @@ export function PodcastDownloadQueue({ libraryId }: { libraryId: string }) {
 	return (
 		<section className="space-y-4">
 			<h1 className="text-2xl font-semibold">Podcast download queue</h1>
-			{error && <p role="alert">{error}</p>}
-			{!queue.length && !error && <p>No queued downloads.</p>}
+			{loading && <p role="status">Loading downloads…</p>}
+			{error && (
+				<div>
+					<p role="alert">{error}</p>
+					<Button onClick={() => void load()}>Retry</Button>
+				</div>
+			)}
+			{!loading && !queue.length && !error && <p>No queued downloads.</p>}
 			<ul className="divide-y">
 				{queue.map((item) => (
 					<li
 						key={item.id}
 						className="flex items-center justify-between gap-3 py-3"
 					>
-						<span>
+						<span className="min-w-0 [overflow-wrap:anywhere]">
 							{item.episodeDisplayTitle ||
 								item.episodeTitle ||
 								item.podcastTitle ||
@@ -660,7 +690,13 @@ export function PodcastDownloadQueue({ libraryId }: { libraryId: string }) {
 	)
 }
 
-export function PodcastManagementSettings({ itemId }: { itemId: string }) {
+export function PodcastManagementSettings({
+	itemId,
+	children,
+}: {
+	itemId: string
+	children?: (content: ReactNode) => ReactNode
+}) {
 	const admin = useAuth((s) => isAdmin(s.user))
 	const [item, setItem] = useState<z.infer<typeof itemSchema> | null>(null)
 	const [busy, setBusy] = useState(false)
@@ -677,9 +713,13 @@ export function PodcastManagementSettings({ itemId }: { itemId: string }) {
 	const [selected, setSelected] = useState<string[]>([])
 	useEffect(() => {
 		let active = true
+		const generation = getAuthGeneration()
+		setItem(null)
+		setError('')
+		if (!admin) return
 		void getPodcast(itemId)
 			.then((value) => {
-				if (!active) return
+				if (!active || generation !== getAuthGeneration()) return
 				setItem(value)
 				setAutoDownload(!!value.media.autoDownloadEpisodes)
 				setSchedule(value.media.autoDownloadSchedule || '')
@@ -698,7 +738,7 @@ export function PodcastManagementSettings({ itemId }: { itemId: string }) {
 		return () => {
 			active = false
 		}
-	}, [itemId])
+	}, [itemId, admin])
 	async function save() {
 		setBusy(true)
 		setError('')
@@ -771,7 +811,7 @@ export function PodcastManagementSettings({ itemId }: { itemId: string }) {
 			setBusy(false)
 		}
 	}
-	return (
+	const content = (
 		<section className="space-y-4">
 			<h2 className="text-xl font-semibold">Podcast management</h2>
 			{error && <p role="alert">{error}</p>}
@@ -819,16 +859,12 @@ export function PodcastManagementSettings({ itemId }: { itemId: string }) {
 							onChange={(e) => setLimit(Math.max(0, Number(e.target.value)))}
 						/>
 					</label>
-					<label className="block">
-						Look for episodes after
-						<input
-							className="mt-1 h-10 rounded-md border bg-background px-3"
-							type="datetime-local"
-							value={lastCheck}
-							disabled={!admin || busy}
-							onChange={(e) => setLastCheck(e.target.value)}
-						/>
-					</label>
+					<IsoDateTimeField
+						label="Look for episodes after"
+						value={lastCheck}
+						isDisabled={!admin || busy}
+						onChange={setLastCheck}
+					/>
 					<div className="flex flex-wrap gap-2">
 						<Button disabled={!admin || busy} onClick={() => void save()}>
 							Save settings
@@ -893,4 +929,5 @@ export function PodcastManagementSettings({ itemId }: { itemId: string }) {
 			)}
 		</section>
 	)
+	return children ? children(content) : content
 }

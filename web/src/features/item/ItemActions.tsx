@@ -1,13 +1,16 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Input } from '../../shared/components/ui/input'
+import { NativeSelect } from '../../shared/components/ui/native-select'
 import {
 	feedAddress as feedTransportAddress,
 	itemActions,
 	sharePayload,
 } from './item-actions'
 import type { Item } from './schemas'
+import { WorkflowSheet } from './WorkflowSheet'
 
 const devicesSchema = z
 	.object({
@@ -35,6 +38,7 @@ export function ItemActions({
 						}
 					})
 		| null
+	const fieldId = useId()
 	const admin = user?.type === 'admin' || user?.type === 'root'
 	const canDownload = user?.permissions?.download === true
 	const canDelete = user?.permissions?.delete === true
@@ -83,217 +87,253 @@ export function ItemActions({
 			setError(e instanceof Error ? e.message : 'Could not load devices')
 		}
 	}
+	if (
+		!admin &&
+		!canDownload &&
+		!canDelete &&
+		!item.media.ebookFile &&
+		!item.libraryFiles?.some(
+			(file) => file.fileType === 'ebook' || file.ebookFormat,
+		)
+	)
+		return null
 	return (
-		<section aria-label="Item actions" className="space-y-4 border-t pt-4">
-			<h2 className="text-xl font-semibold">Item actions</h2>
+		<section
+			aria-label="Item actions"
+			className="flex flex-wrap gap-3 border-t pt-4 [overflow-wrap:anywhere]"
+		>
 			{error && <p role="alert">{error}</p>}
 			{admin && (
-				<section className="space-y-2">
-					<h3 className="font-medium">Share</h3>
-					{existingShare?.id ? (
-						<>
-							<p>Shared: {existingShare.slug}</p>
-							<a
-								className="underline"
-								href={`${window.location.origin}${window.__ABS_WEB_CONFIG__?.basePath || ''}/share/${encodeURIComponent(existingShare.slug || '')}`}
-							>
-								Open share
-							</a>
-							<Button
-								disabled={busy}
-								variant="destructive"
-								onClick={() => {
-									if (
-										window.confirm(
-											'Revoke public share? Existing share links stop working.',
+				<WorkflowSheet
+					title="Sharing"
+					description={item.media.metadata.title ?? 'Item'}
+				>
+					<section className="space-y-2">
+						{error && <p role="alert">{error}</p>}
+						<h3 className="font-medium">Share</h3>
+						{existingShare?.id ? (
+							<>
+								<p>Shared: {existingShare.slug}</p>
+								<a
+									className="underline"
+									href={`${window.location.origin}${window.__ABS_WEB_CONFIG__?.basePath || ''}/share/${encodeURIComponent(existingShare.slug || '')}`}
+								>
+									Open share
+								</a>
+								<Button
+									disabled={busy}
+									variant="destructive"
+									onClick={() => {
+										if (
+											window.confirm(
+												'Revoke public share? Existing share links stop working.',
+											)
 										)
-									)
-										void run(() =>
-											itemActions.revokeShare(existingShare.id || ''),
+											void run(() =>
+												itemActions.revokeShare(existingShare.id || ''),
+											)
+									}}
+								>
+									Revoke share
+								</Button>
+							</>
+						) : (
+							<form
+								className="flex flex-wrap items-end gap-2"
+								onSubmit={(e) => {
+									e.preventDefault()
+									void run(async () => {
+										const result = await itemActions.createShare(
+											sharePayload(
+												item,
+												slug.trim(),
+												Number(shareExpiry),
+												shareDownload,
+											),
 										)
+										const url = `${window.location.origin}${window.__ABS_WEB_CONFIG__?.basePath || ''}/share/${encodeURIComponent(result.slug)}`
+										setShareUrl(url)
+										try {
+											await navigator.clipboard.writeText(url)
+										} catch {
+											setError(
+												'Share created. Copy share URL using the link below.',
+											)
+										}
+									})
 								}}
 							>
-								Revoke share
-							</Button>
-						</>
-					) : (
-						<form
-							className="flex flex-wrap items-end gap-2"
-							onSubmit={(e) => {
-								e.preventDefault()
-								void run(async () => {
-									const result = await itemActions.createShare(
-										sharePayload(
-											item,
-											slug.trim(),
-											Number(shareExpiry),
-											shareDownload,
-										),
-									)
-									const url = `${window.location.origin}${window.__ABS_WEB_CONFIG__?.basePath || ''}/share/${encodeURIComponent(result.slug)}`
-									setShareUrl(url)
-									try {
-										await navigator.clipboard.writeText(url)
-									} catch {
-										setError(
-											'Share created. Copy share URL using the link below.',
-										)
+								<label htmlFor={`${fieldId}-share-slug`}>
+									Slug
+									<Input
+										id={`${fieldId}-share-slug`}
+										required
+										pattern="[A-Za-z0-9_-]+"
+										value={slug}
+										onChange={(e) => setSlug(e.target.value)}
+										className="mt-1"
+									/>
+								</label>
+								<label htmlFor={`${fieldId}-share-expiry`}>
+									Expiry timestamp
+									<Input
+										id={`${fieldId}-share-expiry`}
+										type="number"
+										min="0"
+										value={shareExpiry}
+										onChange={(e) => setShareExpiry(e.target.value)}
+										className="mt-1"
+									/>
+								</label>
+								<label>
+									<input
+										type="checkbox"
+										checked={shareDownload}
+										onChange={(e) => setShareDownload(e.target.checked)}
+									/>{' '}
+									Allow download
+								</label>
+								<Button
+									disabled={
+										busy ||
+										!Number.isFinite(Number(shareExpiry)) ||
+										Number(shareExpiry) < 0 ||
+										!/^[A-Za-z0-9_-]+$/.test(slug.trim()) ||
+										item.mediaType !== 'book' ||
+										!item.media.id
 									}
-								})
-							}}
-						>
-							<label>
-								Slug
-								<input
-									required
-									pattern="[A-Za-z0-9_-]+"
-									value={slug}
-									onChange={(e) => setSlug(e.target.value)}
-									className="ml-2 rounded border bg-background p-2"
-								/>
-							</label>
-							<label>
-								Expiry timestamp
-								<input
-									type="number"
-									min="0"
-									value={shareExpiry}
-									onChange={(e) => setShareExpiry(e.target.value)}
-									className="ml-2 rounded border bg-background p-2"
-								/>
-							</label>
-							<label>
-								<input
-									type="checkbox"
-									checked={shareDownload}
-									onChange={(e) => setShareDownload(e.target.checked)}
-								/>{' '}
-								Allow download
-							</label>
-							<Button
-								disabled={
-									busy ||
-									!Number.isFinite(Number(shareExpiry)) ||
-									Number(shareExpiry) < 0 ||
-									!/^[A-Za-z0-9_-]+$/.test(slug.trim()) ||
-									item.mediaType !== 'book' ||
-									!item.media.id
-								}
-							>
-								Create and copy share
-							</Button>
-						</form>
-					)}
-					{shareUrl && (
-						<p>
-							Share URL:{' '}
-							<a className="underline" href={shareUrl}>
-								{shareUrl}
-							</a>
-						</p>
-					)}
-				</section>
+								>
+									Create and copy share
+								</Button>
+							</form>
+						)}
+						{shareUrl && (
+							<p>
+								Share URL:{' '}
+								<a className="underline" href={shareUrl}>
+									{shareUrl}
+								</a>
+							</p>
+						)}
+					</section>
+				</WorkflowSheet>
 			)}
 			{admin && (
-				<section className="space-y-2">
-					<h3 className="font-medium">RSS feed</h3>
-					{feed?.id ? (
-						<>
-							<p>{feed.feedUrl || feed.slug}</p>
-							<Button
-								disabled={busy}
-								variant="outline"
-								onClick={() =>
-									void navigator.clipboard.writeText(
-										feedTransportAddress(feed.feedUrl || `/feed/${feed.slug}`),
-									)
-								}
-							>
-								Copy feed URL
-							</Button>
-							<Button
-								disabled={busy}
-								variant="destructive"
-								onClick={() => {
-									if (
-										window.confirm(
-											'Close RSS feed? Existing subscribers lose access.',
+				<WorkflowSheet
+					title="RSS feed"
+					description={item.media.metadata.title ?? 'Item'}
+				>
+					<section className="space-y-2">
+						{error && <p role="alert">{error}</p>}
+						<h3 className="font-medium">RSS feed</h3>
+						{feed?.id ? (
+							<>
+								<p>{feed.feedUrl || feed.slug}</p>
+								<Button
+									disabled={busy}
+									variant="outline"
+									onClick={() =>
+										void navigator.clipboard.writeText(
+											feedTransportAddress(
+												feed.feedUrl || `/feed/${feed.slug}`,
+											),
 										)
+									}
+								>
+									Copy feed URL
+								</Button>
+								<Button
+									disabled={busy}
+									variant="destructive"
+									onClick={() => {
+										if (
+											window.confirm(
+												'Close RSS feed? Existing subscribers lose access.',
+											)
+										)
+											void run(() => itemActions.closeFeed(feed.id || ''))
+									}}
+								>
+									Close feed
+								</Button>
+							</>
+						) : (
+							<form
+								className="flex flex-wrap items-end gap-2"
+								onSubmit={(e) => {
+									e.preventDefault()
+									void run(() =>
+										itemActions.openFeed(item.id, {
+											slug: feedSlug.trim(),
+											serverAddress: feedAddress.trim(),
+											preventIndexing: true,
+										}),
 									)
-										void run(() => itemActions.closeFeed(feed.id || ''))
 								}}
 							>
-								Close feed
-							</Button>
-						</>
-					) : (
-						<form
-							className="flex flex-wrap items-end gap-2"
-							onSubmit={(e) => {
-								e.preventDefault()
-								void run(() =>
-									itemActions.openFeed(item.id, {
-										slug: feedSlug.trim(),
-										serverAddress: feedAddress.trim(),
-										preventIndexing: true,
-									}),
-								)
-							}}
-						>
-							<label>
-								RSS slug
-								<input
-									required
-									pattern="[A-Za-z0-9_-]+"
-									value={feedSlug}
-									onChange={(e) => setFeedSlug(e.target.value)}
-									className="ml-2 rounded border bg-background p-2"
-								/>
-							</label>
-							<label>
-								Server address
-								<input
-									required
-									type="url"
-									value={feedAddress}
-									onChange={(e) => setFeedAddress(e.target.value)}
-									className="ml-2 rounded border bg-background p-2"
-								/>
-							</label>
-							<Button disabled={busy}>Open RSS feed</Button>
-						</form>
-					)}
-				</section>
+								<label htmlFor={`${fieldId}-feed-slug`}>
+									RSS slug
+									<Input
+										id={`${fieldId}-feed-slug`}
+										required
+										pattern="[A-Za-z0-9_-]+"
+										value={feedSlug}
+										onChange={(e) => setFeedSlug(e.target.value)}
+										className="mt-1"
+									/>
+								</label>
+								<label htmlFor={`${fieldId}-feed-address`}>
+									Server address
+									<Input
+										id={`${fieldId}-feed-address`}
+										required
+										type="url"
+										value={feedAddress}
+										onChange={(e) => setFeedAddress(e.target.value)}
+										className="mt-1"
+									/>
+								</label>
+								<Button disabled={busy}>Open RSS feed</Button>
+							</form>
+						)}
+					</section>
+				</WorkflowSheet>
 			)}
 			{item.mediaType === 'book' && item.media.ebookFile && (
-				<section className="space-y-2">
-					<h3 className="font-medium">Send ebook to device</h3>
-					{!devices.length ? (
-						<Button variant="outline" onClick={() => void loadDevices()}>
-							Load available devices
-						</Button>
-					) : (
-						<>
-							<select
-								aria-label="E-reader device"
-								value={device}
-								onChange={(e) => setDevice(e.target.value)}
-							>
-								{devices.map((name) => (
-									<option key={name}>{name}</option>
-								))}
-							</select>
-							<Button
-								disabled={busy || !device}
-								onClick={() =>
-									void run(() => itemActions.sendEbook(item.id, device))
-								}
-							>
-								Send ebook
+				<WorkflowSheet
+					title="Send ebook to device"
+					description={item.media.metadata.title ?? 'Item'}
+				>
+					<section className="space-y-2">
+						{error && <p role="alert">{error}</p>}
+						<h3 className="font-medium">Send ebook to device</h3>
+						{!devices.length ? (
+							<Button variant="outline" onClick={() => void loadDevices()}>
+								Load available devices
 							</Button>
-						</>
-					)}
-				</section>
+						) : (
+							<>
+								<NativeSelect
+									aria-label="E-reader device"
+									value={device}
+									onChange={(e) => setDevice(e.target.value)}
+								>
+									{devices.map((name) => (
+										<option key={name}>{name}</option>
+									))}
+								</NativeSelect>
+								<Button
+									disabled={busy || !device}
+									onClick={() =>
+										void run(() => itemActions.sendEbook(item.id, device))
+									}
+								>
+									Send ebook
+								</Button>
+							</>
+						)}
+					</section>
+				</WorkflowSheet>
 			)}
 			{item.libraryFiles?.some(
 				(file) => file.fileType === 'ebook' || file.ebookFormat,
@@ -359,37 +399,43 @@ export function ItemActions({
 				</a>
 			)}
 			{canDelete && (
-				<section className="flex flex-wrap items-center gap-2">
-					<label>
-						<input
-							type="checkbox"
-							checked={hard}
-							onChange={(e) => setHard(e.target.checked)}
-						/>{' '}
-						Delete media from filesystem
-					</label>
-					<Button
-						variant="destructive"
-						disabled={busy}
-						onClick={() => {
-							if (
-								window.confirm(
-									hard
-										? 'Permanently delete item and media files from filesystem? This cannot be undone.'
-										: 'Remove item from library? Media files remain unchanged.',
-								)
-							)
-								void run(async () => {
-									await itemActions.deleteItem(item.id, hard)
-									window.location.assign(
-										`${window.__ABS_WEB_CONFIG__?.basePath || '/new'}/`,
+				<WorkflowSheet
+					title="Remove item"
+					description={item.media.metadata.title ?? 'Item'}
+				>
+					<section className="flex flex-wrap items-center gap-2">
+						{error && <p role="alert">{error}</p>}
+						<label>
+							<input
+								type="checkbox"
+								checked={hard}
+								onChange={(e) => setHard(e.target.checked)}
+							/>{' '}
+							Delete media from filesystem
+						</label>
+						<Button
+							variant="destructive"
+							disabled={busy}
+							onClick={() => {
+								if (
+									window.confirm(
+										hard
+											? 'Permanently delete item and media files from filesystem? This cannot be undone.'
+											: 'Remove item from library? Media files remain unchanged.',
 									)
-								})
-						}}
-					>
-						{hard ? 'Delete item and files' : 'Remove from library'}
-					</Button>
-				</section>
+								)
+									void run(async () => {
+										await itemActions.deleteItem(item.id, hard)
+										window.location.assign(
+											`${window.__ABS_WEB_CONFIG__?.basePath || '/new'}/`,
+										)
+									})
+							}}
+						>
+							{hard ? 'Delete item and files' : 'Remove from library'}
+						</Button>
+					</section>
+				</WorkflowSheet>
 			)}
 		</section>
 	)

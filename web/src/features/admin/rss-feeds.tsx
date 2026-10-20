@@ -2,6 +2,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import {
+	Sheet,
+	SheetClose,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '../../shared/components/ui/sheet'
 import { dateTime } from '../../shared/date-time'
 
 const feed = z
@@ -38,15 +47,22 @@ export function RssFeeds() {
 		(s) => s.user?.type === 'root' || s.user?.type === 'admin',
 	)
 	const [feeds, setFeeds] = useState<z.infer<typeof feed>[]>([])
-	const [selected, setSelected] = useState<z.infer<typeof feed> | null>(null)
+	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState('')
 	const load = useCallback(async () => {
-		if (!admin) return
+		if (!admin) {
+			setLoading(false)
+			return
+		}
+		setLoading(true)
+		setError('')
 		try {
 			const r = await api('/api/feeds', schema)
 			setFeeds(r.feeds)
 		} catch (e) {
 			setError(message(e))
+		} finally {
+			setLoading(false)
 		}
 	}, [admin])
 	useEffect(() => {
@@ -55,8 +71,16 @@ export function RssFeeds() {
 	return (
 		<section className="space-y-4">
 			<h1 className="text-2xl">RSS feeds</h1>
-			{error && <p role="alert">{error}</p>}
-			{!feeds.length ? (
+			{error ? (
+				<div>
+					<p role="alert">{error}</p>
+					<Button onClick={() => void load()}>Retry</Button>
+				</div>
+			) : loading ? (
+				<p role="status">Loading RSS feeds…</p>
+			) : !admin ? (
+				<p>Administrator permission required to view RSS feeds.</p>
+			) : feeds.length === 0 ? (
 				<p>No RSS feeds.</p>
 			) : (
 				<div className="overflow-x-auto">
@@ -76,13 +100,46 @@ export function RssFeeds() {
 							{feeds.map((f) => (
 								<tr className="border-t" key={f.id}>
 									<td>
-										<button
-											type="button"
-											className="underline"
-											onClick={() => setSelected(f)}
-										>
-											{f.meta.title || f.slug}
-										</button>
+										<Sheet>
+											<SheetTrigger asChild>
+												<button type="button" className="underline">
+													{f.meta.title || f.slug}
+												</button>
+											</SheetTrigger>
+											<SheetContent className="w-full overflow-y-auto p-6 sm:max-w-xl">
+												<SheetHeader>
+													<SheetTitle>{f.meta.title || f.slug}</SheetTitle>
+													<SheetDescription>
+														RSS feed details and episodes
+													</SheetDescription>
+												</SheetHeader>
+												<label className="block">
+													Feed URL
+													<input
+														className="w-full"
+														readOnly
+														value={`${window.location.origin}${window.__ABS_WEB_CONFIG__?.basePath || ''}${f.feedUrl}`}
+													/>
+												</label>
+												<p>
+													Prevent indexing:{' '}
+													{f.meta.preventIndexing ? 'Yes' : 'No'}
+												</p>
+												{f.meta.ownerName && <p>Owner: {f.meta.ownerName}</p>}
+												{f.meta.ownerEmail && (
+													<p>Owner email: {f.meta.ownerEmail}</p>
+												)}
+												<h3>Episodes</h3>
+												<ul className="max-h-64 overflow-auto">
+													{f.episodes.map((e) => (
+														<li key={e.id}>{e.title}</li>
+													))}
+												</ul>
+												<SheetClose asChild>
+													<Button>Close</Button>
+												</SheetClose>
+											</SheetContent>
+										</Sheet>
 									</td>
 									<td>{f.slug}</td>
 									<td>{f.entityType}</td>
@@ -112,37 +169,6 @@ export function RssFeeds() {
 						</tbody>
 					</table>
 				</div>
-			)}
-			{selected && (
-				<dialog
-					open
-					aria-label="RSS feed details"
-					className="fixed inset-0 m-auto max-h-[80vh] overflow-auto rounded border bg-background p-6"
-				>
-					<h2 className="text-xl">{selected.meta.title || selected.slug}</h2>
-					<label className="block">
-						Feed URL
-						<input
-							className="w-full"
-							readOnly
-							value={`${window.location.origin}${window.__ABS_WEB_CONFIG__?.basePath || ''}${selected.feedUrl}`}
-						/>
-					</label>
-					<p>
-						Prevent indexing: {selected.meta.preventIndexing ? 'Yes' : 'No'}
-					</p>
-					{selected.meta.ownerName && <p>Owner: {selected.meta.ownerName}</p>}
-					{selected.meta.ownerEmail && (
-						<p>Owner email: {selected.meta.ownerEmail}</p>
-					)}
-					<h3>Episodes</h3>
-					<ul className="max-h-64 overflow-auto">
-						{selected.episodes.map((e) => (
-							<li key={e.id}>{e.title}</li>
-						))}
-					</ul>
-					<Button onClick={() => setSelected(null)}>Close</Button>
-				</dialog>
 			)}
 		</section>
 	)

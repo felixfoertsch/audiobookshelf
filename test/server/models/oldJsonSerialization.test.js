@@ -91,6 +91,7 @@ describe('old JSON serialization', () => {
       index: 1,
       audioFile: { ino: '3', metadata: { filename: 'ep1.mp3', ext: '.mp3', path: '/ep1.mp3', relPath: 'ep1.mp3' } }
     })
+    await podcast.update({ numEpisodes: 1 })
   })
 
   afterEach(async () => {
@@ -117,6 +118,21 @@ describe('old JSON serialization', () => {
   })
 
   describe('Podcast', () => {
+    it('uses stored episode count when episodes are unloaded', async () => {
+      const podcast = await Database.podcastModel.findByPk((await Database.libraryItemModel.findByPk(podcastLibraryItemId)).mediaId)
+      podcast.numEpisodes = 7
+
+      expect(podcast.toOldJSONMinified().numEpisodes).to.equal(7)
+    })
+
+    it('uses stored episode count when episodes are loaded', async () => {
+      const podcast = await Database.podcastModel.findByPk((await Database.libraryItemModel.findByPk(podcastLibraryItemId)).mediaId)
+      podcast.numEpisodes = 7
+      podcast.podcastEpisodes = []
+
+      expect(podcast.toOldJSONMinified().numEpisodes).to.equal(7)
+    })
+
     it('toOldJSONExpanded is a strict superset of toOldJSONMinified', async () => {
       const libraryItem = await Database.libraryItemModel.getExpandedById(podcastLibraryItemId)
       const minified = libraryItem.media.toOldJSONMinified()

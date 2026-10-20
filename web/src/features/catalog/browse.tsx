@@ -1,12 +1,15 @@
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
-import { duration, itemSchema } from '../../catalog'
+import { duration, episodeSchema, itemSchema } from '../../catalog'
 import { playEpisode, playQueue } from '../../player'
 import { Button } from '../../shared/components/ui/button'
 import { Input } from '../../shared/components/ui/input'
+import { NativeSelect } from '../../shared/components/ui/native-select'
 import {
+	SidebarGroup,
+	SidebarGroupLabel,
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
@@ -29,6 +32,52 @@ import {
 } from './browse-api'
 import { persistSearch, useCoverSize, useShelfPosition } from './preferences'
 import { SelectionTools } from './selection-tools'
+
+export const LibraryNameContext = createContext('')
+
+function CatalogHeading({ title }: { title: string }) {
+	const libraryName = useContext(LibraryNameContext)
+	return (
+		<header>
+			<h1 className="text-3xl font-semibold">
+				{libraryName ? `${libraryName} · ${title}` : title}
+			</h1>
+		</header>
+	)
+}
+
+function humanLabel(value: string) {
+	const labels: Record<string, string> = {
+		'feed-open': 'RSS feed open',
+		'share-open': 'Public share active',
+		publishedYear: 'Publication year',
+		publishedDecades: 'Publication decades',
+		asin: 'ASIN',
+		isbn: 'ISBN',
+		tracks: 'Audio tracks',
+		ebooks: 'Ebooks',
+		missing: 'Missing metadata',
+		none: 'No audio tracks',
+		single: 'One audio track',
+		multi: 'Multiple audio tracks',
+		ebook: 'Has ebook',
+		'no-ebook': 'No ebook',
+		supplementary: 'Has supplementary ebook',
+		'no-supplementary': 'No supplementary ebook',
+	}
+	const text = labels[value] || value.replaceAll('-', ' ')
+	return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+function currentFilterLabel(filter: string) {
+	const [group, encoded] = filter.split('.')
+	if (!encoded) return humanLabel(group)
+	try {
+		return `${humanLabel(group)} · ${humanLabel(decodeURIComponent(escape(atob(encoded))))}`
+	} catch {
+		return filter
+	}
+}
 
 export function useCatalogRefresh() {
 	const router = useRouter()
@@ -65,132 +114,152 @@ export function LibraryNav({
 	const admin = user?.type === 'root' || user?.type === 'admin'
 	return (
 		<nav aria-label="Library">
-			<SidebarMenu>
-				<SidebarMenuItem>
-					<SidebarMenuButton asChild>
-						<Link
-							activeOptions={{ exact: true, includeSearch: false }}
-							activeProps={{ 'data-active': true }}
-							to="/library/$library"
-							params={{ library }}
-						>
-							Home
-						</Link>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
-				<SidebarMenuItem>
-					<SidebarMenuButton asChild>
-						<Link
-							activeOptions={{ exact: true, includeSearch: false }}
-							activeProps={{ 'data-active': true }}
-							to="/library/$library/bookshelf"
-							params={{ library }}
-						>
-							Library
-						</Link>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
-				{(podcast
-					? ['playlists']
-					: ['series', 'authors', 'collections', 'playlists']
-				).map((id) => (
-					<SidebarMenuItem key={id}>
-						<SidebarMenuButton asChild>
-							<Link
-								activeOptions={{ exact: true, includeSearch: false }}
-								activeProps={{ 'data-active': true }}
-								to="/library/$library/bookshelf/$id"
-								params={{ library, id }}
-							>
-								{id[0].toUpperCase() + id.slice(1)}
-							</Link>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				))}
-				{!podcast && (
+			<SidebarGroup>
+				<SidebarGroupLabel>Discover</SidebarGroupLabel>
+				<SidebarMenu>
 					<SidebarMenuItem>
 						<SidebarMenuButton asChild>
 							<Link
+								to="/library/$library"
+								params={{ library }}
 								activeOptions={{ exact: true, includeSearch: false }}
 								activeProps={{ 'data-active': true }}
-								to="/library/$library/narrators"
-								params={{ library }}
 							>
-								Narrators
+								Home
 							</Link>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
-				)}
-				{admin && !podcast && (
-					<SidebarMenuItem>
-						<SidebarMenuButton asChild>
-							<Link
-								activeOptions={{ exact: true, includeSearch: false }}
-								activeProps={{ 'data-active': true }}
-								to="/library/$library/stats"
-								params={{ library }}
-							>
-								Statistics
-							</Link>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				)}
-				{podcast && (
-					<>
+					{podcast && (
 						<SidebarMenuItem>
 							<SidebarMenuButton asChild>
 								<Link
-									activeOptions={{ exact: true, includeSearch: false }}
-									activeProps={{ 'data-active': true }}
 									to="/library/$library/podcast/latest"
 									params={{ library }}
+									activeProps={{ 'data-active': true }}
 								>
 									Latest episodes
 								</Link>
 							</SidebarMenuButton>
 						</SidebarMenuItem>
-						{admin && (
-							<>
-								<SidebarMenuItem>
-									<SidebarMenuButton asChild>
-										<Link
-											activeOptions={{ exact: true, includeSearch: false }}
-											activeProps={{ 'data-active': true }}
-											to="/library/$library/podcast/search"
-											params={{ library }}
-										>
-											Add podcast
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-								<SidebarMenuItem>
-									<SidebarMenuButton asChild>
-										<Link
-											activeOptions={{ exact: true, includeSearch: false }}
-											activeProps={{ 'data-active': true }}
-											to="/library/$library/podcast/download-queue"
-											params={{ library }}
-										>
-											Download queue
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							</>
-						)}
-					</>
-				)}
-			</SidebarMenu>
+					)}
+					{podcast && admin && (
+						<SidebarMenuItem>
+							<SidebarMenuButton asChild>
+								<Link
+									to="/library/$library/podcast/search"
+									params={{ library }}
+									activeProps={{ 'data-active': true }}
+								>
+									Add podcast
+								</Link>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					)}
+				</SidebarMenu>
+			</SidebarGroup>
+			<SidebarGroup>
+				<SidebarGroupLabel>Library</SidebarGroupLabel>
+				<SidebarMenu>
+					<SidebarMenuItem>
+						<SidebarMenuButton asChild>
+							<Link
+								to="/library/$library/bookshelf"
+								params={{ library }}
+								activeOptions={{ exact: true, includeSearch: false }}
+								activeProps={{ 'data-active': true }}
+							>
+								Library
+							</Link>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+					{!podcast &&
+						['series', 'authors', 'collections'].map((id) => (
+							<SidebarMenuItem key={id}>
+								<SidebarMenuButton asChild>
+									<Link
+										to="/library/$library/bookshelf/$id"
+										params={{ library, id }}
+										activeOptions={{ exact: true, includeSearch: false }}
+										activeProps={{ 'data-active': true }}
+									>
+										{humanLabel(id)}
+									</Link>
+								</SidebarMenuButton>
+							</SidebarMenuItem>
+						))}
+					{!podcast && (
+						<SidebarMenuItem>
+							<SidebarMenuButton asChild>
+								<Link
+									to="/library/$library/narrators"
+									params={{ library }}
+									activeProps={{ 'data-active': true }}
+								>
+									Narrators
+								</Link>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					)}
+				</SidebarMenu>
+			</SidebarGroup>
+			<SidebarGroup>
+				<SidebarGroupLabel>Playlists</SidebarGroupLabel>
+				<SidebarMenu>
+					<SidebarMenuItem>
+						<SidebarMenuButton asChild>
+							<Link
+								to="/library/$library/bookshelf/$id"
+								params={{ library, id: 'playlists' }}
+								activeProps={{ 'data-active': true }}
+							>
+								Playlists
+							</Link>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				</SidebarMenu>
+			</SidebarGroup>
+			{admin && (
+				<SidebarGroup>
+					<SidebarGroupLabel>Library tools</SidebarGroupLabel>
+					<SidebarMenu>
+						<SidebarMenuItem>
+							<SidebarMenuButton asChild>
+								{podcast ? (
+									<Link
+										to="/library/$library/podcast/download-queue"
+										params={{ library }}
+										activeProps={{ 'data-active': true }}
+									>
+										Download queue
+									</Link>
+								) : (
+									<Link
+										to="/library/$library/stats"
+										params={{ library }}
+										activeProps={{ 'data-active': true }}
+									>
+										Statistics
+									</Link>
+								)}
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					</SidebarMenu>
+				</SidebarGroup>
+			)}
 		</nav>
 	)
 }
+
 export function EntryCard({
 	entry,
 	library,
 	view = 'grid',
 	select,
+	headingLevel = 2,
 }: {
 	entry: Entry
 	library: string
+	headingLevel?: 2 | 3
 	view?: string
 	select?: { checked: boolean; toggle: () => void }
 }) {
@@ -200,14 +269,14 @@ export function EntryCard({
 	const entity = parsedEntity.success ? parsedEntity.data : null
 	const recent =
 		'recentEpisode' in entry
-			? z
-					.object({
-						id: z.string(),
-						title: z.string().nullish(),
-						duration: z.number().nullish(),
-					})
-					.safeParse(entry.recentEpisode)
+			? episodeSchema.safeParse(entry.recentEpisode)
 			: null
+	const episode =
+		entry._type === 'episode' && recent?.success ? recent.data : null
+	const recentDuration = recent?.success
+		? (recent.data.duration ?? recent.data.audioFile?.duration)
+		: null
+	const Heading = headingLevel === 3 ? 'h3' : 'h2'
 	const collapsed =
 		'collapsedSeries' in entry
 			? z
@@ -220,7 +289,7 @@ export function EntryCard({
 		entity?.title ||
 		'Untitled'
 	return (
-		<article className="rounded-lg border bg-card p-4 space-y-2">
+		<article className="min-w-0 space-y-1.5 rounded-lg p-2 text-sm [&_p]:text-muted-foreground [overflow-wrap:anywhere]">
 			{select && (
 				<label className="flex gap-2">
 					<input
@@ -240,40 +309,57 @@ export function EntryCard({
 				</Link>
 			) : item ? (
 				<>
-					<Link
-						to="/item/$id"
-						params={{ id: item.id }}
-						className="block text-primary"
-					>
-						<h2 className="text-lg font-semibold">{name}</h2>
-					</Link>
 					{view !== 'list' && item.media.coverPath && (
 						<img
-							className="max-h-56 rounded object-contain"
+							className="aspect-square w-full rounded-md bg-muted object-contain"
 							loading="lazy"
 							alt=""
 							src={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(item.id)}/cover?token=${encodeURIComponent(localStorage.getItem('token') || '')}`}
 						/>
 					)}
+					<Link
+						to="/item/$id"
+						params={{ id: item.id }}
+						className="block text-primary"
+					>
+						<Heading className="font-semibold text-foreground">
+							{episode?.title || name}
+						</Heading>
+					</Link>
+					{episode && <p>{name}</p>}
 					<p>
 						{item.media.metadata.author ||
 							item.media.metadata.authorName ||
 							item.media.metadata.authors?.map((a) => a.name).join(', ')}
 					</p>
-					<p>
-						{item.mediaType === 'podcast'
-							? `${item.media.numEpisodes ?? 0} episodes`
-							: duration(item.media.duration ?? 0)}
-					</p>
-					{recent?.success && (
-						<p>
-							{recent.data.title} · {duration(recent.data.duration ?? 0)}
-						</p>
-					)}
+					{item.mediaType === 'podcast'
+						? item.media.numEpisodes != null && (
+								<p>
+									{item.media.numEpisodes}{' '}
+									{item.media.numEpisodes === 1 ? 'episode' : 'episodes'}
+								</p>
+							)
+						: item.media.duration != null && (
+								<p>{duration(item.media.duration)}</p>
+							)}
+					{recent?.success &&
+						((!episode && recent.data.title) || recentDuration != null) && (
+							<p>
+								{!episode && recent.data.title}
+								{!episode && recent.data.title && recentDuration != null
+									? ' · '
+									: ''}
+								{recentDuration != null && duration(recentDuration)}
+							</p>
+						)}
+
 					{item.isMissing && <p role="status">Missing media files</p>}
 					{item.isInvalid && <p role="status">Invalid media files</p>}
 					{item.numEpisodesIncomplete != null && (
-						<p>{item.numEpisodesIncomplete} unfinished episodes</p>
+						<p>
+							{item.numEpisodesIncomplete} unfinished{' '}
+							{item.numEpisodesIncomplete === 1 ? 'episode' : 'episodes'}
+						</p>
 					)}
 					{item.rssFeed && (
 						<p>
@@ -295,16 +381,7 @@ export function EntryCard({
 						</p>
 					)}
 					{item.mediaItemShare && <p>Public share active</p>}
-					<details>
-						<summary>Item actions</summary>
-						<Link
-							className="block underline"
-							to="/item/$id"
-							params={{ id: item.id }}
-						>
-							Open item controls
-						</Link>
-					</details>
+
 					{view === 'detail' && (
 						<>
 							<p>{item.media.metadata.description?.replace(/<[^>]*>/g, '')}</p>
@@ -315,10 +392,16 @@ export function EntryCard({
 				</>
 			) : (
 				<>
-					<EntityLink entry={entry} library={library}>
-						{name}
-					</EntityLink>
-					{entity?.numBooks != null && <p>{entity?.numBooks} books</p>}
+					<Heading className="font-semibold">
+						<EntityLink entry={entry} library={library}>
+							{name}
+						</EntityLink>
+					</Heading>
+					{entity?.numBooks != null && (
+						<p>
+							{entity.numBooks} {entity.numBooks === 1 ? 'book' : 'books'}
+						</p>
+					)}
 					<p>{entity?.description}</p>
 				</>
 			)}
@@ -373,7 +456,7 @@ export function HomePage({
 	}, [library])
 	return (
 		<section className="space-y-6">
-			<h1 className="text-3xl font-semibold">Home</h1>
+			<CatalogHeading title="Home" />
 
 			{!data.length && (
 				<p>No shelves available. Browse library to start listening.</p>
@@ -381,10 +464,11 @@ export function HomePage({
 			{data.map((shelf) => (
 				<section key={shelf.id} className="space-y-3">
 					<h2 className="text-2xl font-semibold">{shelf.label}</h2>
-					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
 						{shelf.entities.map((entry) => (
 							<EntryCard
 								key={entry.id}
+								headingLevel={3}
 								library={library}
 								entry={{
 									...entry,
@@ -514,7 +598,7 @@ const sortOptions = [
 	['addedAt', 'Added'],
 	['size', 'Size'],
 	['media.duration', 'Duration'],
-	['media.numTracks', 'Episode count'],
+	['media.numTracks', 'Audio track count'],
 	['birthtimeMs', 'File birth time'],
 	['mtimeMs', 'File modified'],
 	['progress', 'Progress'],
@@ -524,6 +608,51 @@ const sortOptions = [
 	['name', 'Name'],
 	['numBooks', 'Book count'],
 ]
+function applicableSorts(section: string, podcast: boolean) {
+	if (section === 'authors')
+		return [
+			['name', 'Name'],
+			['lastFirst', 'Last name first'],
+			['numBooks', 'Book count'],
+			['addedAt', 'Added'],
+			['updatedAt', 'Updated'],
+		]
+	if (section === 'series')
+		return [
+			['name', 'Name'],
+			['numBooks', 'Book count'],
+			['addedAt', 'Added'],
+			['totalDuration', 'Duration'],
+			['lastBookAdded', 'Last book added'],
+			['lastBookUpdated', 'Last book updated'],
+			['random', 'Random'],
+		]
+	if (section) return []
+	return sortOptions
+		.filter(([value]) =>
+			podcast
+				? [
+						'media.metadata.title',
+						'media.metadata.author',
+						'addedAt',
+						'size',
+						'media.numTracks',
+						'birthtimeMs',
+						'mtimeMs',
+						'random',
+					].includes(value)
+				: ![
+						'media.metadata.author',
+						'media.numTracks',
+						'name',
+						'numBooks',
+					].includes(value),
+		)
+		.map(([value, label]) => [
+			value,
+			podcast && value === 'media.numTracks' ? 'Episode count' : label,
+		])
+}
 export function BrowsePage({
 	library,
 	section,
@@ -541,6 +670,9 @@ export function BrowsePage({
 }) {
 	useCatalogRefresh()
 	const coverSize = useCoverSize()
+	const sorts = applicableSorts(section, podcast)
+	const itemView = !section
+	const seriesView = section === 'series'
 	useShelfPosition(`${library}/${section}/${JSON.stringify(search)}`)
 	useEffect(() => {
 		persistSearch(search, section)
@@ -622,147 +754,205 @@ export function BrowsePage({
 	}
 	return (
 		<section className="space-y-5">
-			<h1 className="text-3xl font-semibold">{section || 'Library'}</h1>
+			<CatalogHeading title={section ? humanLabel(section) : 'Library'} />
 
 			<div className="flex flex-wrap gap-4">
-				<label>
-					Sort
-					<select
-						className="block border rounded bg-background p-2"
-						value={search.sort}
-						onChange={(e) => update({ sort: e.target.value })}
-					>
-						{sortOptions.map(([value, name]) => (
-							<option key={value} value={value}>
-								{name}
-							</option>
-						))}
-					</select>
-				</label>
-				<label>
-					Order
-					<select
-						className="block border rounded bg-background p-2"
-						value={search.desc}
-						onChange={(e) => update({ desc: e.target.value })}
-					>
-						<option value="0">Ascending</option>
-						<option value="1">Descending</option>
-					</select>
-				</label>
-				<label>
-					Filter
-					<select
-						className="block border rounded bg-background p-2 max-w-64"
-						value={search.filter}
-						onChange={(e) => update({ filter: e.target.value })}
-					>
-						<option value="all">All</option>
-						{['finished', 'not-finished', 'in-progress', 'not-started'].map(
-							(v) => (
-								<option key={v} value={`progress.${encodeFilter(v)}`}>
-									{v}
-								</option>
-							),
-						)}
-						<option value="issues">Issues</option>
-						{['feed-open', 'share-open', 'abridged', 'explicit'].map(
-							(value) => (
-								<option key={value} value={value}>
-									{value}
-								</option>
-							),
-						)}
-						{Object.entries({
-							tracks: ['none', 'single', 'multi'],
-							ebooks: [
-								'ebook',
-								'no-ebook',
-								'supplementary',
-								'no-supplementary',
-							],
-							missing: [
-								'asin',
-								'isbn',
-								'authors',
-								'chapters',
-								'cover',
-								'description',
-								'genres',
-								'language',
-								'narrators',
-								'publishedYear',
-								'publisher',
-								'series',
-								'subtitle',
-								'tags',
-							],
-						}).map(([group, values]) => (
-							<optgroup key={group} label={group}>
-								{values.map((value) => (
-									<option key={value} value={`${group}.${encodeFilter(value)}`}>
-										{value}
+				{sorts.length > 0 && (
+					<>
+						{' '}
+						<label htmlFor="catalog-sort">
+							Sort
+							<NativeSelect
+								id="catalog-sort"
+								className="block"
+								value={search.sort}
+								onChange={(e) => update({ sort: e.target.value })}
+							>
+								{!sorts.some(([value]) => value === search.sort) && (
+									<option disabled value={search.sort}>
+										Current sort:{' '}
+										{sortOptions.find(
+											([value]) => value === search.sort,
+										)?.[1] || humanLabel(search.sort)}
+									</option>
+								)}
+								{sorts.map(([value, name]) => (
+									<option key={value} value={value}>
+										{name}
 									</option>
 								))}
-							</optgroup>
-						))}
-						{Object.entries(filters)
-							.filter(([, value]) => Array.isArray(value))
-							.map(([group, values]) => (
-								<optgroup key={group} label={group}>
-									{(values as (string | { id: string; name: string })[]).map(
-										(value) => {
-											const label =
-												typeof value === 'string' ? value : value.name
-											const id = typeof value === 'string' ? value : value.id
-											return (
-												<option key={id} value={`${group}.${encodeFilter(id)}`}>
-													{label}
-												</option>
-											)
+							</NativeSelect>
+						</label>
+						<label htmlFor="catalog-order">
+							Order
+							<NativeSelect
+								id="catalog-order"
+								className="block"
+								value={search.desc}
+								onChange={(e) => update({ desc: e.target.value })}
+							>
+								<option value="0">Ascending</option>
+								<option value="1">Descending</option>
+							</NativeSelect>
+						</label>
+					</>
+				)}
+				{(itemView || seriesView) && (
+					<label htmlFor="catalog-filter">
+						Filter
+						<NativeSelect
+							id="catalog-filter"
+							className="max-w-64"
+							value={search.filter}
+							onChange={(e) => update({ filter: e.target.value })}
+						>
+							<option value="all">All</option>
+							{!podcast &&
+								['finished', 'not-finished', 'in-progress', 'not-started'].map(
+									(v) => (
+										<option key={v} value={`progress.${encodeFilter(v)}`}>
+											{humanLabel(v)}
+										</option>
+									),
+								)}
+							{itemView && <option value="issues">Issues</option>}
+							{(seriesView
+								? []
+								: podcast
+									? ['feed-open', 'explicit']
+									: ['feed-open', 'share-open', 'abridged', 'explicit']
+							).map((value) => (
+								<option key={value} value={value}>
+									{humanLabel(value)}
+								</option>
+							))}
+							{Object.entries(
+								podcast || seriesView
+									? {}
+									: {
+											tracks: ['none', 'single', 'multi'],
+											ebooks: [
+												'ebook',
+												'no-ebook',
+												'supplementary',
+												'no-supplementary',
+											],
+											missing: [
+												'asin',
+												'isbn',
+												'authors',
+												'chapters',
+												'cover',
+												'description',
+												'genres',
+												'language',
+												'narrators',
+												'publishedYear',
+												'publisher',
+												'series',
+												'subtitle',
+												'tags',
+											],
 										},
-									)}
+							).map(([group, values]) => (
+								<optgroup key={group} label={humanLabel(group)}>
+									{values.map((value) => (
+										<option
+											key={value}
+											value={`${group}.${encodeFilter(value)}`}
+										>
+											{humanLabel(value)}
+										</option>
+									))}
 								</optgroup>
 							))}
-					</select>
-				</label>
-				<label>
-					Cover size
-					<input
-						className="block"
-						type="range"
-						min={60}
-						max={220}
-						step={20}
-						value={coverSize.size}
-						onChange={(event) => coverSize.setSize(Number(event.target.value))}
-					/>
-				</label>
-				<label>
-					View
-					<select
-						className="block border rounded bg-background p-2"
-						value={search.view}
-						onChange={(e) =>
-							update({ view: e.target.value as BrowseSearch['view'] })
-						}
-					>
-						<option>grid</option>
-						<option>list</option>
-						<option>detail</option>
-					</select>
-				</label>
-				{!podcast && (
-					<label className="self-center">
-						<input
-							type="checkbox"
-							checked={search.collapse === '1'}
-							onChange={(e) =>
-								update({ collapse: e.target.checked ? '1' : '0' })
-							}
-						/>{' '}
-						Group series
+							{Object.entries(filters)
+								.filter(
+									([group, value]) =>
+										Array.isArray(value) &&
+										(podcast
+											? ['genres', 'tags', 'languages'].includes(group)
+											: seriesView
+												? [
+														'genres',
+														'tags',
+														'authors',
+														'narrators',
+														'publishers',
+														'languages',
+													].includes(group)
+												: true),
+								)
+								.map(([group, values]) => (
+									<optgroup key={group} label={humanLabel(group)}>
+										{(values as (string | { id: string; name: string })[]).map(
+											(value) => {
+												const label =
+													typeof value === 'string' ? value : value.name
+												const id = typeof value === 'string' ? value : value.id
+												return (
+													<option
+														key={id}
+														value={`${group}.${encodeFilter(id)}`}
+													>
+														{label}
+													</option>
+												)
+											},
+										)}
+									</optgroup>
+								))}
+							<option hidden disabled value={search.filter}>
+								Current filter: {currentFilterLabel(search.filter)}
+							</option>
+						</NativeSelect>
 					</label>
+				)}
+				{itemView && (
+					<>
+						{' '}
+						<label>
+							Cover size
+							<input
+								className="block"
+								type="range"
+								min={60}
+								max={220}
+								step={20}
+								value={coverSize.size}
+								onChange={(event) =>
+									coverSize.setSize(Number(event.target.value))
+								}
+							/>
+						</label>
+						<label htmlFor="catalog-view">
+							View
+							<NativeSelect
+								id="catalog-view"
+								className="block"
+								value={search.view}
+								onChange={(e) =>
+									update({ view: e.target.value as BrowseSearch['view'] })
+								}
+							>
+								<option value="grid">Grid</option>
+								<option value="list">List</option>
+								<option value="detail">Detailed</option>
+							</NativeSelect>
+						</label>
+						{!podcast && (
+							<label className="self-center">
+								<input
+									type="checkbox"
+									checked={search.collapse === '1'}
+									onChange={(e) =>
+										update({ collapse: e.target.checked ? '1' : '0' })
+									}
+								/>{' '}
+								Group series
+							</label>
+						)}{' '}
+					</>
 				)}
 			</div>
 			{['collections', 'playlists'].includes(section) && (
@@ -789,9 +979,10 @@ export function BrowsePage({
 							)
 					}}
 				>
-					<label>
+					<label htmlFor="catalog-new-name">
 						New {section === 'collections' ? 'collection' : 'playlist'}
-						<input
+						<Input
+							id="catalog-new-name"
 							name="name"
 							required
 							maxLength={255}
@@ -967,12 +1158,13 @@ export function BrowsePage({
 											)
 									}}
 								>
-									<label>
+									<label htmlFor="catalog-collection">
 										Collection
-										<select
+										<NativeSelect
+											id="catalog-collection"
 											name="collection"
 											required
-											className="block border rounded bg-background p-2"
+											className="block"
 										>
 											<option value="">Choose collection</option>
 											{collections.map((entry) => (
@@ -982,7 +1174,7 @@ export function BrowsePage({
 														: entry.id}
 												</option>
 											))}
-										</select>
+										</NativeSelect>
 									</label>
 									<Button type="submit" disabled={pending}>
 										Add selected to collection
@@ -1101,18 +1293,19 @@ export function SearchPage({
 	)
 	return (
 		<section className="space-y-5">
-			<h1 className="text-3xl font-semibold">Search results for “{q}”</h1>
+			<CatalogHeading title={`Search results for “${q}”`} />
 			{count === 0 && <p>No search results.</p>}
 
 			{(['book', 'podcast'] as const).map((type) => (
 				<section key={type}>
 					<h2 className="text-xl">{type === 'book' ? 'Books' : 'Podcasts'}</h2>
-					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
 						{data[type]?.map((match) => (
 							<EntryCard
 								key={match.libraryItem.id}
 								library={library}
 								entry={match.libraryItem}
+								headingLevel={3}
 							/>
 						))}
 					</div>
@@ -1139,19 +1332,20 @@ export function SearchPage({
 			</section>
 			{(['authors', 'series'] as const).map((type) => (
 				<section key={type}>
-					<h2 className="text-xl">{type}</h2>
+					<h2 className="text-xl">{humanLabel(type)}</h2>
 					{data[type]?.map((entry) => (
 						<EntryCard
 							key={entry.id}
 							library={library}
 							entry={{ ...entry, _type: type }}
+							headingLevel={3}
 						/>
 					))}
 				</section>
 			))}
 			{(['tags', 'narrators', 'genres'] as const).map((type) => (
 				<section key={type}>
-					<h2 className="text-xl">{type}</h2>
+					<h2 className="text-xl">{humanLabel(type)}</h2>
 					{data[type]?.map(({ name: value, numItems, numBooks }) => (
 						<Link
 							key={value}
@@ -1493,7 +1687,7 @@ export function SeriesPage({
 								name="slug"
 								pattern="[A-Za-z0-9_-]+"
 								required
-								className="block border rounded bg-background p-2"
+								className="block"
 							/>
 						</label>
 						<label>
@@ -1503,7 +1697,7 @@ export function SeriesPage({
 								type="url"
 								required
 								defaultValue={`${window.location.origin}${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}`}
-								className="block border rounded bg-background p-2"
+								className="block"
 							/>
 						</label>
 						<label>
@@ -1527,7 +1721,7 @@ export function SeriesPage({
 					Mark series unfinished
 				</Button>
 			</div>
-			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
 				{(data.books || data.libraryItems || []).map((item) => (
 					<EntryCard key={item.id} library={library} entry={item} />
 				))}
