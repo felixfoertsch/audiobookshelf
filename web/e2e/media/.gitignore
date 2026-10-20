@@ -1,0 +1,5 @@
+# Native System Voices have redistribution terms not established; local preview only.
+local/*.aiff
+local/*.wav
+# Publisher metadata, covers and audio: local test cache, never redistribute.
+real/

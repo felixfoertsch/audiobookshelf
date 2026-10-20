@@ -1,5 +1,8 @@
 # Set the default behavior, in case people don't have core.autocrlf set.
 * text=auto
 
+# PDF cross-reference offsets require byte-preserving checkout.
+*.pdf binary
+
 # Declare files that will always have CRLF line endings on checkout.
 .devcontainer/post-create.sh text eol=lf

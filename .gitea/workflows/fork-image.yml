@@ -30,11 +30,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check modern frontend
+        run: |
+          set -euo pipefail
+          docker buildx create --name fork --driver remote docker-container://linux-builder-buildkit --use
+          docker buildx build --builder fork --platform linux/amd64 --target check-web .
+
       # ponytail: linux/amd64 only (FFUNRAID); rootless builder has no QEMU. Add arm64 with a native arm64 runner.
       - name: Build runtime image
         run: |
           set -euo pipefail
-          docker buildx create --name fork --driver remote docker-container://linux-builder-buildkit --use
           docker buildx build --builder fork --platform linux/amd64 --load \
             --label org.opencontainers.image.source=https://git.felixfoertsch.de/${{ github.repository }} \
             --label org.opencontainers.image.revision=${{ github.sha }} \

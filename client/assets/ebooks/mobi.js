@@ -426,7 +426,7 @@ class MobiFile {
           resolve(parseContent.join("\n    \n"));
         }
       };
-      handleImage();
+      handleImage().catch(reject);
     });
   }
   render_image = (imgDoms, i) => {

@@ -20,6 +20,12 @@
 /unicode*
 /libnusqlite3*
 
+/web/.tanstack/
+/web/dist/
+/web/test-results/
+/web/playwright-report/
+.mise.local.toml
+
 sw.*
 .DS_STORE
 .idea/*

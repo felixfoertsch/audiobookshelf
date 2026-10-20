@@ -1,0 +1,853 @@
+// Synthetic server only. No ABS connection or production writes.
+
+import { once } from 'node:events'
+import { createServer } from 'node:http'
+import { createRequire } from 'node:module'
+import { z } from 'zod'
+import { items, libraries, playable } from './data'
+import {
+	authSessions,
+	browserUser,
+	fixtureApi,
+	fixturePasswords,
+	fixtureUsers,
+	loginPayload,
+	onFixtureUserUpdated,
+} from './fixture-api'
+import { readerFixtureResponse } from './reader-preview'
+import { realRecords } from './real-media/load'
+
+const dist = process.env.FIXTURE_DIST_PATH
+	? new URL(`file://${process.env.FIXTURE_DIST_PATH.replace(/\/$/, '')}/`)
+	: new URL('../dist/', import.meta.url)
+const mediaRoot = new URL('./media/', import.meta.url)
+const catalog = items
+const cookies = new Map<string, (typeof fixtureUsers)[number]>()
+let initialized = process.env.FIXTURE_UNINITIALIZED !== '1'
+const json = (data: unknown, status = 200, headers: HeadersInit = {}) =>
+	Response.json(data, { status, headers })
+const sessions = new Map<
+	string,
+	{
+		userId: string
+		itemId: string
+		episodeId: string | null
+		duration: number
+		audioTracks: { index: number; key: string }[]
+	}
+>()
+const observations: {
+	sessionId: string
+	action: string
+	itemId: string
+	episodeId: string | null
+	currentTime?: number
+	timeListened?: number
+}[] = []
+type FixtureShare = {
+	id: string
+	slug: string
+	mediaItemId: string
+	mediaItemType: 'book'
+	expiresAt: number | null
+	isDownloadable: boolean
+	createdAt: number
+	updatedAt: number
+}
+const shares: FixtureShare[] = [
+	'public-book',
+	'public-book-no-download',
+	'expired',
+].map((slug) => ({
+	id: crypto.randomUUID(),
+	slug,
+	mediaItemId: 'book-1',
+	mediaItemType: 'book',
+	expiresAt: slug === 'expired' ? 1 : null,
+	isDownloadable: slug === 'public-book',
+	createdAt: Date.now(),
+	updatedAt: Date.now(),
+}))
+const shareSessions = new Map<
+	string,
+	{ shareId: string; currentTime: number }
+>()
+let nextSession = 0
+async function fileResponse(
+	request: Request,
+	file: ReturnType<typeof Bun.file>,
+	mime?: string,
+) {
+	if (!(await file.exists()))
+		return new Response('Unavailable synthetic file', { status: 404 })
+	const size = file.size
+	const headers = new Headers({
+		'accept-ranges': 'bytes',
+		'content-type': mime || file.type,
+		'content-length': String(size),
+	})
+	const range = request.headers.get('range')
+	if (!range)
+		return new Response(request.method === 'HEAD' ? null : file, { headers })
+	const match = /^bytes=(\d*)-(\d*)$/.exec(range)
+	if (!match || (!match[1] && !match[2]))
+		return new Response(null, {
+			status: 416,
+			headers: { 'content-range': `bytes */${size}` },
+		})
+	const start = match[1]
+		? Number(match[1])
+		: Math.max(0, size - Number(match[2]))
+	const end =
+		match[1] && match[2] ? Math.min(Number(match[2]), size - 1) : size - 1
+	if (start >= size || end < start)
+		return new Response(null, {
+			status: 416,
+			headers: { 'content-range': `bytes */${size}` },
+		})
+	headers.set('content-range', `bytes ${start}-${end}/${size}`)
+	headers.set('content-length', String(end - start + 1))
+	return new Response(
+		request.method === 'HEAD' ? null : file.slice(start, end + 1),
+		{ status: 206, headers },
+	)
+}
+async function handleRequest(request: Request) {
+	const url = new URL(request.url)
+	const prefix = url.pathname.startsWith('/audiobookshelf/')
+		? '/audiobookshelf'
+		: url.pathname.startsWith('/classic/')
+			? '/classic'
+			: url.pathname.startsWith('/abs/')
+				? '/abs'
+				: ''
+	const path = url.pathname.slice(prefix.length)
+	const nativeClassic = process.env.CLASSIC_NATIVE_DIST_PATH
+	if (
+		nativeClassic &&
+		path === '/' &&
+		request.method === 'GET' &&
+		url.searchParams.get('classic') !== '1'
+	)
+		return new Response(null, {
+			status: 302,
+			headers: {
+				location: `${prefix}/new/${url.search}`,
+				'cache-control': 'no-store',
+			},
+		})
+	if (path === '/health') return new Response('ok')
+	if (path === '/__fixture/observations') return json(observations)
+	if (
+		(path === '/status' && request.method !== 'GET') ||
+		(path === '/login' &&
+			request.method !== 'POST' &&
+			!((prefix === '/classic' || nativeClassic) && request.method === 'GET'))
+	)
+		return new Response('Method not allowed', {
+			status: 405,
+			headers: { allow: path === '/status' ? 'GET' : 'POST' },
+		})
+	if (path === '/status')
+		return json({
+			isInit: initialized,
+			language: 'en-us',
+			authFormData: { username: '', password: '' },
+			authMethods: ['local'],
+			serverVersion: 'synthetic',
+		})
+	if (path === '/init') {
+		if (request.method !== 'POST')
+			return new Response('Method not allowed', { status: 405 })
+		if (initialized) return new Response('Already initialized', { status: 500 })
+		const input = z
+			.object({
+				newRoot: z
+					.object({
+						username: z.string().trim().min(1),
+						password: z.string().min(1),
+					})
+					.strict(),
+			})
+			.strict()
+			.safeParse(await request.json().catch(() => null))
+		if (!input.success) return json({ error: 'Invalid newRoot' }, 400)
+		const root = fixtureUsers.find((user) => user.type === 'root')
+		if (!root) throw new Error('Missing fixture root')
+		root.username = input.data.newRoot.username
+		fixturePasswords.set(root.id, input.data.newRoot.password)
+		initialized = true
+		return new Response('OK')
+	}
+	if (path === '/login' && request.method === 'POST') {
+		if (!initialized) return json({ error: 'Fixture not initialized' }, 403)
+		const input = z
+			.object({ username: z.string(), password: z.string() })
+			.safeParse(await request.json().catch(() => null))
+		const user = input.success
+			? fixtureUsers.find((user) => user.username === input.data.username)
+			: undefined
+		if (
+			!user ||
+			!input.success ||
+			fixturePasswords.get(user.id) !== input.data.password
+		)
+			return json({ error: 'Invalid credentials' }, 401)
+		const cookie = crypto.randomUUID()
+		cookies.set(cookie, user)
+		authSessions.set(cookie, {
+			id: cookie,
+			userId: user.id,
+			cookie,
+			createdAt: Date.now(),
+		})
+		const oldestCookie = cookies.keys().next().value
+		if (cookies.size > 100 && oldestCookie) cookies.delete(oldestCookie)
+		return json(loginPayload(user), 200, {
+			'set-cookie': `fixture_session=${cookie}; Path=/; HttpOnly; SameSite=Lax`,
+		})
+	}
+	const cookie = request.headers
+		.get('cookie')
+		?.split(';')
+		.map((value) => value.trim())
+		.find((value) => value.startsWith('fixture_session='))
+		?.slice('fixture_session='.length)
+	const cookieUser =
+		cookie && authSessions.has(cookie) ? cookies.get(cookie) : undefined
+	if (path === '/auth/refresh')
+		return cookieUser ? json(loginPayload(cookieUser)) : json({}, 401)
+	if (path === '/logout' && cookie) {
+		if (url.searchParams.get('allDevices') === '1' && cookieUser)
+			for (const [id, session] of authSessions) {
+				if (session.userId === cookieUser.id) {
+					authSessions.delete(id)
+					cookies.delete(id)
+				}
+			}
+		cookies.delete(cookie)
+		authSessions.delete(cookie)
+	}
+	if (path === '/logout')
+		return json({ redirect_url: null }, 200, {
+			'set-cookie':
+				'fixture_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+		})
+	const token =
+		request.headers.get('authorization')?.replace(/^Bearer /, '') ||
+		url.searchParams.get('token')
+	const user = fixtureUsers.find((user) => user.accessToken === token)
+	const isCover = /^\/api\/items\/[^/]+\/cover$/.test(path)
+	if (path.startsWith('/api/') && !user && !(isCover && cookieUser))
+		return json({}, 401)
+	if (path.startsWith('/api/') && user) {
+		const result = await fixtureApi(request, path, url, user)
+		if (result) return result
+	}
+	const shareCreate = path === '/api/share/mediaitem'
+	const shareDelete = /^\/api\/share\/mediaitem\/([^/]+)$/.exec(path)
+	if (shareCreate || shareDelete) {
+		if (!user || !['admin', 'root'].includes(user.type))
+			return json({ error: 'Forbidden' }, 403)
+		if (shareDelete && request.method === 'DELETE') {
+			const index = shares.findIndex((s) => s.id === shareDelete[1])
+			if (index < 0) return new Response('Not found', { status: 404 })
+			const [removed] = shares.splice(index, 1)
+			for (const [id, session] of shareSessions)
+				if (session.shareId === removed.id) shareSessions.delete(id)
+			return new Response(null, { status: 204 })
+		}
+		if (!shareCreate || request.method !== 'POST')
+			return new Response('Method not allowed', { status: 405 })
+		const input = z
+			.object({
+				slug: z
+					.string()
+					.trim()
+					.regex(/^[a-z0-9-]+$/),
+				expiresAt: z.number().nonnegative(),
+				mediaItemType: z.literal('book'),
+				mediaItemId: z.string(),
+				isDownloadable: z.boolean(),
+			})
+			.strict()
+			.safeParse(await request.json().catch(() => null))
+		if (!input.success) return json({ error: 'Invalid share' }, 400)
+		if (
+			!items.some(
+				(i) => i.mediaType === 'book' && i.media.id === input.data.mediaItemId,
+			)
+		)
+			return new Response('Media item not found', { status: 404 })
+		if (
+			shares.some(
+				(s) =>
+					s.slug === input.data.slug ||
+					s.mediaItemId === input.data.mediaItemId,
+			)
+		)
+			return new Response('Item or slug already shared', { status: 409 })
+		const share: FixtureShare = {
+			...input.data,
+			expiresAt: input.data.expiresAt || null,
+			id: crypto.randomUUID(),
+			createdAt: Date.now(),
+			updatedAt: Date.now(),
+		}
+		shares.push(share)
+		return json(share, 201)
+	}
+	const publicShare =
+		/^\/public\/share\/([^/]+)(?:\/(cover|track\/([^/]+)|progress|download))?$/.exec(
+			path,
+		)
+	if (publicShare) {
+		const share = shares.find(
+			(s) =>
+				s.slug === publicShare[1] && (!s.expiresAt || s.expiresAt > Date.now()),
+		)
+		if (!share) return new Response('Share not found', { status: 404 })
+		const item = items.find(
+			(i) => i.mediaType === 'book' && i.media.id === share.mediaItemId,
+		)
+		if (!item) return new Response('Media not found', { status: 404 })
+		const shareCookie = request.headers
+			.get('cookie')
+			?.split(';')
+			.map((s) => s.trim())
+			.find((s) => s.startsWith('share_session_id='))
+			?.slice('share_session_id='.length)
+		let session = shareCookie ? shareSessions.get(shareCookie) : undefined
+		const audioTracks =
+			'tracks' in item.media
+				? item.media.tracks.map((track) => ({
+						...track,
+						contentUrl: `${prefix}/public/share/${share.slug}/track/${track.index}`,
+					}))
+				: []
+		const duration = audioTracks.reduce((n, t) => n + t.duration, 0)
+		if (!publicShare[2]) {
+			if (request.method !== 'GET')
+				return new Response('Method not allowed', { status: 405 })
+			const id =
+				session?.shareId === share.id && shareCookie
+					? shareCookie
+					: crypto.randomUUID()
+			if (session?.shareId !== share.id) {
+				session = { shareId: share.id, currentTime: 0 }
+				shareSessions.set(id, session)
+			}
+			return json(
+				{
+					...share,
+					playbackSession: {
+						id,
+						libraryItemId: item.id,
+						mediaType: 'book',
+						mediaMetadata: item.media.metadata,
+						displayTitle: item.media.metadata.title,
+						currentTime: session.currentTime,
+						duration,
+						audioTracks,
+						chapters: 'chapters' in item.media ? item.media.chapters : [],
+						playMethod: 0,
+						coverPath: item.media.coverPath,
+					},
+				},
+				200,
+				{
+					'set-cookie': `share_session_id=${id}; Path=/; HttpOnly; SameSite=Lax`,
+				},
+			)
+		}
+		if (!session || session.shareId !== share.id)
+			return new Response('Share session not found', { status: 404 })
+		if (publicShare[2] === 'progress') {
+			if (request.method !== 'PATCH')
+				return new Response('Method not allowed', { status: 405 })
+			const input = z
+				.object({ currentTime: z.number().nonnegative() })
+				.strict()
+				.safeParse(await request.json().catch(() => null))
+			if (!input.success)
+				return new Response('Invalid current time', { status: 400 })
+			session.currentTime = Math.min(input.data.currentTime, duration)
+			return new Response(null, { status: 204 })
+		}
+		if (request.method !== 'GET' && request.method !== 'HEAD')
+			return new Response('Method not allowed', { status: 405 })
+		if (publicShare[2] === 'cover')
+			return fileResponse(
+				request,
+				Bun.file(new URL(`covers/${item.id}.svg`, mediaRoot)),
+			)
+		if (publicShare[2] === 'download' && !share.isDownloadable)
+			return new Response('Download is not allowed for this item', {
+				status: 403,
+			})
+		if (publicShare[2] === 'download' && audioTracks.length !== 1)
+			return new Response('Offline multi-file archive download unsupported', {
+				status: 501,
+			})
+		const track = audioTracks.find(
+			(t) => t.index === (publicShare[3] ? Number(publicShare[3]) : 1),
+		)
+		const key = track?.index === 1 ? item.id : `${item.id}-ep-${track?.index}`
+		const audio = track ? playable[key] : undefined
+		if (!audio) return new Response('Track not found', { status: 404 })
+		let file = Bun.file(new URL(audio.file, mediaRoot))
+		if (!(await file.exists()))
+			file = Bun.file(new URL(audio.fallbackFile, mediaRoot))
+		return fileResponse(request, file, audio.mimeType)
+	}
+	if (path === '/api/libraries') return json({ libraries })
+	if (path === '/api/libraries/forbidden/items') return json({}, 403)
+	const library = /^\/api\/libraries\/([^/]+)\/(items|search)$/.exec(path)
+	if (library) {
+		const results = catalog
+			.filter((item) => item.libraryId === library[1])
+			.filter(
+				(item) =>
+					!url.searchParams.get('q') ||
+					(item.media.metadata.title || '')
+						.toLowerCase()
+						.includes((url.searchParams.get('q') || '').toLowerCase()),
+			)
+		if (library[2] === 'search')
+			return json({
+				[libraries.find((l) => l.id === library[1])?.mediaType || 'podcast']:
+					results.map((libraryItem) => ({ libraryItem })),
+			})
+		const page = Number(url.searchParams.get('page') || 0)
+		return json({
+			results: results.slice(page * 48, page * 48 + 48),
+			total: results.length,
+		})
+	}
+	const ebook = /^\/api\/items\/([^/]+)\/ebook$/.exec(path)
+	if (ebook && request.method !== 'GET')
+		return new Response('Method not allowed', { status: 405 })
+	if (ebook && request.method === 'GET')
+		return (
+			(await readerFixtureResponse(ebook[1])) ||
+			new Response('Ebook not found', { status: 404 })
+		)
+	const detail = /^\/api\/items\/([^/]+)$/.exec(path)
+	if (detail) {
+		const item = catalog.find((item) => item.id === detail[1])
+		// Classic's downloaded-episode queue requires audioFile.duration for every row.
+		// Metadata-only synthetic episodes remain available to modern unavailable-file tests.
+		if (
+			prefix === '/classic' &&
+			item?.mediaType === 'podcast' &&
+			'episodes' in item.media
+		)
+			return json({
+				...item,
+				media: {
+					...item.media,
+					episodes: item.media.episodes?.filter((episode) => episode.audioFile),
+				},
+			})
+		return item ? json(item) : json({ error: 'Item not found' }, 404)
+	}
+	const cover = /^\/api\/items\/([^/]+)\/cover$/.exec(path)
+	if (cover)
+		return fileResponse(
+			request,
+			Bun.file(
+				new URL(
+					realRecords.find((record) => record.id === cover[1])?.cover ||
+						`covers/${cover[1].startsWith('read-') ? 'book-1' : cover[1]}.svg`,
+					mediaRoot,
+				),
+			),
+		)
+	const play = /^\/api\/items\/([^/]+)\/play(?:\/([^/]+))?$/.exec(path)
+	if (play) {
+		const item = catalog.find((item) => item.id === play[1])
+		const episodeId = play[2] ?? null
+		const key = episodeId || play[1]
+		const audio = playable[key]
+		if (!item || !audio)
+			return json(
+				{
+					error:
+						'Synthetic metadata only: audio file unavailable. Choose first Field Notes episode or The Glass Orchard.',
+				},
+				404,
+			)
+		const bookRecord = realRecords.find(
+			(record) => record.id === item.id && record.kind === 'book',
+		)
+		const duration = bookRecord
+			? bookRecord.tracks.reduce((n, track) => n + track.duration, 0)
+			: audio.duration
+		const id = `fixture-session-${++nextSession}`
+		if (!user) return json({}, 401)
+		sessions.set(id, {
+			userId: user.id,
+			itemId: item.id,
+			episodeId,
+			duration,
+			audioTracks: bookRecord
+				? bookRecord.tracks.map((track, index) => ({
+						index: index + 1,
+						key: index === 0 ? item.id : track.id,
+					}))
+				: [{ index: 1, key }],
+		})
+		// Fresh session is authoritative, not cached page candidates.
+		return json({
+			id,
+			episodeId,
+			libraryItemId: item.id,
+			currentTime: 0,
+			duration,
+			audioTracks: bookRecord
+				? bookRecord.tracks.map((track, index, tracks) => ({
+						index: index + 1,
+						contentUrl: `${prefix}/media/${encodeURIComponent(index === 0 ? item.id : track.id)}`,
+						mimeType: 'audio/mpeg',
+						duration: track.duration,
+						startOffset: tracks
+							.slice(0, index)
+							.reduce((n, t) => n + t.duration, 0),
+					}))
+				: [
+						{
+							index: 1,
+							contentUrl: `${prefix}/media/${encodeURIComponent(key)}`,
+							mimeType: audio.mimeType,
+							duration,
+							startOffset: 0,
+						},
+					],
+			libraryItem: item,
+			playMethod: 0,
+		})
+	}
+	const sync = /^\/api\/session\/([^/]+)\/(sync|close)$/.exec(path)
+	if (sync) {
+		const session = sessions.get(sync[1])
+		if (!session) return json({}, 404)
+		if (session.userId !== user?.id) return json({ error: 'Forbidden' }, 403)
+		const data = await request.text()
+		let decoded: unknown = {}
+		try {
+			decoded = data ? JSON.parse(data) : {}
+		} catch {
+			return json({ error: 'Invalid session sync JSON' }, 400)
+		}
+		const parsed = z
+			.object({
+				currentTime: z.number().nonnegative().optional(),
+				timeListened: z.number().nonnegative().optional(),
+			})
+			.safeParse(decoded)
+		if (!parsed.success) return json({ error: 'Invalid session sync' }, 400)
+		const payload = parsed.data
+		if (observations.length >= 500) observations.shift()
+		observations.push({
+			sessionId: sync[1],
+			action: sync[2],
+			...session,
+			...payload,
+		})
+		if (sync[2] === 'close') sessions.delete(sync[1])
+		return new Response('OK')
+	}
+	const sessionTrack = /^\/public\/session\/([^/]+)\/track\/([^/]+)$/.exec(path)
+	if (sessionTrack) {
+		if (!['GET', 'HEAD'].includes(request.method))
+			return new Response('Method not allowed', {
+				status: 405,
+				headers: { allow: 'GET, HEAD' },
+			})
+		if (
+			!/^\d+$/.test(sessionTrack[2]) ||
+			!Number.isSafeInteger(Number(sessionTrack[2]))
+		)
+			return new Response('Invalid track index', { status: 400 })
+		const session = sessions.get(sessionTrack[1])
+		const index = Number(sessionTrack[2])
+		const track =
+			session?.audioTracks.find((track) => track.index === index) ??
+			(session?.episodeId && index === 0 ? session.audioTracks[0] : undefined)
+		const audio = track && playable[track.key]
+		if (!audio) return new Response('Missing', { status: 404 })
+		let file = Bun.file(new URL(audio.file, mediaRoot))
+		if (
+			!(await file.exists()) &&
+			'fallbackFile' in audio &&
+			typeof audio.fallbackFile === 'string'
+		)
+			file = Bun.file(new URL(audio.fallbackFile, mediaRoot))
+		return fileResponse(request, file, audio.mimeType)
+	}
+	const media = /^\/media\/([^/]+)$/.exec(path)
+	if (media) {
+		const audio = playable[decodeURIComponent(media[1])]
+		if (!audio) return new Response('Missing', { status: 404 })
+		let file = Bun.file(new URL(audio.file, mediaRoot))
+		if (
+			!(await file.exists()) &&
+			'fallbackFile' in audio &&
+			typeof audio.fallbackFile === 'string'
+		)
+			file = Bun.file(new URL(audio.fallbackFile, mediaRoot))
+		return fileResponse(request, file, audio.mimeType)
+	}
+	if (
+		(prefix === '/classic' || (nativeClassic && !path.startsWith('/new'))) &&
+		!path.startsWith('/api/')
+	) {
+		const relative = decodeURIComponent(path).replace(/^\/+/, '')
+		if (
+			relative.split('/').some((part) => part === '..') ||
+			relative.includes('\\')
+		)
+			return new Response('Invalid path', { status: 400 })
+		const classicDist = nativeClassic
+			? new URL(
+					`file://${nativeClassic.replace(/\/$/, '')}${process.env.CLASSIC_PRODUCTION_BASE === '1' ? '/production' : prefix || '/root'}/`,
+				)
+			: new URL('../../client/dist/', import.meta.url)
+		const staticFile = Bun.file(new URL(relative || 'index.html', classicDist))
+		if (await staticFile.exists()) return fileResponse(request, staticFile)
+		if (path.startsWith('/_nuxt/') || /\.[a-z0-9]+$/i.test(path))
+			return new Response('Missing Classic asset', { status: 404 })
+		if (
+			request.method === 'GET' &&
+			request.headers.get('accept')?.includes('text/html')
+		)
+			return fileResponse(request, Bun.file(new URL('200.html', classicDist)))
+	}
+	if (path.includes('/assets/'))
+		return fileResponse(
+			request,
+			Bun.file(new URL(`assets/${path.split('/assets/')[1]}`, dist)),
+		)
+	if (path === '/new/manifest.webmanifest' || path.startsWith('/new/icons/')) {
+		if (request.method !== 'GET' && request.method !== 'HEAD')
+			return new Response('Method not allowed', { status: 405 })
+		const installFiles: Record<string, string> = {
+			'/new/manifest.webmanifest': 'application/manifest+json',
+			'/new/icons/icon.svg': 'image/svg+xml',
+			'/new/icons/icon192.png': 'image/png',
+			'/new/icons/icon512.png': 'image/png',
+			'/new/icons/apple-touch-icon.png': 'image/png',
+		}
+		const mime = installFiles[path]
+		if (!mime) return new Response('Missing install asset', { status: 404 })
+		const response = await fileResponse(
+			request,
+			Bun.file(new URL(path.slice('/new/'.length), dist)),
+			mime,
+		)
+		response.headers.set('cache-control', 'no-store')
+		return response
+	}
+	if (path.startsWith('/new')) {
+		let html = await Bun.file(new URL('index.html', dist)).text()
+		html = html.replace(
+			'<head>',
+			`<head><base href="${prefix}/new/"><script>window.__ABS_WEB_CONFIG__=${JSON.stringify({ basePath: `${prefix}/new`, apiBasePath: prefix })}</script>`,
+		)
+		return new Response(html, { headers: { 'content-type': 'text/html' } })
+	}
+	return new Response('Not found', { status: 404 })
+}
+
+const server = createServer(async (incoming, outgoing) => {
+	try {
+		const method = incoming.method || 'GET'
+		const rawPath = (incoming.url || '/').split('?')[0]
+		if (/^\/(?:abs\/)?new\/icons\//.test(rawPath)) {
+			let filename: string
+			try {
+				filename = decodeURIComponent(
+					rawPath.slice(rawPath.indexOf('/icons/') + '/icons/'.length),
+				)
+			} catch {
+				outgoing.writeHead(400)
+				outgoing.end('Invalid install asset path')
+				return
+			}
+			if (
+				filename.includes('/') ||
+				filename.includes('\\') ||
+				filename === '..' ||
+				filename === '.'
+			) {
+				outgoing.writeHead(400)
+				outgoing.end('Invalid install asset path')
+				return
+			}
+		}
+		const headers = new Headers()
+		for (const [name, value] of Object.entries(incoming.headers)) {
+			if (Array.isArray(value))
+				for (const entry of value) headers.append(name, entry)
+			else if (value !== undefined) headers.set(name, value)
+		}
+		const request = new Request(
+			`http://127.0.0.1:${process.env.FIXTURE_PORT || 4179}${incoming.url || '/'}`,
+			{
+				method,
+				headers,
+				...(method === 'GET' || method === 'HEAD'
+					? {}
+					: {
+							body: new ReadableStream<Uint8Array>({
+								async start(controller) {
+									try {
+										let size = 0
+										for await (const chunk of incoming) {
+											size += chunk.length
+											if (size > 51_000_000)
+												throw new Error('Request body too large')
+											controller.enqueue(chunk)
+										}
+										controller.close()
+									} catch (error) {
+										controller.error(error)
+									}
+								},
+							}),
+						}),
+			},
+		)
+		const response = await handleRequest(request)
+		outgoing.writeHead(response.status, {
+			...Object.fromEntries(response.headers),
+			...(response.headers.getSetCookie().length
+				? { 'set-cookie': response.headers.getSetCookie() }
+				: {}),
+		})
+		if (!response.body || method === 'HEAD') outgoing.end()
+		else {
+			const reader = response.body.getReader()
+			try {
+				while (true) {
+					const chunk = await reader.read()
+					if (chunk.done) break
+					if (!outgoing.write(chunk.value)) await once(outgoing, 'drain')
+				}
+				outgoing.end()
+			} finally {
+				await reader.cancel()
+			}
+		}
+	} catch (error) {
+		if (!outgoing.headersSent) {
+			outgoing.writeHead(500, { 'content-type': 'text/plain' })
+			outgoing.end('Local fixture request failed')
+		} else outgoing.destroy(error instanceof Error ? error : undefined)
+	}
+})
+// Optional local comparison adapter; portable web-only CI has no backend packages.
+// Narrow structural contract describes only installed Socket.IO consumer surface.
+interface FixtureSocket {
+	on(event: 'auth', listener: (token: unknown) => void): void
+	join(room: string): void
+	leave(room: string): void
+	emit(event: string, payload: unknown): void
+}
+interface FixtureSocketServer {
+	on(event: 'connection', listener: (socket: FixtureSocket) => void): void
+	to(room: string): { emit(event: string, payload: unknown): void }
+	disconnectSockets(close: boolean): void
+}
+type SocketConstructor = new (
+	server: ReturnType<typeof createServer>,
+	options: {
+		path: string
+		serveClient: boolean
+		transports: string[]
+		destroyUpgrade: boolean
+	},
+) => FixtureSocketServer
+let SocketServer: SocketConstructor | undefined
+if (process.env.CLASSIC_COMPARE === '1') {
+	const require = createRequire(import.meta.url)
+	let packageExports: unknown
+	try {
+		packageExports = require('../../node_modules/socket.io')
+	} catch {
+		throw new Error(
+			'CLASSIC_COMPARE=1 requires existing backend socket.io installation; run root npm ci first. Web-only fixture works without comparison flag.',
+		)
+	}
+	const exportsSchema = z.object({
+		Server: z.custom<SocketConstructor>((value) => typeof value === 'function'),
+	})
+	SocketServer = exportsSchema.parse(
+		typeof packageExports === 'function'
+			? { Server: Reflect.get(packageExports, 'Server') }
+			: packageExports,
+	).Server
+}
+const socketServers = (
+	SocketServer
+		? [
+				'/socket.io',
+				'/classic/socket.io',
+				'/abs/socket.io',
+				'/audiobookshelf/socket.io',
+			]
+		: []
+).map((path) => {
+	if (!SocketServer) throw new Error('Socket.IO comparison constructor missing')
+	const io = new SocketServer(server, {
+		path,
+		serveClient: false,
+		transports: ['websocket'],
+		destroyUpgrade: false,
+	})
+	io.on('connection', (socket) => {
+		let authenticatedUserId: string | undefined
+		socket.on('auth', (token: unknown) => {
+			if (authenticatedUserId) socket.leave(authenticatedUserId)
+			authenticatedUserId = undefined
+			const user = fixtureUsers.find((user) => user.accessToken === token)
+			if (!user) {
+				socket.leave('authenticated')
+				socket.emit('auth_failed', { message: 'Invalid token' })
+				return
+			}
+			socket.join('authenticated')
+			socket.join(user.id)
+			authenticatedUserId = user.id
+			socket.emit('init', {
+				userId: user.id,
+				username: user.username,
+				...(user.type !== 'user'
+					? {
+							usersOnline: [
+								{
+									id: user.id,
+									username: user.username,
+									type: user.type,
+									connections: 1,
+								},
+							],
+						}
+					: {}),
+			})
+		})
+	})
+	return io
+})
+onFixtureUserUpdated((user) => {
+	for (const io of socketServers)
+		io.to(user.id).emit('user_updated', browserUser(user))
+})
+server.listen(Number(process.env.FIXTURE_PORT || 4179), '127.0.0.1')
+function shutdown() {
+	for (const io of socketServers) io.disconnectSockets(true)
+	server.close(() => process.exit(0))
+	server.closeAllConnections()
+}
+process.on('SIGTERM', shutdown)
+process.on('SIGINT', shutdown)

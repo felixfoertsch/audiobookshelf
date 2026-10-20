@@ -9,6 +9,28 @@ COPY /client /client
 RUN npm ci && npm cache clean --force
 RUN npm run generate
 
+### Modern preview: same backend, optional static /new/ UI ###
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.3 AS web-bun
+FROM --platform=$BUILDPLATFORM node:24-trixie-slim AS build-web
+# jsdom/Vitest require real Node; Bun's image aliases `node` to Bun.
+COPY --from=web-bun /usr/local/bin/bun /usr/local/bin/bun
+RUN ln -s /usr/local/bin/bun /usr/local/bin/bunx
+WORKDIR /web
+COPY web/package.json web/bun.lock ./
+RUN bun install --frozen-lockfile
+COPY web/ ./
+COPY client/assets/ebooks/ /client/assets/ebooks/
+COPY client/strings/ /client/strings/
+COPY package.json /package.json
+RUN bun run build
+
+# CI builds this target before publishing. Browser OS dependencies stay in this
+# disposable build stage; no privileged container or host package install needed.
+FROM build-web AS check-web
+RUN bun run typecheck && bun run lint && bun run test
+RUN bunx playwright install --with-deps chromium
+RUN bun run e2e
+
 ### STAGE 1: Compile server on the builder CPU (avoid QEMU SIGILL from tsc on arm64) ###
 FROM --platform=$BUILDPLATFORM node:24-alpine AS compile-server
 
@@ -66,6 +88,7 @@ WORKDIR /app
 
 # Copy compiled frontend and server from build stages
 COPY --from=build-client /client/dist /app/client/dist
+COPY --from=build-web /web/dist /app/web/dist
 COPY --from=build-server /server /app
 COPY --from=build-server ${NUSQLITE3_PATH} ${NUSQLITE3_PATH}
 

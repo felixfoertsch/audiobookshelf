@@ -15,6 +15,7 @@ const is = require('./libs/requestIp/isJs')
 const fileUtils = require('./utils/fileUtils')
 const { toNumber } = require('./utils/index')
 const { getRequestOrigin } = require('./utils/requestUtils')
+const createModernWeb = require('./utils/modernWeb')
 const Logger = require('./Logger')
 
 const Auth = require('./Auth')
@@ -404,10 +405,13 @@ class Server {
     })
     router.get('/healthcheck', (req, res) => res.sendStatus(200))
 
+    router.use('/new', createModernWeb(Path.join(global.appRoot, 'web/dist')))
+
     const ReactClientPath = process.env.REACT_CLIENT_PATH
     if (!ReactClientPath) {
       // Static path to generated nuxt
       const distPath = Path.join(global.appRoot, '/client/dist')
+      router.get('/', createModernWeb.defaultLanding(Path.join(global.appRoot, 'web/dist'), process.env.MODERN_WEB_DEFAULT === 'true'))
       router.use(express.static(distPath))
 
       // Client dynamic routes
