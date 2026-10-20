@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-router'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import frontendPackage from '../../../package.json'
 import { useAuth } from '../../api'
 import { Layout } from '../../routes/__root'
 import { BrowsePage, HomePage, SearchPage } from './browse'
@@ -111,6 +112,9 @@ it.each(['home', 'bookshelf', 'search', 'error'])(
 			)
 		expect(screen.getByText('Discover')).toBeTruthy()
 		expect(screen.getByText('Administration')).toBeTruthy()
+		expect(screen.getByRole('contentinfo').textContent).toContain(
+			`Modern frontend ${frontendPackage.version} ·`,
+		)
 		expect(screen.getAllByText('Protected player')).toHaveLength(1)
 		expect(screen.getAllByRole('main')).toHaveLength(1)
 		expect(

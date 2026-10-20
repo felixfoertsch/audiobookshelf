@@ -7,6 +7,7 @@ import {
 	useRouterState,
 } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
+import frontendPackage from '../../package.json'
 import { getAuthGeneration, logout, useAuth } from '../api'
 import { getLibraries } from '../catalog'
 import {
@@ -371,8 +372,8 @@ export function Layout({
 			</SidebarProvider>
 			<Player />
 			<footer className="px-5 pb-80 text-center text-xs text-muted-foreground">
-				Audiobookshelf · Modern frontend 2026.10.20.1 · Original timeline · No
-				offline media cache
+				Audiobookshelf · Modern frontend {frontendPackage.version} · Original
+				timeline · No offline media cache
 			</footer>
 		</>
 	)
