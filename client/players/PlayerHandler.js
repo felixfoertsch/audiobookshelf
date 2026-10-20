@@ -164,6 +164,7 @@ export default class PlayerHandler {
 
   playerTimeupdate(time) {
     this.ctx.setCurrentTime(time)
+    if (this.playerPlaying) this.skipInsertedAudio(time)
   }
 
   playerBufferTimeUpdate(buffertime) {
@@ -288,7 +289,7 @@ export default class PlayerHandler {
   }
 
   // Skips each inserted-audio candidate once per load, so seeking back into one plays it.
-  // ponytail: 1 s interval tick lets up to ~1 s of an ad play; add a precise timer when that matters.
+  // Native timeupdate (~250 ms) bounds how much of an ad plays; the cast player relies on the 1 s tick.
   skipInsertedAudio(currentTime) {
     const analysis = this.episode?.adAnalysis
     if (analysis?.status !== 'candidates' || !Array.isArray(analysis.segments)) return false

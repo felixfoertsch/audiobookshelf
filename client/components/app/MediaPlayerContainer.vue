@@ -33,6 +33,7 @@
     <player-ui
       ref="audioPlayer"
       :chapters="chapters"
+      :ad-segments="adSegments"
       :current-chapter="currentChapter"
       :paused="!isPlaying"
       :loading="playerLoading"
@@ -144,6 +145,10 @@ export default {
     chapters() {
       if (this.streamEpisode) return this.streamEpisode.chapters || []
       return this.media.chapters || []
+    },
+    adSegments() {
+      const analysis = this.streamEpisode?.adAnalysis
+      return analysis?.status === 'candidates' && Array.isArray(analysis.segments) ? analysis.segments : []
     },
     currentChapter() {
       return this.chapters.find((chapter) => chapter.start <= this.currentTime && this.currentTime < chapter.end)

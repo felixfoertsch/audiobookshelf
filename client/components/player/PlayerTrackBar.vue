@@ -5,6 +5,9 @@
       <div ref="readyTrack" class="h-full bg-gray-600 absolute top-0 left-0 pointer-events-none" />
       <div ref="bufferTrack" class="h-full bg-gray-500 absolute top-0 left-0 pointer-events-none" />
       <div ref="playedTrack" class="h-full bg-gray-200 absolute top-0 left-0 pointer-events-none" />
+      <template v-if="!useChapterTrack">
+        <div v-for="(mark, index) in adMarks" :key="'ad' + index" :style="mark" class="h-full absolute top-0 bg-yellow-400/80 pointer-events-none" />
+      </template>
       <div ref="trackCursor" class="h-full w-0.5 bg-gray-50 absolute top-0 left-0 opacity-0 pointer-events-none" />
       <div v-if="loading" class="h-full w-1/4 absolute left-0 top-0 loadingTrack pointer-events-none bg-white/25" />
     </div>
@@ -32,6 +35,10 @@ export default {
     loading: Boolean,
     duration: Number,
     chapters: {
+      type: Array,
+      default: () => []
+    },
+    adSegments: {
       type: Array,
       default: () => []
     },
@@ -77,6 +84,10 @@ export default {
     },
     isMobile() {
       return this.$store.state.globals.isMobile
+    },
+    adMarks() {
+      if (!this.duration) return []
+      return this.adSegments.map((s) => ({ left: (s.start / this.duration) * 100 + '%', width: (Math.max(0, s.end - s.start) / this.duration) * 100 + '%' }))
     }
   },
   methods: {
@@ -182,6 +193,9 @@ export default {
         var chapter = this.chapters.find((chapter) => chapter.start <= totalTime && totalTime < chapter.end)
         if (chapter && chapter.title) {
           hoverText += ` - ${chapter.title}`
+        }
+        if (this.adSegments.some((s) => s.start <= totalTime && totalTime < s.end)) {
+          hoverText += ` - ${this.$strings.LabelInsertedAudio}`
         }
         this.$refs.hoverTimestampText.innerText = hoverText
       }

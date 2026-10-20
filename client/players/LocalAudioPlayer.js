@@ -108,9 +108,7 @@ export default class LocalAudioPlayer extends EventEmitter {
     }
   }
   evtTimeupdate() {
-    if (this.player.paused) {
-      this.emit('timeupdate', this.getCurrentTime())
-    }
+    this.emit('timeupdate', this.getCurrentTime())
   }
 
   destroy() {
