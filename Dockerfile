@@ -5,39 +5,53 @@ ARG NUSQLITE3_PATH="${NUSQLITE3_DIR}/libnusqlite3.so"
 FROM node:24-alpine AS build-client
 
 WORKDIR /client
-COPY /client /client
+COPY client/package.json client/package-lock.json ./
 RUN npm ci && npm cache clean --force
+COPY /client /client
 RUN npm run generate
 
 ### Modern preview: same backend, optional static /new/ UI ###
 FROM --platform=$BUILDPLATFORM oven/bun:1.4.3 AS web-bun
-FROM --platform=$BUILDPLATFORM node:24-trixie-slim AS build-web
+FROM --platform=$BUILDPLATFORM node:24-trixie-slim AS web-deps
 # jsdom/Vitest require real Node; Bun's image aliases `node` to Bun.
 COPY --from=web-bun /usr/local/bin/bun /usr/local/bin/bun
 RUN ln -s /usr/local/bin/bun /usr/local/bin/bunx
 WORKDIR /web
 COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
+
+# Browser and OS dependencies depend on the lockfile, not app source.
+# Keep them off the build-web ancestry used by the runtime image.
+FROM web-deps AS check-web-base
+RUN node ./node_modules/@playwright/test/cli.js install --with-deps chromium
+
+FROM web-deps AS build-web
 COPY web/ ./
 COPY client/assets/ebooks/ /client/assets/ebooks/
 COPY client/strings/ /client/strings/
 COPY package.json /package.json
 RUN bun run build
 
-# CI builds this target before publishing. Browser OS dependencies stay in this
-# disposable build stage; no privileged container or host package install needed.
-FROM build-web AS check-web
+# CI checks the exact modern artifact copied into the runtime image.
+FROM check-web-base AS check-web
+COPY web/ ./
+COPY client/assets/ebooks/ /client/assets/ebooks/
+COPY client/strings/ /client/strings/
+COPY package.json /package.json
+COPY --from=build-web /web/dist ./dist
+COPY --from=build-web /web/src/routeTree.gen.ts ./src/routeTree.gen.ts
 RUN bun run typecheck && bun run lint && bun run test
-RUN bunx playwright install --with-deps chromium
-RUN bun run e2e
+RUN node ./node_modules/@playwright/test/cli.js test
 
 ### STAGE 1: Compile server on the builder CPU (avoid QEMU SIGILL from tsc on arm64) ###
 FROM --platform=$BUILDPLATFORM node:24-alpine AS compile-server
 
 WORKDIR /server
-COPY index.js package* tsconfig.server.json /server
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev --ignore-scripts
+COPY index.js tsconfig.server.json /server/
 COPY /server /server/server
-RUN npm ci --include=dev --ignore-scripts && npm run build:server
+RUN npm run build:server
 
 ### STAGE 2: Install native server deps for the target arch ###
 FROM node:24-alpine AS build-server
@@ -55,9 +69,7 @@ RUN apk add --no-cache --update \
   unzip
 
 WORKDIR /server
-COPY index.js package* /server
-COPY /server /server/server
-COPY --from=compile-server /server/dist-server /server/dist-server
+COPY package.json package-lock.json ./
 
 RUN case "$TARGETPLATFORM" in \
   "linux/amd64") \
@@ -70,6 +82,9 @@ RUN case "$TARGETPLATFORM" in \
   rm /tmp/library.zip
 
 RUN npm ci --omit=dev
+COPY index.js /server/
+COPY /server /server/server
+COPY --from=compile-server /server/dist-server /server/dist-server
 
 ### STAGE 3: Create minimal runtime image ###
 FROM node:24-alpine
