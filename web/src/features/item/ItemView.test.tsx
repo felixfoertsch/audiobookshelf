@@ -68,7 +68,10 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 // Browser audit covers all 489 episodes; units exercise two full pages and a partial last page.
-it('bounds episode pages, reaches last page, and discloses descriptions', async () => {
+// Real Sheet trees exceeded 5 s in Docker CI; keep this integration check bounded at 10 s.
+it('bounds episode pages, reaches last page, and discloses descriptions', {
+	timeout: 10_000,
+}, async () => {
 	render(<ItemView id="show" />)
 	await screen.findByRole('heading', { name: /^Episode 1$/ })
 	expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(25)
