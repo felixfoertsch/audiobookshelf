@@ -57,7 +57,7 @@ beforeEach(() => {
 		mediaType: 'podcast',
 		media: {
 			metadata: { title: 'Show' },
-			episodes: Array.from({ length: 489 }, (_, i) => ({
+			episodes: Array.from({ length: 51 }, (_, i) => ({
 				id: `ep-${i}`,
 				title: `Episode ${i + 1}`,
 				description: 'Episode description',
@@ -67,7 +67,8 @@ beforeEach(() => {
 	})
 })
 afterEach(cleanup)
-it('bounds 489 episodes, reaches last page, and discloses descriptions', async () => {
+// Browser audit covers all 489 episodes; units exercise two full pages and a partial last page.
+it('bounds episode pages, reaches last page, and discloses descriptions', async () => {
 	render(<ItemView id="show" />)
 	await screen.findByRole('heading', { name: /^Episode 1$/ })
 	expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(25)
@@ -77,10 +78,13 @@ it('bounds 489 episodes, reaches last page, and discloses descriptions', async (
 	fireEvent.click(screen.getByRole('button', { name: 'Read less' }))
 	expect(screen.queryByText('Episode description')).toBeNull()
 	const next = screen.getByRole('button', { name: 'Next episodes' })
-	for (let i = 0; i < 19; i++) fireEvent.click(next)
+	fireEvent.click(next)
+	expect(screen.getByRole('heading', { name: 'Episode 26' })).toBeTruthy()
+	expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(25)
+	fireEvent.click(next)
 	expect(screen.getByRole('button', { name: 'Next episodes' })).toBe(next)
-	expect(screen.getByRole('heading', { name: 'Episode 489' })).toBeTruthy()
-	expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(14)
+	expect(screen.getByRole('heading', { name: 'Episode 51' })).toBeTruthy()
+	expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(1)
 	expect(
 		screen
 			.getByRole('button', { name: 'Next episodes' })
