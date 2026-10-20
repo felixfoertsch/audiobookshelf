@@ -5,43 +5,42 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions: {}
-
 concurrency:
   group: fork-image-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  code: read
+  packages: write
+
 jobs:
   publish:
     if: github.repository == 'felixfoertsch/audiobookshelf' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write
+    runs-on: linux-builder
+    container: gitea/runner-images@sha256:0e62e56b382ebf485bff1e51a05cbe27c708545a2e91425467fd31eb3e249521
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
     env:
-      IMAGE: ghcr.io/felixfoertsch/audiobookshelf
+      REGISTRY: git.felixfoertsch.de
+      IMAGE: git.felixfoertsch.de/felixfoertsch/audiobookshelf
     steps:
-      - name: Check out
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build runtime smoke image
-        uses: docker/build-push-action@v6
+      - uses: actions/checkout@v4
         with:
-          context: .
-          platforms: linux/amd64
-          load: true
-          tags: abs-smoke:local
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          persist-credentials: false
+
+      # ponytail: linux/amd64 only (FFUNRAID); rootless builder has no QEMU. Add arm64 with a native arm64 runner.
+      - name: Build runtime image
+        run: |
+          set -euo pipefail
+          docker buildx create --name fork --driver remote docker-container://linux-builder-buildkit --use
+          docker buildx build --builder fork --platform linux/amd64 --load \
+            --label org.opencontainers.image.source=https://git.felixfoertsch.de/${{ github.repository }} \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
+            -t abs-smoke:local .
 
       - name: Check FFmpeg and full-duration Chromaprint runtime
-        shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i --network none --entrypoint node abs-smoke:local <<'NODE'
@@ -65,24 +64,13 @@ jobs:
           }
           NODE
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish multi-platform image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.IMAGE }}:main
-            ${{ env.IMAGE }}:sha-${{ github.sha }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Publish image
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$TOKEN" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+          docker tag abs-smoke:local "$IMAGE:main"
+          docker tag abs-smoke:local "$IMAGE:sha-${{ github.sha }}"
+          docker push "$IMAGE:main"
+          docker push "$IMAGE:sha-${{ github.sha }}"

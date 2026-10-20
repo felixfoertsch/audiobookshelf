@@ -2,15 +2,15 @@
 
 ## Fork container image
 
-Fork development uses `main` at <https://github.com/felixfoertsch/audiobookshelf>. Every push to `main`, including documentation-only changes, builds and publishes `ghcr.io/felixfoertsch/audiobookshelf:main` for `linux/amd64` and `linux/arm64`. Each build also publishes `:sha-<full-commit-SHA>` for commit-specific pulls. The `Publish fork image` workflow can also run manually on `main`; other branches and pull requests cannot publish. Newer runs cancel older runs on the same branch.
+Fork development uses `main` at <https://git.felixfoertsch.de/felixfoertsch/audiobookshelf>. Every push to `main`, including documentation-only changes, runs `.gitea/workflows/fork-image.yml` on the `linux-builder` Gitea runner and publishes `git.felixfoertsch.de/felixfoertsch/audiobookshelf:main` for `linux/amd64`. Each build also publishes `:sha-<full-commit-SHA>` for commit-specific pulls. The workflow can also run manually on `main`; other branches cannot publish. Newer runs cancel older runs on the same branch.
 
-```fish
-docker pull ghcr.io/felixfoertsch/audiobookshelf:main
+```sh
+docker pull git.felixfoertsch.de/felixfoertsch/audiobookshelf:main
 ```
 
-For a new installation, use the repository's `docker-compose.yml` example and replace only its `image:` value with `ghcr.io/felixfoertsch/audiobookshelf:main` (or a commit-specific tag). Keep its `13378:80` port mapping and persistent `/config`, `/metadata`, `/audiobooks`, and `/podcasts` mounts; adjust host paths for your installation. Back up existing config/metadata before choosing to run experimental builds against existing data.
+For a new installation, use the repository's `docker-compose.yml` example and replace only its `image:` value with `git.felixfoertsch.de/felixfoertsch/audiobookshelf:main` (or a commit-specific tag). Keep its `13378:80` port mapping and persistent `/config`, `/metadata`, `/audiobooks`, and `/podcasts` mounts; adjust host paths for your installation. Back up existing config/metadata before choosing to run experimental builds against existing data.
 
-Publication uses GitHub's built-in `GITHUB_TOKEN` with package-write permission; no Docker Hub credentials, PAT, or repository-secret registration required. GitHub initially creates container packages as private; the package owner must set package visibility to public for anonymous pulls, even when the fork is public. CI checks FFmpeg and full-duration Chromaprint in the built amd64 runtime before multi-platform publication. This checks runtime compatibility, not inserted-audio detection accuracy. Image publication does not update or restart any deployed ABS service; pulling and deploying remain explicit operator actions.
+Publication uses the workflow's built-in Gitea token with package-write permission. CI checks FFmpeg and full-duration Chromaprint in the built runtime before publication. This checks runtime compatibility, not inserted-audio detection accuracy. Image publication does not update or restart any deployed ABS service; pulling and deploying remain explicit operator actions.
 
 ## Optional analysis VPN proxy
 
