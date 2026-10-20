@@ -1,13 +1,12 @@
 import { expect, test } from '@playwright/test'
+import { appMenu, signOut } from './shell-controls'
 
 async function openBook(page: import('@playwright/test').Page) {
 	await page.goto('/new/')
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-	await expect(
-		page.getByRole('button', { name: 'Sign out', exact: true }),
-	).toBeVisible()
+	await expect(appMenu(page)).toBeVisible()
 	await page.goto('/new/item/book-1')
 	await expect(
 		page.getByRole('heading', { name: 'The Glass Orchard', exact: true }),
@@ -36,7 +35,8 @@ test('local logout closes playback before revocation and stays signed out', asyn
 		await release
 		await route.fulfill({ response })
 	})
-	await page.getByRole('link', { name: /Account$/ }).click()
+	await appMenu(page).click()
+	await page.getByRole('menuitem', { name: /Account$/ }).click()
 	await started
 	const requests: string[] = []
 	page.on('request', (req) => {
@@ -45,10 +45,7 @@ test('local logout closes playback before revocation and stays signed out', asyn
 	const revoked = page.waitForResponse(
 		(response) => new URL(response.url()).pathname === '/logout',
 	)
-	await page
-		.getByRole('navigation', { name: 'Main' })
-		.getByRole('button', { name: 'Sign out', exact: true })
-		.click()
+	await signOut(page)
 	await revoked
 	await expect(
 		page.getByRole('button', { name: 'Sign in', exact: true }),

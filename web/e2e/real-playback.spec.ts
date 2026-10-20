@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { expect, type Page, test } from '@playwright/test'
 import { realRecordsSchema } from './real-media/schema'
+import { appMenu } from './shell-controls'
 
 // Validate bounded metadata without importing load.ts, which hashes full tracks.
 const manifest = new URL('./media/real/manifest.json', import.meta.url)
@@ -22,9 +23,7 @@ async function login(page: Page, prefix: string) {
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-	await expect(
-		page.getByRole('button', { name: 'Sign out', exact: true }).first(),
-	).toBeVisible()
+	await expect(appMenu(page).first()).toBeVisible()
 }
 async function advancing(page: Page) {
 	const audio = page.getByLabel('Audio playback')

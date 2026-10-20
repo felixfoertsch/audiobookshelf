@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { appMenu, chooseLibrary, chooseTheme } from './shell-controls'
 
 async function signIn(page: import('@playwright/test').Page, prefix = '') {
 	await page.goto(`${prefix}/new/`)
@@ -11,16 +12,15 @@ async function signIn(page: import('@playwright/test').Page, prefix = '') {
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-	await expect(
-		page.getByRole('button', { name: 'Sign out', exact: true }),
-	).toBeVisible()
+	await expect(appMenu(page)).toBeVisible()
 	await expect(page).toHaveURL(new RegExp(`${prefix}/new/library/podcasts$`))
 	await expect(
 		page.getByRole('link', { name: 'Open Classic', exact: true }),
 	).toHaveAttribute('href', `${prefix}/?classic=1`)
-	await expect(
-		page.getByRole('combobox', { name: 'Library', exact: true }),
-	).toHaveValue('podcasts')
+	if (await page.getByRole('button', { name: /^Library:/ }).isVisible())
+		await expect(page.getByRole('button', { name: /^Library:/ })).toContainText(
+			'Field Notes',
+		)
 }
 for (const prefix of ['', '/abs'])
 	test(`browse and original audio lifecycle ${prefix || 'root'}`, async ({
@@ -28,9 +28,7 @@ for (const prefix of ['', '/abs'])
 		request,
 	}) => {
 		await signIn(page, prefix)
-		await page
-			.getByRole('combobox', { name: 'Library', exact: true })
-			.selectOption('podcasts')
+		await chooseLibrary(page, 'podcasts')
 		await expect(
 			page.getByRole('link', { name: /Night Garden/ }).first(),
 		).toBeVisible()
@@ -80,9 +78,7 @@ for (const prefix of ['', '/abs'])
 		await page
 			.getByRole('link', { name: 'Audiobookshelf', exact: true })
 			.click()
-		await page
-			.getByRole('combobox', { name: 'Library', exact: true })
-			.selectOption('books')
+		await chooseLibrary(page, 'books')
 		await expect(
 			page.getByRole('link', { name: /Northbound Letters/ }).first(),
 		).toBeVisible()
@@ -142,10 +138,7 @@ test('permission error and range contract', async ({ page, request }) => {
 	await expect(page.getByRole('alert').first()).toContainText(
 		'Permission denied',
 	)
-	await expect(
-		page.getByRole('button', { name: 'Sign out', exact: true }),
-	).toBeVisible()
-	await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+	await expect(appMenu(page)).toBeVisible()
 	await expect(
 		page.getByRole('button', { name: 'Sign in', exact: true }),
 	).toHaveCount(0)
@@ -168,10 +161,8 @@ for (const width of [320, 390, 1280])
 		test(`layout ${width} ${theme}`, async ({ page }, testInfo) => {
 			await page.setViewportSize({ width, height: 844 })
 			await signIn(page)
-			await page.getByRole('combobox', { name: 'Theme' }).selectOption(theme)
-			await page
-				.getByRole('combobox', { name: 'Library', exact: true })
-				.selectOption('books')
+			await chooseTheme(page, theme)
+			await chooseLibrary(page, 'books')
 			await expect
 				.poll(() =>
 					page
@@ -221,6 +212,10 @@ for (const width of [320, 390, 1280])
 				.getByLabel('Audio playback')
 				.elementHandle()
 			if (!mountedAudio) throw new Error('Mounted audio missing')
+			if (width < 768)
+				await page
+					.getByRole('button', { name: 'Toggle Sidebar', exact: true })
+					.click()
 			await page
 				.getByRole('link', { name: 'Audiobookshelf', exact: true })
 				.click()

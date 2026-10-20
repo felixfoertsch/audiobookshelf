@@ -5,6 +5,13 @@ import { api, useAuth } from '../../api'
 import { duration, itemSchema } from '../../catalog'
 import { playEpisode, playQueue } from '../../player'
 import { Button } from '../../shared/components/ui/button'
+import { Input } from '../../shared/components/ui/input'
+import {
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
+	useSidebar,
+} from '../../shared/components/ui/sidebar'
 import {
 	type BrowseSearch,
 	browseSearch,
@@ -48,58 +55,131 @@ export function LibraryNav({
 	library: string
 	podcast?: boolean
 }) {
+	const { setOpenMobile } = useSidebar()
+	const router = useRouter()
+	useEffect(
+		() => router.subscribe('onResolved', () => setOpenMobile(false)),
+		[router, setOpenMobile],
+	)
 	const user = useAuth((state) => state.user)
 	const admin = user?.type === 'root' || user?.type === 'admin'
 	return (
-		<nav aria-label="Library" className="flex flex-wrap gap-4 border-b pb-4">
-			<Link to="/library/$library" params={{ library }}>
-				Home
-			</Link>
-			<Link to="/library/$library/bookshelf" params={{ library }}>
-				Library
-			</Link>
-			{(podcast
-				? ['playlists']
-				: ['series', 'authors', 'collections', 'playlists']
-			).map((id) => (
-				<Link
-					key={id}
-					to="/library/$library/bookshelf/$id"
-					params={{ library, id }}
-				>
-					{id[0].toUpperCase() + id.slice(1)}
-				</Link>
-			))}
-			{!podcast && (
-				<Link to="/library/$library/narrators" params={{ library }}>
-					Narrators
-				</Link>
-			)}
-			{admin && !podcast && (
-				<Link to="/library/$library/stats" params={{ library }}>
-					Statistics
-				</Link>
-			)}
-			{podcast && (
-				<>
-					<Link to="/library/$library/podcast/latest" params={{ library }}>
-						Latest episodes
-					</Link>
-					{admin && (
-						<>
-							<Link to="/library/$library/podcast/search" params={{ library }}>
-								Add podcast
-							</Link>
+		<nav aria-label="Library">
+			<SidebarMenu>
+				<SidebarMenuItem>
+					<SidebarMenuButton asChild>
+						<Link
+							activeOptions={{ exact: true, includeSearch: false }}
+							activeProps={{ 'data-active': true }}
+							to="/library/$library"
+							params={{ library }}
+						>
+							Home
+						</Link>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+				<SidebarMenuItem>
+					<SidebarMenuButton asChild>
+						<Link
+							activeOptions={{ exact: true, includeSearch: false }}
+							activeProps={{ 'data-active': true }}
+							to="/library/$library/bookshelf"
+							params={{ library }}
+						>
+							Library
+						</Link>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+				{(podcast
+					? ['playlists']
+					: ['series', 'authors', 'collections', 'playlists']
+				).map((id) => (
+					<SidebarMenuItem key={id}>
+						<SidebarMenuButton asChild>
 							<Link
-								to="/library/$library/podcast/download-queue"
+								activeOptions={{ exact: true, includeSearch: false }}
+								activeProps={{ 'data-active': true }}
+								to="/library/$library/bookshelf/$id"
+								params={{ library, id }}
+							>
+								{id[0].toUpperCase() + id.slice(1)}
+							</Link>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				))}
+				{!podcast && (
+					<SidebarMenuItem>
+						<SidebarMenuButton asChild>
+							<Link
+								activeOptions={{ exact: true, includeSearch: false }}
+								activeProps={{ 'data-active': true }}
+								to="/library/$library/narrators"
 								params={{ library }}
 							>
-								Download queue
+								Narrators
 							</Link>
-						</>
-					)}
-				</>
-			)}
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
+				{admin && !podcast && (
+					<SidebarMenuItem>
+						<SidebarMenuButton asChild>
+							<Link
+								activeOptions={{ exact: true, includeSearch: false }}
+								activeProps={{ 'data-active': true }}
+								to="/library/$library/stats"
+								params={{ library }}
+							>
+								Statistics
+							</Link>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
+				{podcast && (
+					<>
+						<SidebarMenuItem>
+							<SidebarMenuButton asChild>
+								<Link
+									activeOptions={{ exact: true, includeSearch: false }}
+									activeProps={{ 'data-active': true }}
+									to="/library/$library/podcast/latest"
+									params={{ library }}
+								>
+									Latest episodes
+								</Link>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+						{admin && (
+							<>
+								<SidebarMenuItem>
+									<SidebarMenuButton asChild>
+										<Link
+											activeOptions={{ exact: true, includeSearch: false }}
+											activeProps={{ 'data-active': true }}
+											to="/library/$library/podcast/search"
+											params={{ library }}
+										>
+											Add podcast
+										</Link>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+								<SidebarMenuItem>
+									<SidebarMenuButton asChild>
+										<Link
+											activeOptions={{ exact: true, includeSearch: false }}
+											activeProps={{ 'data-active': true }}
+											to="/library/$library/podcast/download-queue"
+											params={{ library }}
+										>
+											Download queue
+										</Link>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							</>
+						)}
+					</>
+				)}
+			</SidebarMenu>
 		</nav>
 	)
 }
@@ -282,7 +362,6 @@ function EntityLink({
 export function HomePage({
 	library,
 	data,
-	podcast,
 }: {
 	library: string
 	data: Awaited<ReturnType<typeof loadHome>>
@@ -294,9 +373,8 @@ export function HomePage({
 	}, [library])
 	return (
 		<section className="space-y-6">
-			<LibraryNav library={library} podcast={podcast} />
 			<h1 className="text-3xl font-semibold">Home</h1>
-			<SearchForm library={library} />
+
 			{!data.length && (
 				<p>No shelves available. Browse library to start listening.</p>
 			)}
@@ -340,6 +418,10 @@ export function SearchForm({
 		ReturnType<typeof searchLibrary>
 	> | null>(null)
 	useEffect(() => {
+		setTerm(q)
+		setSuggestions(null)
+	}, [q])
+	useEffect(() => {
 		if (term.trim().length < 2) {
 			setSuggestions(null)
 			return
@@ -374,10 +456,10 @@ export function SearchForm({
 						})
 				}}
 			>
-				<label className="flex-1">
+				<label htmlFor="library-search" className="min-w-0 flex-1">
 					Search library
-					<input
-						className="block w-full rounded border bg-background p-2"
+					<Input
+						id="library-search"
 						name="q"
 						type="search"
 						value={term}
@@ -540,9 +622,8 @@ export function BrowsePage({
 	}
 	return (
 		<section className="space-y-5">
-			<LibraryNav library={library} podcast={podcast} />
 			<h1 className="text-3xl font-semibold">{section || 'Library'}</h1>
-			<SearchForm library={library} />
+
 			<div className="flex flex-wrap gap-4">
 				<label>
 					Sort
@@ -1020,10 +1101,9 @@ export function SearchPage({
 	)
 	return (
 		<section className="space-y-5">
-			<LibraryNav library={library} />
 			<h1 className="text-3xl font-semibold">Search results for “{q}”</h1>
 			{count === 0 && <p>No search results.</p>}
-			<SearchForm library={library} q={q} />
+
 			{(['book', 'podcast'] as const).map((type) => (
 				<section key={type}>
 					<h2 className="text-xl">{type === 'book' ? 'Books' : 'Podcasts'}</h2>
@@ -1132,7 +1212,6 @@ export function NarratorsPage({
 	}
 	return (
 		<section className="space-y-5">
-			<LibraryNav library={library} />
 			<h1 className="text-3xl">Narrators</h1>
 			{error && <p role="alert">{error}</p>}
 			<table className="w-full">
@@ -1225,7 +1304,6 @@ export function StatsPage({
 }) {
 	return (
 		<section className="space-y-6">
-			<LibraryNav library={library} />
 			<h1 className="text-3xl">Library statistics</h1>
 			<dl className="grid grid-cols-2 gap-3">
 				{[
@@ -1368,7 +1446,6 @@ export function SeriesPage({
 	}
 	return (
 		<section className="space-y-5">
-			<LibraryNav library={library} />
 			<h1 className="text-3xl">{data.name}</h1>
 			<p>{data.description}</p>
 			<p>

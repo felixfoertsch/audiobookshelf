@@ -70,7 +70,12 @@ describe('public shell', () => {
 			)
 			expect(screen.queryByText('Protected player')).toBeNull()
 			expect(screen.queryByText('Audiobookshelf')).toBeNull()
+			expect(screen.queryByRole('searchbox')).toBeNull()
+			expect(screen.queryByRole('navigation', { name: 'Library' })).toBeNull()
+			expect(screen.queryByRole('button', { name: /Menu$/ })).toBeNull()
 			expect(getLibraries).not.toHaveBeenCalled()
+			expect(screen.getAllByRole('main')).toHaveLength(1)
+			expect(screen.getByRole('main').id).toBe('content')
 		},
 	)
 })

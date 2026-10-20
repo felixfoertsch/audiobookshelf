@@ -6,13 +6,44 @@ import {
 	useNavigate,
 	useRouterState,
 } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getAuthGeneration, logout, useAuth } from '../api'
 import { getLibraries } from '../catalog'
 import { LibraryNav, SearchForm } from '../features/catalog/browse'
 import { ServerActivity } from '../features/catalog/server-activity'
 import { Player } from '../player'
 import { Button } from '../shared/components/ui/button'
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from '../shared/components/ui/dropdown-menu'
+import {
+	Sidebar,
+	SidebarContent,
+	SidebarGroup,
+	SidebarHeader,
+	SidebarInset,
+	SidebarProvider,
+	SidebarTrigger,
+	useSidebar,
+} from '../shared/components/ui/sidebar'
+
+function ShellSidebarTrigger() {
+	const { openMobile } = useSidebar()
+	const trigger = useRef<HTMLButtonElement>(null)
+	const wasOpen = useRef(false)
+	useEffect(() => {
+		if (wasOpen.current && !openMobile) trigger.current?.focus()
+		wasOpen.current = openMobile
+	}, [openMobile])
+	return <SidebarTrigger ref={trigger} />
+}
 
 export function AlphaNotice() {
 	return (
@@ -84,6 +115,9 @@ export function Layout({
 	const user = useAuth((state) => state.user)
 	const pathname = useRouterState({
 		select: (state) => state.location.pathname,
+	})
+	const query = useRouterState({
+		select: (state) => state.location.search as { q?: unknown },
 	})
 	const routeIds = useRouterState({
 		select: (state) => state.matches.map((match) => match.routeId),
@@ -173,94 +207,148 @@ export function Layout({
 			>
 				Skip to content
 			</a>
-			<AlphaNotice />
-			<header className="border-b bg-card pt-[env(safe-area-inset-top)]">
-				<div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-5 py-4">
-					<ServerActivity />
-					<Link to="/" className="text-lg font-semibold">
-						Audiobookshelf
-					</Link>
-					<label>
-						Library{' '}
-						<select
-							className="rounded border bg-background p-2"
-							value={currentLibrary?.id || ''}
-							onChange={(event) => {
-								if (event.target.value) {
-									localStorage.setItem('currentLibraryId', event.target.value)
-									void navigate({
-										to: '/library/$library',
-										params: { library: event.target.value },
-									})
-								}
-							}}
-						>
-							<option value="">Choose library</option>
-							{libraries.map((library) => (
-								<option key={library.id} value={library.id}>
-									{library.name}
-								</option>
-							))}
-						</select>
-					</label>
-					<nav
-						aria-label="Main"
-						className="flex flex-1 flex-wrap items-center justify-end gap-3"
-					>
-						<Link to="/config/stats">Your statistics</Link>
-						{(admin || permissions?.upload) && <Link to="/upload">Upload</Link>}
-						{admin && <Link to="/config">Settings</Link>}
-						<Link to="/account">{user.username} · Account</Link>
-						<label className="text-sm">
-							Theme{' '}
-							<select
-								className="rounded-md border bg-background p-2"
-								value={theme}
-								onChange={(event) => setTheme(event.target.value)}
+			<SidebarProvider>
+				<Sidebar>
+					<SidebarHeader>
+						<Link to="/" className="px-2 text-lg font-semibold">
+							Audiobookshelf
+						</Link>
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button variant="outline" className="w-full justify-between">
+									<span className="truncate">
+										Library: {currentLibrary?.name || 'Choose library'}
+									</span>
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent
+								align="start"
+								className="max-w-[calc(100vw-2rem)]"
 							>
-								<option value="system">System</option>
-								<option value="light">Light</option>
-								<option value="dark">Dark</option>
-							</select>
-						</label>
-						<Button
-							variant="outline"
-							onClick={() =>
-								void logout().catch((error: unknown) =>
-									setError(
-										error instanceof Error ? error.message : 'Logout failed',
-									),
-								)
-							}
-						>
-							Sign out
-						</Button>
-					</nav>
-				</div>
-				{currentLibrary && (
-					<div className="mx-auto max-w-6xl space-y-3 px-5 pb-4">
-						<SearchForm library={currentLibrary.id} />
-						<LibraryNav
-							library={currentLibrary.id}
-							podcast={currentLibrary.mediaType === 'podcast'}
-						/>
+								<DropdownMenuLabel>Library</DropdownMenuLabel>
+								<DropdownMenuRadioGroup
+									value={currentLibrary?.id || ''}
+									onValueChange={(id) => {
+										localStorage.setItem('currentLibraryId', id)
+										void navigate({
+											to: '/library/$library',
+											params: { library: id },
+										})
+									}}
+								>
+									{libraries.map((library) => (
+										<DropdownMenuRadioItem key={library.id} value={library.id}>
+											<span className="truncate">{library.name}</span>
+										</DropdownMenuRadioItem>
+									))}
+								</DropdownMenuRadioGroup>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					</SidebarHeader>
+					<SidebarContent>
+						<SidebarGroup>
+							{currentLibrary && (
+								<LibraryNav
+									library={currentLibrary.id}
+									podcast={currentLibrary.mediaType === 'podcast'}
+								/>
+							)}
+						</SidebarGroup>
+					</SidebarContent>
+				</Sidebar>
+				<SidebarInset className="min-w-0">
+					<AlphaNotice />
+					<header className="flex flex-wrap items-center gap-3 border-b bg-card px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+						<ShellSidebarTrigger />
+						<ServerActivity />
+						<div className="min-w-0 basis-40 flex-1">
+							{currentLibrary && (
+								<SearchForm
+									key={currentLibrary.id}
+									library={currentLibrary.id}
+									q={
+										/^\/library\/[^/]+\/search\/?$/.test(pathname) &&
+										typeof query.q === 'string'
+											? query.q
+											: ''
+									}
+								/>
+							)}
+						</div>
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button variant="outline" className="max-w-full">
+									<span className="truncate">{user.username} · Menu</span>
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent
+								align="end"
+								className="max-w-[calc(100vw-2rem)]"
+							>
+								<DropdownMenuItem asChild>
+									<Link to="/config/stats">Your statistics</Link>
+								</DropdownMenuItem>
+								{(admin || permissions?.upload) && (
+									<DropdownMenuItem asChild>
+										<Link to="/upload">Upload</Link>
+									</DropdownMenuItem>
+								)}
+								{admin && (
+									<DropdownMenuItem asChild>
+										<Link to="/config">Settings</Link>
+									</DropdownMenuItem>
+								)}
+								<DropdownMenuItem asChild>
+									<Link to="/account" className="min-w-0">
+										<span className="truncate">{user.username} · Account</span>
+									</Link>
+								</DropdownMenuItem>
+								<DropdownMenuSeparator />
+								<DropdownMenuLabel>Theme</DropdownMenuLabel>
+								<DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+									<DropdownMenuRadioItem value="system">
+										System
+									</DropdownMenuRadioItem>
+									<DropdownMenuRadioItem value="light">
+										Light
+									</DropdownMenuRadioItem>
+									<DropdownMenuRadioItem value="dark">
+										Dark
+									</DropdownMenuRadioItem>
+								</DropdownMenuRadioGroup>
+								<DropdownMenuSeparator />
+								<DropdownMenuItem
+									onSelect={() =>
+										void logout().catch((error: unknown) =>
+											setError(
+												error instanceof Error
+													? error.message
+													: 'Logout failed',
+											),
+										)
+									}
+								>
+									Sign out
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					</header>
+					<div
+						id="content"
+						className="mx-auto w-full min-w-0 min-h-[60vh] max-w-6xl px-4 py-8 pb-80"
+					>
+						{error && (
+							<p role="alert" className="text-destructive">
+								{error}
+							</p>
+						)}
+						{routeError ? <RouteError {...routeError} /> : <Outlet />}
 					</div>
-				)}
-			</header>
-			<main
-				id="content"
-				className="mx-auto min-h-[60vh] max-w-6xl px-5 py-8 pb-80"
-			>
-				{error && (
-					<p role="alert" className="text-destructive">
-						{error}
-					</p>
-				)}
-				{routeError ? <RouteError {...routeError} /> : <Outlet />}
-			</main>
+				</SidebarInset>
+			</SidebarProvider>
 			<Player />
 			<footer className="px-5 pb-80 text-center text-xs text-muted-foreground">
-				Audiobookshelf · Modern frontend 2026.10.20 · Original timeline · No
+				Audiobookshelf · Modern frontend 2026.10.20.1 · Original timeline · No
 				offline media cache
 			</footer>
 		</>

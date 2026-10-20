@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { appMenu, signOut } from './shell-controls'
 
 const sender = `(() => {
  const state = window.__castEvidence = { options: [], ended: 0, stopped: 0 };
@@ -60,9 +61,7 @@ for (const prefix of ['', '/abs'])
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 			await page.waitForURL(`${prefix}/new/library/podcasts`)
-			await expect(
-				page.getByRole('button', { name: 'Sign out', exact: true }).first(),
-			).toBeVisible()
+			await expect(appMenu(page).first()).toBeVisible()
 			if (enabled) {
 				// Login uses location.assign: sender may start in outgoing document too.
 				await expect.poll(() => sdkRequests).toBeGreaterThanOrEqual(1)
@@ -104,13 +103,8 @@ for (const prefix of ['', '/abs'])
 				await expect(page.getByLabel('Choose Cast device')).toHaveCount(0)
 				expect(sdkRequests).toBe(0)
 			}
-			await page
-				.getByRole('button', { name: 'Sign out', exact: true })
-				.first()
-				.click()
-			await expect(
-				page.getByRole('button', { name: 'Sign out', exact: true }),
-			).toHaveCount(0)
+			await signOut(page)
+			await expect(appMenu(page)).toHaveCount(0)
 			expect(errors).toEqual([])
 			await expect
 				.poll(() => page.evaluate(() => localStorage.getItem('token')))

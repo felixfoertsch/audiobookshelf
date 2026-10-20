@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { appMenu, chooseLibrary } from './shell-controls'
 
 test('cached page candidates never override fresh stale session', async ({
 	page,
@@ -19,12 +20,8 @@ test('cached page candidates never override fresh stale session', async ({
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-	await expect(
-		page.getByRole('button', { name: 'Sign out', exact: true }),
-	).toBeVisible()
-	await page
-		.getByRole('combobox', { name: 'Library', exact: true })
-		.selectOption('podcasts')
+	await expect(appMenu(page)).toBeVisible()
+	await chooseLibrary(page, 'podcasts')
 	await page
 		.getByRole('link', { name: /^Field Notes/ })
 		.first()

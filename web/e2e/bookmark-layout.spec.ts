@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { appMenu, chooseTheme } from './shell-controls'
 
 for (const width of [320, 390])
 	for (const theme of ['light', 'dark']) {
@@ -10,17 +11,13 @@ for (const width of [320, 390])
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-			await expect(
-				page.getByRole('button', { name: 'Sign out', exact: true }).first(),
-			).toBeVisible()
+			await expect(appMenu(page).first()).toBeVisible()
 			await page.goto('/new/item/book-1')
-			const themeControl = page.getByRole('combobox', {
-				name: 'Theme',
-				exact: true,
-			})
-			await themeControl.selectOption(theme)
+			await chooseTheme(page, theme)
 			const assertTheme = async () => {
-				await expect(themeControl).toHaveValue(theme)
+				expect(
+					await page.evaluate(() => localStorage.getItem('abs-modern-theme')),
+				).toBe(theme)
 				const colors = await page.evaluate(() => {
 					const root = document.documentElement
 					const background = getComputedStyle(document.body).backgroundColor

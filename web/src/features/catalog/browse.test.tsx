@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-router'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { SidebarProvider } from '../../shared/components/ui/sidebar'
 import { LibraryNav } from './browse'
 import {
 	browsePath,
@@ -54,7 +55,11 @@ describe('canonical library contracts', () => {
 	})
 	it('renders original book navigation paths without alternate plural taxonomy', async () => {
 		const root = createRootRoute({
-			component: () => <LibraryNav library="lib" />,
+			component: () => (
+				<SidebarProvider>
+					<LibraryNav library="lib" />
+				</SidebarProvider>
+			),
 		})
 		const router = createRouter({
 			routeTree: root,

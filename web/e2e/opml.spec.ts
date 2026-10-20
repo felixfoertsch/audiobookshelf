@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { appMenu } from './shell-controls'
 
 const text =
 	'<opml><body><outline type="rss" title="Private original feed" xmlUrl="http://192.168.1.2/feed"/></body></opml>'
@@ -14,9 +15,7 @@ async function signIn(page: Page, prefix: string) {
 	)
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 	await login
-	await expect(
-		page.getByRole('button', { name: 'Sign out', exact: true }).first(),
-	).toBeVisible()
+	await expect(appMenu(page).first()).toBeVisible()
 	await page.goto(`${prefix}/new/library/podcasts/podcast/search`)
 	await expect(page.getByLabel('Import OPML', { exact: true })).toBeEnabled()
 }
