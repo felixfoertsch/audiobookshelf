@@ -76,8 +76,9 @@ it('bounds 489 episodes, reaches last page, and discloses descriptions', async (
 	expect(screen.getByText('Episode description')).toBeTruthy()
 	fireEvent.click(screen.getByRole('button', { name: 'Read less' }))
 	expect(screen.queryByText('Episode description')).toBeNull()
-	for (let i = 0; i < 19; i++)
-		fireEvent.click(screen.getByRole('button', { name: 'Next episodes' }))
+	const next = screen.getByRole('button', { name: 'Next episodes' })
+	for (let i = 0; i < 19; i++) fireEvent.click(next)
+	expect(screen.getByRole('button', { name: 'Next episodes' })).toBe(next)
 	expect(screen.getByRole('heading', { name: 'Episode 489' })).toBeTruthy()
 	expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(14)
 	expect(
