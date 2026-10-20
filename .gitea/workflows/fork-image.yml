@@ -68,6 +68,17 @@ jobs:
           } finally {
             fs.rmSync(dir, { recursive: true, force: true })
           }
+          assert.ok(process.env.NUSQLITE3_PATH, 'NUSQLITE3_PATH must be set')
+          const db = new (require('sqlite3').Database)(':memory:', (err) => {
+            assert.ifError(err)
+            db.loadExtension(process.env.NUSQLITE3_PATH, (err) => {
+              assert.ifError(err)
+              db.close((err) => {
+                assert.ifError(err)
+                console.log('SQLite native binding and nusqlite extension smoke passed')
+              })
+            })
+          })
           NODE
 
       - name: Publish image
