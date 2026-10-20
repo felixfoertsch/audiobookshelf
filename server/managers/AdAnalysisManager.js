@@ -242,19 +242,25 @@ class AdAnalysisManager {
       const refreshInventory = async () => { result.corpus = await corpus.inventory(job.itemId, job.episodeId) }
       await refreshInventory()
       const fingerprints = new Set([result.samples[0].fingerprintSha256])
-      const compare = async (variant, sample) => {
+      const compare = async (variant, variantPath, sample) => {
         await checkpoint()
         const sourceHash = await sha256(job.path)
         if (sourceHash !== hash) throw new Error('cancelled')
         result.samples.push(sample)
         fingerprints.add(sample.fingerprintSha256)
-        const comparison = await alignAsync(original, variant, controller.signal)
+        // Byte-identical frames give exact edges; re-encoded or non-MPEG copies fall back to Chromaprint.
+        let comparison = await alignAsync(job.path, variantPath, controller.signal).catch(() => null)
+        sample.method = 'mpeg_frames'
+        if (!comparison?.segments.length && comparison?.reason !== 'no_inserted_audio') {
+          comparison = await alignAsync(original, variant, controller.signal)
+          sample.method = 'chromaprint'
+        }
         sample.status = comparison.reason
         sample.matchedSeconds = comparison.matchedSeconds
         result.segments.push(...comparison.segments.map((segment) => ({ ...segment, sampleIndex: result.samples.length - 1 })))
       }
       for (const saved of retained.versions) {
-        await compare(saved.fingerprint, { origin: saved.provider, route: saved.route, versionId: saved.versionId, sha256: saved.sha256, fingerprintSha256: saved.fingerprintSha256, retained: true })
+        await compare(saved.fingerprint, Path.join(corpus.root, saved.versionId, 'audio'), { origin: saved.provider, route: saved.route, versionId: saved.versionId, sha256: saved.sha256, fingerprintSha256: saved.fingerprintSha256, retained: true })
       }
       const title = initial.item.media.title
       const author = initial.item.media.author
@@ -321,7 +327,7 @@ class AdAnalysisManager {
             // Duplicates already compared from durable inventory; never bypass capacity with transient samples.
             if (publication.status === 'duplicate') { sample.status = 'duplicate'; break }
             result.samples.pop()
-            await compare(variant, sample)
+            await compare(variant, path, sample)
             attempt.status = 'sampled'
             break
           }
