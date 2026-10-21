@@ -5,6 +5,8 @@ for (const prefix of ['', '/abs']) {
 	test(`compact native player ${prefix || 'root'}`, async ({
 		page,
 	}, testInfo) => {
+		const cdp = await page.context().newCDPSession(page)
+		await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 })
 		await page.route('**/api/items/podcast-1/play/*', async (route) => {
 			const response = await route.fetch()
 			const data = await response.json()

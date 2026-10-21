@@ -129,6 +129,22 @@ test('replacement retains native volume even before queued volumechange fires', 
 	expect(replacement.volume).toBe(0.4)
 	expect(replacement.muted).toBe(true)
 })
+test('replacement restores native volume before metadata event delivery', () => {
+	start()
+	const audio = screen.getByLabelText('Audio playback') as HTMLAudioElement
+	fireEvent.loadedMetadata(audio)
+	audio.volume = 0.4
+	audio.muted = true
+	const session = usePlayer.getState().session
+	if (!session) throw new Error('Missing test session')
+	act(() => usePlayer.getState().set(null))
+	act(() => usePlayer.getState().set({ ...session, id: 'replacement' }))
+	const replacement = screen.getByLabelText('Audio playback') as HTMLAudioElement
+	// readyState and defaultPlaybackRate can change before queued loadedmetadata.
+	expect(replacement.src).toContain('/audio.wav')
+	expect(replacement.volume).toBe(0.4)
+	expect(replacement.muted).toBe(true)
+})
 test('native rate changes persist canonical settings and survive next session', () => {
 	start()
 	const audio = screen.getByLabelText('Audio playback') as HTMLAudioElement
