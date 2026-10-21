@@ -53,3 +53,20 @@ export async function chooseTheme(page: Page, theme: string) {
 		theme === 'dark' ? /dark/ : /^(?!.*dark)/,
 	)
 }
+
+export async function openPlayerOptions(page: Page) {
+	const button = page.getByRole('button', {
+		name: 'Player options',
+		exact: true,
+	})
+	if (await button.isVisible()) await button.click()
+	else {
+		await page.getByRole('button', { name: 'More player actions' }).click()
+		await page
+			.getByRole('menuitem', { name: 'Player options', exact: true })
+			.click()
+	}
+	await expect(
+		page.getByRole('dialog', { name: 'Player options' }),
+	).toBeVisible()
+}

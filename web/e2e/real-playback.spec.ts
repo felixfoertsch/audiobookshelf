@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { expect, type Page, test } from '@playwright/test'
 import { realRecordsSchema } from './real-media/schema'
-import { appMenu } from './shell-controls'
+import { appMenu, openPlayerOptions } from './shell-controls'
 
 // Validate bounded metadata without importing load.ts, which hashes full tracks.
 const manifest = new URL('./media/real/manifest.json', import.meta.url)
@@ -27,7 +27,12 @@ async function login(page: Page, prefix: string) {
 }
 async function advancing(page: Page) {
 	const audio = page.getByLabel('Audio playback')
-	await expect(audio).toBeVisible()
+	await expect(audio).toBeAttached()
+	await expect(
+		page
+			.getByRole('region', { name: 'Audio player' })
+			.or(page.getByRole('dialog', { name: 'Player options' })),
+	).toBeVisible()
 	const before = await audio.evaluate(
 		(node: HTMLAudioElement) => node.currentTime,
 	)
@@ -37,20 +42,10 @@ async function advancing(page: Page) {
 }
 async function seek(page: Page, value: number) {
 	if (!(await page.getByRole('dialog', { name: 'Player options' }).isVisible()))
-		await page.getByRole('button', { name: 'Player options' }).click()
-	await page
-		.getByLabel('Original position (seconds)')
-		.evaluate((node: HTMLInputElement, target) => {
-			const setter = Object.getOwnPropertyDescriptor(
-				HTMLInputElement.prototype,
-				'value',
-			)?.set
-			if (!setter) throw new Error('Native input value setter unavailable')
-			setter.call(node, String(target))
-			node.dispatchEvent(new Event('input', { bubbles: true }))
-			node.dispatchEvent(new Event('change', { bubbles: true }))
-		}, value)
+		await openPlayerOptions(page)
+	await page.getByLabel('Original position (seconds)').fill(String(value))
 	await page.getByLabel('Original position (seconds)').press('Enter')
+	await page.getByLabel('Sleep timer').focus()
 }
 
 test.describe('local real-media browser playback', () => {
@@ -165,7 +160,7 @@ test.describe('local real-media browser playback', () => {
 				.first()
 				.click()
 			await advancing(page)
-			await page.getByRole('button', { name: 'Player options' }).click()
+			await openPlayerOptions(page)
 			await expect(
 				page.getByLabel('Original position (seconds)'),
 			).toHaveAttribute('max', String(total))
@@ -259,6 +254,7 @@ test.describe('local real-media browser playback', () => {
 				})
 				.click()
 			await advancing(page)
+			await page.keyboard.press('Escape')
 			await page
 				.getByRole('link', { name: 'Audiobookshelf', exact: true })
 				.click()

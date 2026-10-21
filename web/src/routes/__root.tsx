@@ -30,7 +30,7 @@ import {
 	LibraryNav,
 	SearchForm,
 } from '../features/catalog/browse'
-import { ServerActivity } from '../features/catalog/server-activity'
+import { ServerActivityObserver } from '../features/catalog/server-activity'
 import { DebugMenu, RouteDebugOverlay } from '../features/debug'
 import { Player } from '../player'
 import { Button } from '../shared/components/ui/button'
@@ -48,8 +48,6 @@ import {
 	Sidebar,
 	SidebarContent,
 	SidebarFooter,
-	SidebarGroup,
-	SidebarGroupLabel,
 	SidebarHeader,
 	SidebarInset,
 	SidebarProvider,
@@ -320,12 +318,6 @@ export function Layout({
 						)}
 					</SidebarContent>
 					<SidebarFooter className="border-t p-3">
-						<SidebarGroup className="p-0">
-							<SidebarGroupLabel>
-								{admin ? 'Administration' : 'About server'}
-							</SidebarGroupLabel>
-							<ServerActivity />
-						</SidebarGroup>
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
 								<Button
@@ -402,6 +394,7 @@ export function Layout({
 						</DropdownMenu>
 					</SidebarFooter>
 				</Sidebar>
+				<ServerActivityObserver />
 				<SidebarInset className="min-w-0 md:peer-data-[state=collapsed]:[--sidebar-width:0px]">
 					<AlphaNotice />
 					<header className="flex items-center gap-2 border-b px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] md:contents">

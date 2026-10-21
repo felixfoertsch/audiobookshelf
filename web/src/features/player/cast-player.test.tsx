@@ -26,8 +26,8 @@ vi.mock('./cast', () => ({
 	stopCast: cast.stop,
 	setCastPlaying: cast.playing,
 	setCastVolume: vi.fn(),
-	setCastRate: vi.fn(),
-	seekCast: vi.fn(),
+	setCastRate: vi.fn().mockResolvedValue(undefined),
+	seekCast: vi.fn().mockResolvedValue(undefined),
 	disconnectCast: vi.fn(),
 }))
 vi.mock('@tanstack/react-router', () => ({
@@ -166,4 +166,48 @@ it('receiver load rejection cannot report successful handoff or start local audi
 	expect(usePlayer.getState().session?.modernCastLoaded).not.toBe(true)
 	expect(cast.stop).toHaveBeenCalledTimes(1)
 	expect(play).not.toHaveBeenCalled()
+})
+
+it('same transport, progress, rate and volume controls drive Cast instead of local audio', async () => {
+	vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+	vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => Response.json({ bookmarks: [] })),
+	)
+	cast.state.connected = true
+	cast.snapshot.mockReturnValue({
+		currentTime: 12,
+		paused: false,
+		volume: 0.6,
+		ended: false,
+	})
+	usePlayer.setState({
+		session: sessionSchema.parse({
+			...native,
+			modernCast: true,
+			modernCastLoaded: true,
+		}),
+		error: '',
+	})
+	const view = render(<Player />)
+	fireEvent.click(view.getByRole('button', { name: 'Pause', exact: true }))
+	expect(cast.playing).toHaveBeenCalledWith(false)
+	const { seekCast, setCastRate, setCastVolume } = await import('./cast')
+	fireEvent.click(view.getByRole('button', { name: 'Skip forward 30 seconds' }))
+	expect(seekCast).toHaveBeenCalledWith(42)
+	fireEvent.keyDown(view.getByRole('slider', { name: 'Playback progress' }), {
+		key: 'ArrowRight',
+		code: 'ArrowRight',
+	})
+	expect(seekCast).toHaveBeenCalledWith(13)
+	fireEvent.click(view.getByRole('button', { name: 'Player options' }))
+	fireEvent.change(view.getByLabelText('Playback speed'), {
+		target: { value: '1.5' },
+	})
+	expect(setCastRate).toHaveBeenCalledWith(1.5)
+	fireEvent.keyDown(view.getByRole('slider', { name: 'Volume' }), {
+		key: 'Home',
+	})
+	expect(setCastVolume).toHaveBeenCalledWith(0)
 })

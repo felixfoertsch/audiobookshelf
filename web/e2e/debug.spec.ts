@@ -53,7 +53,10 @@ for (const prefix of ['', '/abs'])
 		await expect(page.locator('.dbo-route')).toHaveText('/item/book-1')
 		await page.getByRole('button', { name: 'Play audiobook' }).click()
 		const audio = page.getByLabel('Audio playback')
-		await expect(audio).toBeVisible()
+		await expect(audio).toBeAttached()
+		await expect(
+			page.getByRole('region', { name: 'Audio player' }),
+		).toBeVisible()
 		await expect
 			.poll(() =>
 				audio.evaluate(

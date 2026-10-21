@@ -30,10 +30,20 @@ function start() {
 	)
 	return render(<Player />)
 }
-test('native audio is sole local timeline and volume; settings stay disclosed without replacing audio', () => {
+test('custom controls drive single hidden audio engine; settings preserve audio', () => {
 	const { container } = start()
 	const audio = screen.getByLabelText('Audio playback')
-	expect(audio.hasAttribute('controls')).toBe(true)
+	expect(audio.hasAttribute('controls')).toBe(false)
+	expect(audio.className).toBe('hidden')
+	fireEvent.loadedMetadata(audio)
+	fireEvent.click(
+		screen.getByRole('button', { name: 'Skip forward 30 seconds' }),
+	)
+	expect((audio as HTMLAudioElement).currentTime).toBe(30)
+	fireEvent.click(screen.getByRole('button', { name: 'Skip back 15 seconds' }))
+	expect((audio as HTMLAudioElement).currentTime).toBe(15)
+	;(audio as HTMLAudioElement).currentTime = 0
+	fireEvent.timeUpdate(audio)
 	expect(container.querySelectorAll('audio')).toHaveLength(1)
 	const nativeKey = new KeyboardEvent('keydown', {
 		code: 'Space',
@@ -42,7 +52,7 @@ test('native audio is sole local timeline and volume; settings stay disclosed wi
 	})
 	audio.dispatchEvent(nativeKey)
 	expect(nativeKey.defaultPrevented).toBe(false)
-	expect(screen.queryByRole('slider')).toBeNull()
+	expect(screen.getByRole('slider', { name: 'Playback progress' })).toBeTruthy()
 	expect(screen.queryByLabelText('Sleep timer')).toBeNull()
 	fireEvent.click(screen.getByRole('button', { name: 'Player options' }))
 	expect(screen.getByRole('dialog', { name: 'Player options' })).toBeTruthy()
@@ -161,4 +171,73 @@ test('native rate changes persist canonical settings and survive next session', 
 	act(() => usePlayer.getState().set({ ...session, id: 'next' }))
 	fireEvent.loadedMetadata(audio)
 	expect(audio.playbackRate).toBe(1.5)
+})
+
+test('transport, progress keys and volume use the audio engine without hijacking inputs', () => {
+	start()
+	const audio = screen.getByLabelText('Audio playback') as HTMLAudioElement
+	fireEvent.loadedMetadata(audio)
+	fireEvent.play(audio)
+	expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
+	fireEvent.waiting(audio)
+	expect(screen.getByLabelText('Buffering')).toBeTruthy()
+	fireEvent.playing(audio)
+	expect(screen.queryByLabelText('Buffering')).toBeNull()
+	fireEvent.keyDown(screen.getByRole('slider', { name: 'Playback progress' }), {
+		key: 'ArrowRight',
+		code: 'ArrowRight',
+	})
+	expect(audio.currentTime).toBe(1)
+	fireEvent.click(screen.getByRole('button', { name: 'Player options' }))
+	const input = screen.getByLabelText('Original position (seconds)')
+	const play = vi.mocked(HTMLMediaElement.prototype.play)
+	play.mockClear()
+	fireEvent.keyDown(input, { key: ' ', code: 'Space' })
+	expect(play).not.toHaveBeenCalled()
+	fireEvent.click(screen.getByRole('button', { name: 'Mute' }))
+	expect(audio.muted).toBe(true)
+	fireEvent.click(screen.getByRole('button', { name: 'Unmute' }))
+	expect(audio.muted).toBe(false)
+	fireEvent.keyDown(screen.getByRole('slider', { name: 'Volume' }), {
+		key: 'Home',
+	})
+	expect(audio.volume).toBe(0)
+	fireEvent.keyDown(screen.getByRole('slider', { name: 'Volume' }), {
+		key: 'ArrowRight',
+	})
+	expect(audio.volume).toBe(0.01)
+})
+
+test('volume chosen while loading survives track switch before metadata', () => {
+	start()
+	const session = usePlayer.getState().session
+	if (!session) throw new Error('Missing session')
+	act(() =>
+		usePlayer.getState().set({
+			...session,
+			duration: 120,
+			audioTracks: [
+				{ contentUrl: '/one.wav', duration: 60, startOffset: 0 },
+				{ contentUrl: '/two.wav', duration: 60, startOffset: 60 },
+			],
+		}),
+	)
+	const audio = screen.getByLabelText('Audio playback') as HTMLAudioElement
+	fireEvent.click(screen.getByRole('button', { name: 'Player options' }))
+	fireEvent.keyDown(screen.getByRole('slider', { name: 'Volume' }), {
+		key: 'Home',
+	})
+	fireEvent.keyDown(screen.getByRole('slider', { name: 'Volume' }), {
+		key: 'ArrowRight',
+	})
+	fireEvent.click(screen.getByRole('button', { name: 'Mute' }))
+	expect(audio.volume).toBe(0.01)
+	expect(audio.muted).toBe(true)
+	fireEvent.loadedMetadata(audio)
+	const position = screen.getByLabelText('Original position (seconds)')
+	fireEvent.change(position, { target: { value: '65' } })
+	fireEvent.submit(position.closest('form') || position)
+	expect(audio.src).toContain('/two.wav')
+	expect(audio.volume).toBe(0.01)
+	expect(audio.muted).toBe(true)
 })

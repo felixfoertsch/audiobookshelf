@@ -1,6 +1,17 @@
 import { Link } from '@tanstack/react-router'
 import Hls from 'hls.js'
-import { Ellipsis, Pause, Play } from 'lucide-react'
+import {
+	Ellipsis,
+	Info,
+	ListMusic,
+	LoaderCircle,
+	Pause,
+	Play,
+	RotateCcw,
+	RotateCw,
+	Volume2,
+	VolumeX,
+} from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { create } from 'zustand'
@@ -31,6 +42,17 @@ import { candidateAt } from './features/player/skipping'
 import { originalTime, trackAt } from './features/player/timeline'
 import { Button } from './shared/components/ui/button'
 import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from './shared/components/ui/dropdown-menu'
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from './shared/components/ui/popover'
+import {
 	Sheet,
 	SheetContent,
 	SheetDescription,
@@ -38,6 +60,7 @@ import {
 	SheetTitle,
 	SheetTrigger,
 } from './shared/components/ui/sheet'
+import { Slider } from './shared/components/ui/slider'
 
 const segment = z
 	.object({ start: z.number().nonnegative(), end: z.number().positive() })
@@ -344,6 +367,27 @@ export function Player() {
 		[remote],
 	)
 	const [position, setPosition] = useState(0)
+	const [paused, setPaused] = useState(true)
+	const [buffering, setBuffering] = useState(false)
+	const [volume, setVolume] = useState(1)
+	const [muted, setMuted] = useState(false)
+	const [optionsOpen, setOptionsOpen] = useState(false)
+	function changeVolume(value: number) {
+		if (remote) setCastVolume(value)
+		else if (audio.current) {
+			audio.current.volume = value
+			localVolume.current = { volume: value, muted: audio.current.muted }
+		}
+		setVolume(value)
+	}
+	function toggleMute() {
+		if (remote) setCastVolume(muted ? volume : 0)
+		else if (audio.current) {
+			audio.current.muted = !muted
+			localVolume.current = { volume: audio.current.volume, muted: !muted }
+		}
+		setMuted(!muted)
+	}
 	const [seekDraft, setSeekDraft] = useState('0')
 	const editingSeek = useRef(false)
 	useEffect(() => {
@@ -405,7 +449,9 @@ export function Player() {
 				event.metaKey ||
 				(target instanceof HTMLElement &&
 					(target.isContentEditable ||
-						target.closest('input,textarea,select,button,a,audio')))
+						target.closest(
+							'input,textarea,select,button,a,audio,[role=slider],[role=menuitem],[role=dialog]',
+						)))
 			)
 				return
 			if (event.code === 'Space') {
@@ -727,6 +773,9 @@ export function Player() {
 			element.playbackRate = element.defaultPlaybackRate
 			initialized = true
 			sourceReady.current = true
+			setVolume(element.volume)
+			setMuted(element.muted)
+			setBuffering(false)
 			setPosition(
 				originalTime(
 					session.audioTracks,
@@ -838,7 +887,14 @@ export function Player() {
 		if (remote) {
 			element.pause()
 			initialized = session.modernCastLoaded === true
-			setPosition(session.currentTime)
+			const snapshot = castSnapshot()
+			setPaused(snapshot?.paused ?? true)
+			setBuffering(!initialized)
+			if (snapshot) {
+				setVolume(snapshot.volume)
+				setMuted(snapshot.volume === 0)
+			}
+			setPosition(snapshot?.currentTime ?? session.currentTime)
 		} else loadSource(url)
 		const timer = window.setInterval(() => {
 			const now = performance.now()
@@ -853,6 +909,10 @@ export function Player() {
 					disconnected = false
 					remotePosition = snapshot.currentTime
 					setPosition(remotePosition)
+					setPaused(snapshot.paused)
+					setBuffering(false)
+					if (snapshot.volume > 0) setVolume(snapshot.volume)
+					setMuted(snapshot.volume === 0)
 					if (!snapshot.paused) {
 						listened += Math.min((now - lastTick) / 1000, 2)
 						const index = candidateAt(
@@ -930,7 +990,7 @@ export function Player() {
 	return (
 		<section
 			aria-label="Audio player"
-			className="fixed inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-3xl rounded-2xl border bg-card/80 px-3 py-2 shadow-xl backdrop-blur-xl sm:rounded-full md:left-[calc(var(--sidebar-width,0px)+0.5rem)]"
+			className="fixed inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-3xl rounded-2xl border bg-card/80 px-3 py-1 shadow-xl sm:py-1.5 backdrop-blur-xl sm:rounded-full md:left-[calc(var(--sidebar-width,0px)+0.5rem)]"
 		>
 			<div className="space-y-1 break-words">
 				{streamMessage && <p role="status">{streamMessage}</p>}
@@ -956,8 +1016,45 @@ export function Player() {
 					</p>
 				)}
 				{session && (
-					<div className="grid min-w-0 grid-cols-[1fr_auto] items-center gap-x-2 sm:grid-cols-[minmax(0,1fr)_minmax(300px,2fr)_auto]">
-						<div className="flex min-w-0 items-center gap-2">
+					<div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-1 sm:grid-cols-[176px_minmax(0,1fr)_auto_auto_auto_auto]">
+						<div className="col-start-1 row-span-2 row-start-1 hidden items-center sm:flex">
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button
+										variant="ghost"
+										className="size-11 p-0"
+										aria-label="Playback rate"
+										title="Playback rate"
+									>
+										{settings.playbackRate || 1}×
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent>
+									{Array.from(
+										{ length: 16 },
+										(_, index) => (index + 1) / 4,
+									).map((rate) => (
+										<DropdownMenuItem
+											key={rate}
+											onSelect={() => updateSetting('playbackRate', rate)}
+										>
+											{rate}×
+										</DropdownMenuItem>
+									))}
+								</DropdownMenuContent>
+							</DropdownMenu>
+							<Button
+								variant="ghost"
+								className="size-11 p-0"
+								aria-label="Skip back 15 seconds"
+								title="Skip back 15 seconds"
+								onClick={() => seekPlayback(position - 15)}
+							>
+								<RotateCcw aria-hidden="true" />
+								<span className="text-[10px]">15</span>
+							</Button>
+						</div>
+						<div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2 sm:col-start-2">
 							{session.libraryItemId && session.coverPath && (
 								<img
 									alt=""
@@ -986,20 +1083,144 @@ export function Player() {
 								)}
 							</div>
 						</div>
+						<div className="col-span-full row-start-2 flex min-w-0 items-center gap-2 sm:col-span-1 sm:col-start-2">
+							<span
+								role="timer"
+								aria-label="Elapsed time"
+								className="text-[10px] tabular-nums text-muted-foreground"
+							>
+								{duration(position)}
+							</span>
+							<Slider
+								aria-label="Playback progress"
+								aria-valuetext={`${duration(position)} of ${duration(session.duration)}`}
+								className="h-6"
+								min={0}
+								max={session.duration}
+								step={1}
+								value={[Math.min(position, session.duration)]}
+								onValueChange={([value]) => seekPlayback(value)}
+							/>
+							<span
+								role="timer"
+								aria-label="Remaining time"
+								className="text-[10px] tabular-nums text-muted-foreground"
+							>
+								-{duration(Math.max(0, session.duration - position))}
+							</span>
+						</div>
+						<Button
+							variant="ghost"
+							className="col-start-2 row-start-1 size-11 p-0 sm:col-start-1 sm:ml-[88px] sm:row-span-2 sm:row-start-1"
+							disabled={remote && !casting.connected}
+							aria-label={paused ? 'Play' : 'Pause'}
+							title={paused ? 'Play (Space)' : 'Pause (Space)'}
+							onClick={() => playing(paused)}
+						>
+							{buffering ? (
+								<LoaderCircle
+									aria-label="Buffering"
+									className="animate-spin motion-reduce:animate-none"
+								/>
+							) : paused ? (
+								<Play aria-hidden="true" className="size-6" />
+							) : (
+								<Pause aria-hidden="true" className="size-6" />
+							)}
+						</Button>
+						<Button
+							variant="ghost"
+							className="col-start-3 row-start-1 size-11 p-0 sm:col-start-1 sm:row-span-2 sm:row-start-1 sm:ml-[132px]"
+							aria-label="Skip forward 30 seconds"
+							title="Skip forward 30 seconds"
+							onClick={() => seekPlayback(position + 30)}
+						>
+							<RotateCw aria-hidden="true" />
+							<span className="text-[10px]">30</span>
+						</Button>
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button
+									variant="ghost"
+									className="col-start-4 row-start-1 size-11 p-0 sm:col-start-3 sm:row-span-2 sm:row-start-1"
+									aria-label="More player actions"
+									title="More player actions"
+								>
+									<Ellipsis aria-hidden="true" />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent
+								onCloseAutoFocus={(event) => {
+									if (optionsOpen) event.preventDefault()
+								}}
+							>
+								{session.libraryItemId && (
+									<DropdownMenuItem asChild>
+										<Link to="/item/$id" params={{ id: session.libraryItemId }}>
+											Go to show or book
+										</Link>
+									</DropdownMenuItem>
+								)}
+								<DropdownMenuItem onSelect={() => setOptionsOpen(true)}>
+									Player options
+								</DropdownMenuItem>
+								<DropdownMenuItem onSelect={() => seekPlayback(position - 15)}>
+									Skip back 15 seconds
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+						<Popover>
+							<PopoverTrigger asChild>
+								<Button
+									variant="ghost"
+									className="hidden size-11 p-0 sm:col-start-6 sm:row-span-2 sm:row-start-1 sm:flex"
+									aria-label="Volume"
+									title="Volume"
+								>
+									{muted || volume === 0 ? (
+										<VolumeX aria-hidden="true" />
+									) : (
+										<Volume2 aria-hidden="true" />
+									)}
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent className="w-60 space-y-3" side="top">
+								<Slider
+									aria-label="Volume"
+									min={0}
+									max={1}
+									step={0.01}
+									value={[muted ? 0 : volume]}
+									onValueChange={([value]) => changeVolume(value)}
+								/>
+								<Button variant="outline" onClick={toggleMute}>
+									{muted ? 'Unmute' : 'Mute'}
+								</Button>
+							</PopoverContent>
+						</Popover>
 						<audio
 							ref={audio}
-							className={
-								remote
-									? 'hidden'
-									: 'col-span-2 row-start-2 h-[40px] w-full min-w-0 sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:h-[54px]'
-							}
-							controls
+							className="hidden"
+							onPlay={() => setPaused(false)}
+							onPause={() => setPaused(true)}
+							onLoadStart={() => {
+								if (!remote) setBuffering(true)
+							}}
+							onWaiting={() => setBuffering(true)}
+							onPlaying={() => {
+								setBuffering(false)
+								setPaused(false)
+							}}
+							onCanPlay={() => setBuffering(false)}
 							onVolumeChange={() => {
-								if (!remote && sourceReady.current && audio.current)
+								if (!remote && sourceReady.current && audio.current) {
+									setVolume(audio.current.volume)
+									setMuted(audio.current.muted)
 									localVolume.current = {
 										volume: audio.current.volume,
 										muted: audio.current.muted,
 									}
+								}
 							}}
 							onRateChange={() => {
 								if (!remote && sourceReady.current && audio.current) {
@@ -1017,40 +1238,32 @@ export function Player() {
 							}}
 							onTimeUpdate={update}
 							onSeeked={update}
-							onError={() =>
+							onError={() => {
+								setBuffering(false)
 								usePlayer.setState({
 									error:
 										'Audio could not load. Retry playback or retry with transcoding.',
 								})
-							}
+							}}
 							aria-label="Audio playback"
 						>
 							<track kind="captions" />
 						</audio>
-						{remote && (
-							<div className="col-span-2 flex items-center justify-center gap-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
-								<Button
-									variant="ghost"
-									size="icon"
-									disabled={!casting.connected}
-									aria-label="Play on Cast"
-									onClick={() => playing(true)}
-								>
-									<Play aria-hidden="true" />
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									disabled={!casting.connected}
-									aria-label="Pause Cast"
-									onClick={() => playing(false)}
-								>
-									<Pause aria-hidden="true" />
-								</Button>
-							</div>
+						{queue.entries.length > 0 && (
+							<Button
+								variant="ghost"
+								className="hidden size-11 sm:col-start-5 sm:row-span-2 sm:row-start-1 sm:flex"
+								aria-label="Up next"
+								title="Up next"
+								onClick={() => setOptionsOpen(true)}
+							>
+								<ListMusic aria-hidden="true" />
+							</Button>
 						)}
 						<Sheet
-							onOpenChange={() => {
+							open={optionsOpen}
+							onOpenChange={(open) => {
+								setOptionsOpen(open)
 								editingSeek.current = false
 								setSeekDraft(String(Math.floor(position)))
 							}}
@@ -1059,11 +1272,11 @@ export function Player() {
 								<Button
 									variant="ghost"
 									size="icon"
-									className="col-start-2 row-start-1 sm:col-start-3"
+									className="hidden size-11 sm:col-start-4 sm:row-span-2 sm:row-start-1 sm:flex"
 									aria-label="Player options"
 									title="Player options"
 								>
-									<Ellipsis aria-hidden="true" />
+									<Info aria-hidden="true" />
 								</Button>
 							</SheetTrigger>
 							<SheetContent className="w-full overflow-y-auto p-4 sm:max-w-2xl">
@@ -1210,25 +1423,19 @@ export function Player() {
 										>
 											Next queued
 										</Button>
-										{remote && (
-											<label>
-												Volume{' '}
-												<input
-													aria-label="Volume"
-													type="range"
-													min="0"
-													max="1"
-													step="0.01"
-													defaultValue="1"
-													onChange={(event) => {
-														if (remote)
-															setCastVolume(Number(event.target.value))
-														else if (audio.current)
-															audio.current.volume = Number(event.target.value)
-													}}
-												/>
-											</label>
-										)}
+										<div className="flex w-60 items-center gap-3">
+											<Slider
+												aria-label="Volume"
+												min={0}
+												max={1}
+												step={0.01}
+												value={[muted ? 0 : volume]}
+												onValueChange={([value]) => changeVolume(value)}
+											/>
+											<Button variant="outline" onClick={toggleMute}>
+												{muted ? 'Unmute' : 'Mute'}
+											</Button>
+										</div>
 										<label>
 											Sleep{' '}
 											<select

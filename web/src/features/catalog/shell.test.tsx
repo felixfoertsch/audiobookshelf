@@ -113,7 +113,8 @@ it.each(['home', 'bookshelf', 'search', 'error'])(
 				view === 'home' ? 'Home' : view === 'search' ? 'Search' : 'Library',
 			)
 		expect(screen.getByText('Discover')).toBeTruthy()
-		expect(screen.getByText('Administration')).toBeTruthy()
+		expect(screen.queryByText('Administration')).toBeNull()
+		expect(screen.queryByText(/Server activity/)).toBeNull()
 		expect(screen.getByRole('contentinfo').textContent).toContain(
 			`Modern frontend ${frontendPackage.version} ·`,
 		)

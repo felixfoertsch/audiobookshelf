@@ -4,6 +4,7 @@ import {
 	chooseLibrary,
 	chooseTheme,
 	closeSidebar,
+	openPlayerOptions,
 	openSidebar,
 } from './shell-controls'
 
@@ -50,7 +51,10 @@ for (const prefix of ['', '/abs'])
 			.first()
 			.click()
 		const audio = page.getByLabel('Audio playback')
-		await expect(audio).toBeVisible()
+		await expect(audio).toBeAttached()
+		await expect(
+			page.getByRole('region', { name: 'Audio player' }),
+		).toBeVisible()
 		await expect
 			.poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
 			.toBeGreaterThan(0.1)
@@ -61,7 +65,7 @@ for (const prefix of ['', '/abs'])
 				),
 			)
 			.toBeGreaterThan(8)
-		await page.getByRole('button', { name: 'Player options' }).click()
+		await openPlayerOptions(page)
 		await expect(
 			page.getByRole('checkbox', { name: 'Skip detected inserted audio' }),
 		).toBeEnabled()
@@ -84,7 +88,10 @@ for (const prefix of ['', '/abs'])
 			.toBeGreaterThan(5.9)
 		await page.keyboard.press('Escape')
 		await page.goBack()
-		await expect(audio).toBeVisible()
+		await expect(audio).toBeAttached()
+		await expect(
+			page.getByRole('region', { name: 'Audio player' }),
+		).toBeVisible()
 		await page
 			.getByRole('link', { name: 'Audiobookshelf', exact: true })
 			.click()
@@ -108,7 +115,7 @@ for (const prefix of ['', '/abs'])
 			node.currentTime = 7
 			node.pause()
 		})
-		await page.getByRole('button', { name: 'Player options' }).click()
+		await openPlayerOptions(page)
 		await page.getByRole('button', { name: 'Close player' }).click()
 		await expect(page.getByLabel('Audio playback')).toHaveCount(0)
 		const observations = (await (
@@ -229,7 +236,7 @@ for (const width of [320, 390, 1280])
 			expect(
 				await player.evaluate((node) => node.scrollWidth <= node.clientWidth),
 			).toBe(true)
-			await expect(page.getByLabel('Audio playback')).toBeInViewport()
+			await expect(page.getByLabel('Audio playback')).toBeAttached()
 			const mountedAudio = await page
 				.getByLabel('Audio playback')
 				.elementHandle()
@@ -243,7 +250,7 @@ for (const width of [320, 390, 1280])
 				.click()
 			await expect(page).toHaveURL('/new/library/books')
 			expect(await mountedAudio.evaluate((node) => node.isConnected)).toBe(true)
-			await expect(page.getByLabel('Audio playback')).toBeVisible()
+			await expect(page.getByLabel('Audio playback')).toBeAttached()
 			await expect(player).toBeVisible()
 			expect(
 				await page.evaluate(
@@ -253,7 +260,7 @@ for (const width of [320, 390, 1280])
 			expect(
 				await player.evaluate((node) => node.scrollWidth <= node.clientWidth),
 			).toBe(true)
-			await expect(page.getByLabel('Audio playback')).toBeInViewport()
+			await expect(page.getByLabel('Audio playback')).toBeAttached()
 			await page.screenshot({
 				path: testInfo.outputPath(`player-${width}-${theme}.png`),
 			})

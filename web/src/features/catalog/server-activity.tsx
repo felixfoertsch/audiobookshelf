@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { z } from 'zod'
+import { create } from 'zustand'
 import serverPackage from '../../../../package.json'
 import { useAuth } from '../../api'
 
@@ -13,17 +14,24 @@ const taskSchema = z.object({
 	isFinished: z.boolean().optional(),
 	isFailed: z.boolean().optional(),
 })
-export function ServerActivity() {
+type ActivityState = {
+	identity: string
+	online: z.infer<typeof onlineUser>[] | null
+	tasks: z.infer<typeof taskSchema>[]
+}
+const useActivity = create<ActivityState>(() => ({
+	identity: '',
+	online: null,
+	tasks: [],
+}))
+
+export function ServerActivityObserver() {
 	const user = useAuth((state) => state.user)
-	const source = useAuth((state) => state.bootstrap?.Source)
-	const [online, setOnline] = useState<z.infer<typeof onlineUser>[] | null>(
-		null,
-	)
-	const [tasks, setTasks] = useState<z.infer<typeof taskSchema>[]>([])
+	const identity = `${user?.id ?? ''}:${user?.type ?? ''}`
 	const admin = user?.type === 'root' || user?.type === 'admin'
 	useEffect(() => {
-		setOnline(null)
-		setTasks([])
+		useActivity.setState({ identity, online: null, tasks: [] })
+		if (!user) return
 		const receive = (event: Event) => {
 			if (useAuth.getState().user !== user) return
 			const data = z
@@ -32,14 +40,15 @@ export function ServerActivity() {
 			if (!data.success) return
 			const { event: name, payload } = data.data
 			if (name === 'reconnect' || name === 'disconnect') {
-				setOnline(null)
-				setTasks([])
+				useActivity.setState({ online: null, tasks: [] })
+				return
 			}
 			if (name === 'init') {
 				const result = z
 					.object({ usersOnline: z.array(onlineUser).optional() })
 					.safeParse(payload)
-				if (result.success) setOnline(result.data.usersOnline || null)
+				if (result.success)
+					useActivity.setState({ online: result.data.usersOnline || null })
 			}
 			if (
 				admin &&
@@ -47,27 +56,43 @@ export function ServerActivity() {
 			) {
 				const result = onlineUser.safeParse(payload)
 				if (result.success)
-					setOnline((previous) =>
-						previous === null
-							? null
-							: [
-									...previous.filter((entry) => entry.id !== result.data.id),
-									...(name === 'user_offline' ? [] : [result.data]),
-								],
-					)
+					useActivity.setState((state) => ({
+						online:
+							state.online === null
+								? null
+								: [
+										...state.online.filter(
+											(entry) => entry.id !== result.data.id,
+										),
+										...(name === 'user_offline' ? [] : [result.data]),
+									],
+					}))
 			}
 			if (name === 'task_started' || name === 'task_finished') {
 				const result = taskSchema.safeParse(payload)
 				if (result.success)
-					setTasks((previous) => [
-						...previous.filter((task) => task.id !== result.data.id),
-						result.data,
-					])
+					useActivity.setState((state) => ({
+						tasks: [
+							...state.tasks.filter((task) => task.id !== result.data.id),
+							result.data,
+						],
+					}))
 			}
 		}
 		window.addEventListener('abs:socket', receive)
 		return () => window.removeEventListener('abs:socket', receive)
-	}, [user, admin])
+	}, [user, identity, admin])
+	return null
+}
+
+export function ServerActivity() {
+	const user = useAuth((state) => state.user)
+	const source = useAuth((state) => state.bootstrap?.Source)
+	const identity = `${user?.id ?? ''}:${user?.type ?? ''}`
+	const state = useActivity()
+	const online = state.identity === identity ? state.online : null
+	const tasks = state.identity === identity ? state.tasks : []
+	const admin = user?.type === 'root' || user?.type === 'admin'
 	return (
 		<details className="rounded border p-2">
 			<summary>Server activity · v{serverPackage.version}</summary>

@@ -506,6 +506,17 @@ async function handleRequest(request: Request) {
 			id,
 			episodeId,
 			libraryItemId: item.id,
+			displayTitle:
+				'episodes' in item.media
+					? item.media.episodes.find((episode) => episode.id === episodeId)
+							?.title
+					: item.media.metadata.title,
+			displayAuthor:
+				'author' in item.media.metadata
+					? item.media.metadata.author
+					: undefined,
+			coverPath: item.media.coverPath,
+			chapters: 'chapters' in item.media ? item.media.chapters : [],
 			currentTime: 0,
 			duration,
 			audioTracks: bookRecord

@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { appMenu, chooseTheme, openSidebar } from './shell-controls'
+import {
+	appMenu,
+	chooseTheme,
+	openPlayerOptions,
+	openSidebar,
+} from './shell-controls'
 
 for (const width of [320, 390])
 	for (const theme of ['light', 'dark']) {
@@ -54,7 +59,7 @@ for (const width of [320, 390])
 					audio.evaluate((node: HTMLAudioElement) => node.currentTime),
 				)
 				.toBeGreaterThan(0)
-			await page.getByRole('button', { name: 'Player options' }).click()
+			await openPlayerOptions(page)
 			await page
 				.getByText('Chapters, bookmarks, queue and settings', { exact: true })
 				.click()

@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { appMenu, closeSidebar, openSidebar, signOut } from './shell-controls'
+import {
+	appMenu,
+	closeSidebar,
+	openPlayerOptions,
+	openSidebar,
+	signOut,
+} from './shell-controls'
 
 async function openBook(page: import('@playwright/test').Page) {
 	await page.goto('/new/')
@@ -19,7 +25,8 @@ test('local logout closes playback before revocation and stays signed out', asyn
 }) => {
 	await openBook(page)
 	await page.getByRole('button', { name: 'Play audiobook' }).click()
-	await expect(page.getByLabel('Audio playback')).toBeVisible()
+	await expect(page.getByRole('region', { name: 'Audio player' })).toBeVisible()
+	await expect(page.getByLabel('Audio playback')).toBeAttached()
 	// Keep short fixture audio from ending while refresh is deliberately blocked.
 	await page
 		.getByLabel('Audio playback')
@@ -97,7 +104,7 @@ test('failed metadata preserves resume when closing', async ({ page }) => {
 	await openBook(page)
 	await page.getByRole('button', { name: 'Play audiobook' }).click()
 	await expect(page.getByRole('alert')).toContainText('Audio could not load')
-	await page.getByRole('button', { name: 'Player options' }).click()
+	await openPlayerOptions(page)
 	await page.getByRole('button', { name: 'Close player' }).click()
 	await expect.poll(() => closedTime).toBe(8)
 })
@@ -111,7 +118,8 @@ test('ended session removed then replay creates fresh session', async ({
 	await page.getByRole('button', { name: 'Play audiobook' }).click()
 	const initial = await (await initialResponse).json()
 	const audio = page.getByLabel('Audio playback')
-	await expect(audio).toBeVisible()
+	await expect(audio).toBeAttached()
+	await expect(page.getByRole('region', { name: 'Audio player' })).toBeVisible()
 	await audio.evaluate((node) => node.dispatchEvent(new Event('ended')))
 	await expect(audio).toHaveCount(0)
 	const request = page.waitForResponse((response) =>
@@ -121,7 +129,8 @@ test('ended session removed then replay creates fresh session', async ({
 	const data = await (await request).json()
 	expect(data.id).toMatch(/^fixture-session-/)
 	expect(data.id).not.toBe(initial.id)
-	await expect(audio).toBeVisible()
+	await expect(audio).toBeAttached()
+	await expect(page.getByRole('region', { name: 'Audio player' })).toBeVisible()
 })
 test('failed replacement removes closed controls and retry syncs fresh session', async ({
 	page,
@@ -144,7 +153,8 @@ test('failed replacement removes closed controls and retry syncs fresh session',
 	const play = page.getByRole('button', { name: 'Play audiobook' })
 	const audio = page.getByLabel('Audio playback')
 	await play.click()
-	await expect(audio).toBeVisible()
+	await expect(audio).toBeAttached()
+	await expect(page.getByRole('region', { name: 'Audio player' })).toBeVisible()
 	await play.click()
 	await expect(page.getByRole('alert').first()).toBeVisible()
 	await expect(audio).toHaveCount(0)
@@ -156,7 +166,8 @@ test('failed replacement removes closed controls and retry syncs fresh session',
 	)
 	await play.click()
 	const fresh = await (await response).json()
-	await expect(audio).toBeVisible()
+	await expect(audio).toBeAttached()
+	await expect(page.getByRole('region', { name: 'Audio player' })).toBeVisible()
 	await expect
 		.poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
 		.toBeGreaterThan(0.1)
