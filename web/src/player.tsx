@@ -881,6 +881,8 @@ export function Player() {
 			if (listened > 0) void sync()
 		}, 10000)
 		return () => {
+			if (!remote && sourceReady.current)
+				localVolume.current = { volume: element.volume, muted: element.muted }
 			sourceReady.current = false
 			active = false
 			clearInterval(timer)
