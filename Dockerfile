@@ -27,12 +27,13 @@ RUN --mount=type=bind,source=web,target=/src \
 	&& bun run build
 
 # CI checks the exact modern artifact copied into the runtime image.
+# Headless checks need only Chromium's shell, not the unused headed browser.
 # Browsers stay in this stage; runtime copies only /web/dist from build-web.
 FROM build-web AS check-web
 RUN --mount=type=bind,source=client/assets/ebooks,target=/client/assets/ebooks \
 	--mount=type=bind,source=client/strings,target=/client/strings \
 	--mount=type=bind,source=package.json,target=/package.json \
-	node ./node_modules/@playwright/test/cli.js install --with-deps chromium \
+	node ./node_modules/@playwright/test/cli.js install --with-deps --only-shell chromium \
 	&& bun run typecheck && bun run lint && bun run test \
 	&& node ./node_modules/@playwright/test/cli.js test
 
