@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
@@ -63,6 +64,7 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 	const canUpdate = !!permissions?.permissions?.update
 	const canUpload = !!permissions?.permissions?.upload
 	const canDelete = !!permissions?.permissions?.delete
+	const uploadInput = useRef<HTMLInputElement>(null)
 	const [item, setItem] = useState<Item | null>(null)
 	const [chapters, setChapters] = useState<Chapter[]>([])
 	const [tracks, setTracks] = useState<Track[]>([])
@@ -206,7 +208,9 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 				</Link>
 			</nav>
 			<h1 className="text-2xl font-semibold">{title}</h1>
-			<h2 className="text-xl font-semibold">{heading}</h2>
+			{section !== 'edit' && (
+				<h2 className="text-xl font-semibold">{heading}</h2>
+			)}
 			{error && (
 				<p role="alert" className="text-destructive">
 					{error}
@@ -219,9 +223,12 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 					{chapters.map((chapter, index) => (
 						<div
 							key={chapter.id ?? index}
-							className="grid gap-2 rounded border p-3 sm:grid-cols-[1fr_9rem_9rem_auto]"
+							className="grid items-end gap-2 rounded border p-3 sm:grid-cols-[1fr_9rem_9rem_auto]"
 						>
-							<label htmlFor={`book-input-1-${index}`}>
+							<label
+								className="grid content-start gap-1"
+								htmlFor={`book-input-1-${index}`}
+							>
 								Title
 								<Input
 									id={`book-input-1-${index}`}
@@ -230,7 +237,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 									onChange={(e) => setChapter(index, { title: e.target.value })}
 								/>
 							</label>
-							<label htmlFor={`book-input-2-${index}`}>
+							<label
+								className="grid content-start gap-1"
+								htmlFor={`book-input-2-${index}`}
+							>
 								Start (seconds)
 								<Input
 									id={`book-input-2-${index}`}
@@ -244,7 +254,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 									}
 								/>
 							</label>
-							<label htmlFor={`book-input-3-${index}`}>
+							<label
+								className="grid content-start gap-1"
+								htmlFor={`book-input-3-${index}`}
+							>
 								End (seconds)
 								<Input
 									id={`book-input-3-${index}`}
@@ -273,7 +286,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 						</div>
 					))}
 					<div className="flex flex-wrap items-end gap-2">
-						<label htmlFor={'book-input-4'}>
+						<label
+							className="grid content-start gap-1"
+							htmlFor={'book-input-4'}
+						>
 							Bulk title prefix
 							<Input
 								id={'book-input-4'}
@@ -296,7 +312,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 						>
 							Apply titles
 						</Button>
-						<label htmlFor={'book-input-5'}>
+						<label
+							className="grid content-start gap-1"
+							htmlFor={'book-input-5'}
+						>
 							Shift seconds
 							<Input
 								id={'book-input-5'}
@@ -321,7 +340,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 						>
 							Shift all
 						</Button>
-						<label htmlFor={'book-input-6'}>
+						<label
+							className="grid content-start gap-1"
+							htmlFor={'book-input-6'}
+						>
 							ASIN
 							<Input
 								id={'book-input-6'}
@@ -330,7 +352,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 								onChange={(e) => setAsin(e.target.value)}
 							/>
 						</label>
-						<label htmlFor="book-control-1">
+						<label
+							className="grid content-start gap-1"
+							htmlFor="book-control-1"
+						>
 							Region
 							<NativeSelect
 								id="book-control-1"
@@ -447,7 +472,7 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 			)}
 			{section === 'edit' && (
 				<>
-					<h3 className="text-lg font-semibold">Audio tracks</h3>
+					<h2 className="text-xl font-semibold">Audio tracks</h2>
 					{tracks.map((track, index) => (
 						<div
 							key={track.ino}
@@ -474,21 +499,26 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 							</label>
 							<Button
 								variant="outline"
+								size="icon"
+								aria-label={`Move ${track.metadata?.filename ?? track.filename} up`}
 								disabled={index === 0}
 								onClick={() => moveTrack(index, -1)}
 							>
-								Up
+								<ChevronUp aria-hidden="true" />
 							</Button>
 							<Button
 								variant="outline"
+								size="icon"
+								aria-label={`Move ${track.metadata?.filename ?? track.filename} down`}
 								disabled={index === tracks.length - 1}
 								onClick={() => moveTrack(index, 1)}
 							>
-								Down
+								<ChevronDown aria-hidden="true" />
 							</Button>
 						</div>
 					))}
 					<Button
+						variant="outline"
 						disabled={busy || !tracks.length}
 						onClick={() => {
 							const orderedFileData = tracks.map((track, index) => ({
@@ -502,9 +532,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 					>
 						Save track order
 					</Button>
-					<h3 className="text-lg font-semibold">Metadata</h3>
+					<h2 className="text-xl font-semibold">Metadata</h2>
 					<form
-						className="grid gap-3 sm:grid-cols-2"
+						id="book-metadata-form"
+						className="grid items-start gap-3 sm:grid-cols-2"
 						onSubmit={(e) => {
 							e.preventDefault()
 							const { tags, authorName, ...mediaMetadata } = metadata
@@ -537,8 +568,11 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 								'tags',
 							] as const
 						).map((key) => (
-							<div key={key} className="grid gap-1">
-								<label htmlFor={`metadata-${key}`}>
+							<div key={key} className="grid content-start gap-1">
+								<label
+									className="grid content-start gap-1"
+									htmlFor={`metadata-${key}`}
+								>
 									{
 										(
 											{
@@ -609,7 +643,6 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 								{key === 'explicit' ? 'Explicit content' : 'Abridged'}
 							</label>
 						))}
-						<Button disabled={busy}>Save all metadata</Button>
 					</form>
 					<form
 						className="flex flex-wrap gap-2"
@@ -628,7 +661,12 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 							)
 						}}
 					>
-						<Button disabled={busy}>Apply match</Button>
+						<Button variant="outline" disabled={busy}>
+							Apply match
+						</Button>
+						<Button form="book-metadata-form" disabled={busy}>
+							Save metadata
+						</Button>
 					</form>
 				</>
 			)}
@@ -639,8 +677,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 						are not exposed as update-permission controls.
 					</p>
 					{isAdmin && (
-						<div className="grid gap-3">
+						<div className="grid justify-items-start gap-3">
+							<h3 className="font-semibold">Metadata embedding</h3>
 							<Button
+								variant="outline"
 								disabled={busy}
 								onClick={() =>
 									void action(
@@ -685,7 +725,11 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 							>
 								Start metadata embed
 							</Button>
-							<label htmlFor="book-control-2">
+							<h3 className="mt-4 font-semibold">Audio encoding</h3>
+							<label
+								className="grid content-start gap-1"
+								htmlFor="book-control-2"
+							>
 								Codec
 								<NativeSelect
 									id="book-control-2"
@@ -698,7 +742,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 									))}
 								</NativeSelect>
 							</label>
-							<label htmlFor="book-control-3">
+							<label
+								className="grid content-start gap-1"
+								htmlFor="book-control-3"
+							>
 								Bitrate
 								<NativeSelect
 									id="book-control-3"
@@ -711,7 +758,10 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 									))}
 								</NativeSelect>
 							</label>
-							<label htmlFor="book-control-4">
+							<label
+								className="grid content-start gap-1"
+								htmlFor="book-control-4"
+							>
 								Channels
 								<NativeSelect
 									id="book-control-4"
@@ -763,117 +813,144 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 				</>
 			)}
 			{section === 'edit' && (
-				<section className="space-y-2 border-t pt-4">
-					<h3 className="font-semibold">Cover</h3>
-					{item.media.coverPath && (
-						<img
-							className="w-32 rounded"
-							src={`${coverPath}${coverToken ? `?token=${encodeURIComponent(coverToken)}` : ''}`}
-							alt={`${item.media.metadata.title ?? 'Audiobook'} cover`}
-						/>
-					)}
-					<form
-						className="flex flex-wrap gap-2"
-						onSubmit={(e) => {
-							e.preventDefault()
-							void action(() => setCoverUrl(id, coverUrl))
-						}}
-					>
-						<label className="min-w-0 grow" htmlFor={'book-input-7'}>
-							Cover URL
-							<Input
-								id={'book-input-7'}
-								type="url"
-								className="block w-full rounded border bg-background p-2"
-								value={coverUrl}
-								onChange={(e) => setCover(e.target.value)}
+				<section className="space-y-4 border-t pt-4">
+					<h2 className="text-xl font-semibold">Cover</h2>
+					<div className="grid items-start gap-4 sm:grid-cols-[8rem_minmax(0,1fr)]">
+						{item.media.coverPath ? (
+							<img
+								className="w-32 rounded"
+								src={`${coverPath}${coverToken ? `?token=${encodeURIComponent(coverToken)}` : ''}`}
+								alt={`${item.media.metadata.title ?? 'Audiobook'} cover`}
 							/>
-						</label>
-						<Button disabled={busy}>Set cover URL</Button>
-					</form>
-					<label htmlFor={'book-input-8'}>
-						Search cover title
-						<Input
-							id={'book-input-8'}
-							className="block w-full rounded border bg-background p-2"
-							value={searchTerm}
-							onChange={(e) => setSearchTerm(e.target.value)}
-						/>
-					</label>
-					<Button
-						variant="outline"
-						disabled={busy || !searchTerm.trim()}
-						onClick={() =>
-							void action(
-								async () => {
-									const result = await searchCovers(
-										'best',
-										searchTerm.trim(),
-										String(metadata.authorName ?? ''),
-									)
-									if (currentOwner()) setCoverResults(result.results)
-								},
-								false,
-								'Cover search loaded',
-							)
-						}
-					>
-						Search covers
-					</Button>
-					{coverResults.map((url) => (
-						<button
-							type="button"
-							key={url}
-							className="rounded border p-2"
-							onClick={() => void action(() => setCoverUrl(id, url))}
-						>
-							<img className="h-24" src={url} alt="Cover search result" />
-						</button>
-					))}
-					{item.libraryFiles
-						?.filter((file) => file.fileType === 'image')
-						.map((file) => (
-							<Button
-								key={file.ino}
-								variant="outline"
-								onClick={() => {
-									const path = (
-										file as typeof file & { metadata?: { path?: string } }
-									).metadata?.path
-									if (path) void action(() => setLocalCover(id, path))
+						) : (
+							<div />
+						)}
+						<div className="min-w-0 space-y-3">
+							<form
+								className="flex flex-wrap items-end gap-2"
+								onSubmit={(e) => {
+									e.preventDefault()
+									void action(() => setCoverUrl(id, coverUrl))
 								}}
 							>
-								Use local cover {file.metadata?.filename}
-							</Button>
-						))}
-					{canUpload && (
-						<label htmlFor={'book-input-9'}>
-							Upload cover
-							<Input
-								id={'book-input-9'}
-								type="file"
-								accept="image/*"
-								disabled={busy}
-								onChange={(e) => {
-									const file = e.target.files?.[0]
-									if (file) void action(() => uploadCover(id, file))
-									e.currentTarget.value = ''
-								}}
-							/>
-						</label>
-					)}
-					{canDelete && item.media.coverPath && (
-						<Button
-							variant="destructive"
-							disabled={busy}
-							onClick={() => {
-								if (window.confirm('Remove audiobook cover?'))
-									void action(() => removeCover(id))
-							}}
-						>
-							Remove cover
-						</Button>
-					)}
+								<label
+									className="grid min-w-0 grow gap-1"
+									htmlFor={'book-input-7'}
+								>
+									Cover URL
+									<Input
+										id={'book-input-7'}
+										type="url"
+										className="block w-full rounded border bg-background p-2"
+										value={coverUrl}
+										onChange={(e) => setCover(e.target.value)}
+									/>
+								</label>
+								<Button variant="outline" disabled={busy}>
+									Set cover URL
+								</Button>
+							</form>
+							<div className="flex flex-wrap items-end gap-2">
+								<label
+									className="grid min-w-0 grow gap-1"
+									htmlFor={'book-input-8'}
+								>
+									Search cover title
+									<Input
+										id={'book-input-8'}
+										className="block w-full rounded border bg-background p-2"
+										value={searchTerm}
+										onChange={(e) => setSearchTerm(e.target.value)}
+									/>
+								</label>
+								<Button
+									variant="outline"
+									disabled={busy || !searchTerm.trim()}
+									onClick={() =>
+										void action(
+											async () => {
+												const result = await searchCovers(
+													'best',
+													searchTerm.trim(),
+													String(metadata.authorName ?? ''),
+												)
+												if (currentOwner()) setCoverResults(result.results)
+											},
+											false,
+											'Cover search loaded',
+										)
+									}
+								>
+									Search covers
+								</Button>
+							</div>
+							{coverResults.map((url) => (
+								<button
+									type="button"
+									key={url}
+									className="rounded border p-2"
+									onClick={() => void action(() => setCoverUrl(id, url))}
+								>
+									<img className="h-24" src={url} alt="Cover search result" />
+								</button>
+							))}
+							{item.libraryFiles
+								?.filter((file) => file.fileType === 'image')
+								.map((file) => (
+									<Button
+										key={file.ino}
+										variant="outline"
+										onClick={() => {
+											const path = (
+												file as typeof file & { metadata?: { path?: string } }
+											).metadata?.path
+											if (path) void action(() => setLocalCover(id, path))
+										}}
+									>
+										Use local cover {file.metadata?.filename}
+									</Button>
+								))}
+							{canUpload && (
+								<div>
+									<Button
+										type="button"
+										variant="outline"
+										disabled={busy}
+										onClick={() => uploadInput.current?.click()}
+									>
+										Upload cover
+									</Button>
+									<Input
+										id={'book-input-9'}
+										ref={uploadInput}
+										className="hidden"
+										aria-label="Upload cover file"
+										type="file"
+										accept="image/*"
+										disabled={busy}
+										onChange={(e) => {
+											const file = e.target.files?.[0]
+											if (file) void action(() => uploadCover(id, file))
+											e.currentTarget.value = ''
+										}}
+									/>
+								</div>
+							)}
+							{canDelete && item.media.coverPath && (
+								<Button
+									variant="outline"
+									className="text-destructive hover:text-destructive"
+									disabled={busy}
+									onClick={() => {
+										if (window.confirm('Remove audiobook cover?'))
+											void action(() => removeCover(id))
+									}}
+								>
+									Remove cover
+								</Button>
+							)}
+						</div>
+					</div>
 				</section>
 			)}
 		</section>

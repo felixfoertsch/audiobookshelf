@@ -42,6 +42,27 @@ for (const width of [390, 1280])
 						page.getByRole('heading', { level: 1, name: 'The Glass Orchard' }),
 					).toBeVisible()
 				}
+				if (section === 'edit') {
+					if (width === 1280) {
+						const description = await page
+							.getByLabel('Description', { exact: true })
+							.boundingBox()
+						const authors = await page
+							.getByLabel('Authors', { exact: true })
+							.boundingBox()
+						expect(description).not.toBeNull()
+						expect(authors).not.toBeNull()
+						expect(
+							Math.abs((description?.y ?? 0) - (authors?.y ?? 0)),
+						).toBeLessThanOrEqual(1)
+					}
+					await page
+						.getByRole('button', { name: 'Upload cover', exact: true })
+						.focus()
+					const chooser = page.waitForEvent('filechooser')
+					await page.keyboard.press('Enter')
+					await chooser
+				}
 				await expect
 					.poll(() =>
 						page.evaluate(

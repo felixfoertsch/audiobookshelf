@@ -92,14 +92,13 @@ export function EpisodeEdit({
 						.finally(() => setBusy(false))
 				}}
 			>
-				<h3 className="font-medium">Edit episode</h3>
 				{Object.entries(draft).map(([key, value]) => {
 					const Control = key === 'description' ? 'textarea' : Input
 					return (
 						<label
 							htmlFor={`${fieldId}-${key}`}
 							key={key}
-							className="grid gap-1"
+							className="grid content-start gap-1"
 						>
 							{{
 								title: 'Title',
@@ -131,7 +130,7 @@ export function EpisodeEdit({
 					)
 				})}
 				{error && <p role="alert">{error}</p>}
-				<div className="flex gap-2">
+				<div className="flex flex-wrap gap-2">
 					<Button disabled={busy}>Save episode</Button>
 					<Button
 						type="button"

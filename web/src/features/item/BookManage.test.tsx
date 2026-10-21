@@ -73,6 +73,49 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 describe('BookManage private drafts', () => {
+	it('keeps metadata save separate from match, names track moves and activates upload picker', async () => {
+		const value = book('A')
+		mocks.getItem.mockResolvedValue({
+			...value,
+			media: {
+				...value.media,
+				audioFiles: [
+					{ ino: 1, filename: 'first.mp3', index: 0 },
+					{ ino: 2, filename: 'second.mp3', index: 1 },
+				],
+			},
+		})
+		render(<BookManage id="A" section="edit" />)
+		await screen.findByLabelText('Title')
+		expect(screen.queryByText('Tracks and metadata')).toBeNull()
+		expect(
+			(
+				screen.getByRole('button', {
+					name: 'Move first.mp3 up',
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true)
+		fireEvent.click(screen.getByRole('button', { name: 'Move first.mp3 down' }))
+		expect(
+			(
+				screen.getByRole('button', {
+					name: 'Move first.mp3 down',
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true)
+		const save = screen.getByRole('button', {
+			name: 'Save metadata',
+		}) as HTMLButtonElement
+		expect(save.form?.id).toBe('book-metadata-form')
+		expect(
+			(screen.getByRole('button', { name: 'Apply match' }) as HTMLButtonElement)
+				.form,
+		).not.toBe(save.form)
+		const picker = screen.getByLabelText('Upload cover file')
+		const click = vi.spyOn(picker, 'click')
+		fireEvent.click(screen.getByRole('button', { name: 'Upload cover' }))
+		expect(click).toHaveBeenCalledOnce()
+	})
 	it('hides A draft while B loads and saves only B draft to B', async () => {
 		const pending = deferred<ReturnType<typeof book>>()
 		const view = render(<BookManage id="A" section="chapters" />)
