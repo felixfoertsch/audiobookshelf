@@ -191,7 +191,7 @@ it('same transport, progress, rate and volume controls drive Cast instead of loc
 		error: '',
 	})
 	const view = render(<Player />)
-	fireEvent.click(view.getByRole('button', { name: 'Pause', exact: true }))
+	fireEvent.click(view.getByRole('button', { name: /^Pause$/ }))
 	expect(cast.playing).toHaveBeenCalledWith(false)
 	const { seekCast, setCastRate, setCastVolume } = await import('./cast')
 	fireEvent.click(view.getByRole('button', { name: 'Skip forward 30 seconds' }))
