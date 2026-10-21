@@ -46,7 +46,7 @@ for (const prefix of ['', '/abs'])
 			.click()
 		await expect(page).toHaveURL(`${prefix}/new/item/podcast-1`)
 		await page
-			.getByRole('button', { name: 'Play', exact: true })
+			.getByRole('button', { name: /^Play (?!latest episode)/ })
 			.first()
 			.click()
 		const audio = page.getByLabel('Audio playback')

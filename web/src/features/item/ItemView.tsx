@@ -1,6 +1,13 @@
 import { Link } from '@tanstack/react-router'
-import { Check, Circle, Ellipsis, Play } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import {
+	Check,
+	Circle,
+	Ellipsis,
+	Play,
+	Settings2,
+	SlidersHorizontal,
+} from 'lucide-react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../api'
 import { duration } from '../../catalog'
 import {
@@ -17,6 +24,14 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '../../shared/components/ui/dropdown-menu'
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '../../shared/components/ui/sheet'
 import { PodcastManagementSettings } from '../podcast'
 import { Reader, readerItemSchema } from '../reader'
 import { EpisodeEdit } from './EpisodeEdit'
@@ -29,7 +44,42 @@ import {
 	getItem,
 	updateProgress,
 } from './service'
-import { WorkflowSheet } from './WorkflowSheet'
+
+function DetailSheet({
+	title,
+	description,
+	children,
+}: {
+	title: string
+	description: string
+	children: ReactNode
+}) {
+	return (
+		<Sheet>
+			<SheetTrigger asChild>
+				<Button
+					variant="outline"
+					size="icon"
+					className="rounded-full"
+					aria-label={title}
+				>
+					{title === 'Podcast settings' ? (
+						<Settings2 aria-hidden="true" />
+					) : (
+						<SlidersHorizontal aria-hidden="true" />
+					)}
+				</Button>
+			</SheetTrigger>
+			<SheetContent className="w-full overflow-y-auto p-4 sm:max-w-2xl">
+				<SheetHeader>
+					<SheetTitle>{title}</SheetTitle>
+					<SheetDescription>{description}</SheetDescription>
+				</SheetHeader>
+				{children}
+			</SheetContent>
+		</Sheet>
+	)
+}
 
 export function ItemView({ id }: { id: string }) {
 	const user = useAuth((state) => state.user)
@@ -138,6 +188,13 @@ export function ItemView({ id }: { id: string }) {
 	const media = item.media
 	const metadata = media.metadata
 	const episodes = media.episodes ?? []
+	const latestEpisode = episodes.reduce<(typeof episodes)[number] | undefined>(
+		(latest, episode) =>
+			!latest || (episode.publishedAt ?? 0) > (latest.publishedAt ?? 0)
+				? episode
+				: latest,
+		undefined,
+	)
 	const episodePage = Math.min(
 		page,
 		Math.max(0, Math.ceil(episodes.length / 25) - 1),
@@ -273,11 +330,11 @@ export function ItemView({ id }: { id: string }) {
 						</div>
 					)}
 					<div className="flex flex-wrap gap-2">
-						{item.mediaType === 'podcast' && episodes.length > 0 && (
+						{item.mediaType === 'podcast' && latestEpisode && (
 							<Button
 								className="rounded-full px-6"
-								disabled={busy || !episodes[0]?.audioFile}
-								onClick={() => void play(episodes[0]?.id)}
+								disabled={busy || !latestEpisode.audioFile}
+								onClick={() => void play(latestEpisode.id)}
 							>
 								<Play aria-hidden="true" className="size-4" />
 								Play latest episode
@@ -325,7 +382,7 @@ export function ItemView({ id }: { id: string }) {
 						{item.mediaType === 'podcast' && admin && (
 							<PodcastManagementSettings key={`${user?.id}:${id}`} itemId={id}>
 								{(content) => (
-									<WorkflowSheet
+									<DetailSheet
 										title="Podcast settings"
 										description={metadata.title ?? 'Podcast'}
 									>
@@ -338,7 +395,7 @@ export function ItemView({ id }: { id: string }) {
 										</Button>
 										{error && <p role="alert">{error}</p>}
 										{content}
-									</WorkflowSheet>
+									</DetailSheet>
 								)}
 							</PodcastManagementSettings>
 						)}
@@ -425,7 +482,7 @@ export function ItemView({ id }: { id: string }) {
 								const progress = episodeProgress(user, id, ep.id)
 								return (
 									<li key={ep.id} className="min-w-0 space-y-2 border-b py-3">
-										<div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+										<div className="flex flex-col items-stretch gap-3">
 											<div className="min-w-0 flex-1">
 												{ep.publishedAt ? (
 													<p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
@@ -438,6 +495,35 @@ export function ItemView({ id }: { id: string }) {
 													{ep.title ?? 'Untitled episode'}
 												</h3>
 
+												{ep.subtitle && (
+													<p className="text-sm">{ep.subtitle}</p>
+												)}
+												{ep.description && (
+													<div>
+														<RichText
+															text={ep.description}
+															className={
+																expanded.has(ep.id)
+																	? 'text-sm'
+																	: 'line-clamp-2 text-sm text-muted-foreground'
+															}
+														/>
+														<Button
+															variant="link"
+															aria-expanded={expanded.has(ep.id)}
+															onClick={() =>
+																setExpanded((current) => {
+																	const next = new Set(current)
+																	if (next.has(ep.id)) next.delete(ep.id)
+																	else next.add(ep.id)
+																	return next
+																})
+															}
+														>
+															{expanded.has(ep.id) ? 'Read less' : 'Read more'}
+														</Button>
+													</div>
+												)}
 												<p className="flex items-center gap-1 text-xs text-muted-foreground">
 													{progress?.isFinished ? (
 														<Check aria-hidden="true" className="size-3" />
@@ -484,6 +570,7 @@ export function ItemView({ id }: { id: string }) {
 													<DropdownMenuTrigger asChild>
 														<Button
 															variant="ghost"
+															className="order-last ml-auto"
 															size="icon"
 															aria-label={`More actions for ${ep.title ?? 'episode'}`}
 														>
@@ -508,7 +595,7 @@ export function ItemView({ id }: { id: string }) {
 														</DropdownMenuItem>
 													</DropdownMenuContent>
 												</DropdownMenu>
-												<WorkflowSheet
+												<DetailSheet
 													title="Episode controls"
 													description={ep.title ?? 'Untitled episode'}
 												>
@@ -601,36 +688,9 @@ export function ItemView({ id }: { id: string }) {
 															onSaved={() => void action(async () => {})}
 														/>
 													)}
-												</WorkflowSheet>
+												</DetailSheet>
 											</div>
 										</div>
-										{ep.subtitle && <p className="text-sm">{ep.subtitle}</p>}
-										{ep.description && (
-											<div>
-												<Button
-													variant="link"
-													aria-expanded={expanded.has(ep.id)}
-													onClick={() =>
-														setExpanded((current) => {
-															const next = new Set(current)
-															if (next.has(ep.id)) next.delete(ep.id)
-															else next.add(ep.id)
-															return next
-														})
-													}
-												>
-													{expanded.has(ep.id) ? 'Read less' : 'Read more'}
-												</Button>
-												<RichText
-													text={ep.description}
-													className={
-														expanded.has(ep.id)
-															? 'text-sm'
-															: 'line-clamp-2 text-sm text-muted-foreground'
-													}
-												/>
-											</div>
-										)}
 									</li>
 								)
 							})}
@@ -696,7 +756,7 @@ export function ItemView({ id }: { id: string }) {
 						['ASIN', metadata.asin],
 						[
 							'Size',
-							media.size == null
+							typeof media.size !== 'number'
 								? undefined
 								: `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(media.size / (media.size >= 1e9 ? 1e9 : 1e6))} ${media.size >= 1e9 ? 'GB' : 'MB'}`,
 						],

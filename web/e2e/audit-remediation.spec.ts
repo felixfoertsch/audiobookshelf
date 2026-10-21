@@ -121,7 +121,9 @@ for (const [width, colorScheme, prefix] of [
 			.filter({
 				has: page.getByRole('heading', { level: 3, name: /^Audit episode / }),
 			})
-			.filter({ has: page.getByRole('button', { name: 'Play', exact: true }) })
+			.filter({
+				has: page.getByRole('button', { name: /^Play (?!latest episode)/ }),
+			})
 		const titles = rows.getByRole('heading', {
 			level: 3,
 			name: /^Audit episode /,
@@ -130,7 +132,7 @@ for (const [width, colorScheme, prefix] of [
 		expect(await rows.count()).toBeLessThan(489)
 		await expect(
 			page.getByText('Readable paragraph & entity.', { exact: true }),
-		).toHaveCount(0)
+		).toHaveCount(25)
 		await noOverflow(page)
 		const first = rows.first()
 		const titleBox = await first
@@ -206,7 +208,9 @@ for (const [width, colorScheme, prefix] of [
 						`${prefix}/api/items/podcast-1/play/${episode.id}` &&
 					response.request().method() === 'POST',
 			)
-			await first.getByRole('button', { name: 'Play', exact: true }).click()
+			await first
+				.getByRole('button', { name: /^Play (?!latest episode)/ })
+				.click()
 			expect((await result).ok()).toBe(true)
 		}
 	})
@@ -493,7 +497,7 @@ for (const [width, prefix] of [
 		).toBeVisible()
 		await expect(
 			page.getByText('Readable paragraph & entity.', { exact: true }),
-		).toHaveCount(0)
+		).toHaveCount(1)
 		await noOverflow(page)
 		await page.getByText('Read description', { exact: true }).focus()
 		await page.keyboard.press('Enter')

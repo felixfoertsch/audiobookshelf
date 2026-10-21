@@ -34,7 +34,7 @@ it('queue distinguishes pending, failure, retry and successful empty', async () 
 	await screen.findByText('No queued downloads.')
 	expect(screen.queryByRole('alert')).toBeNull()
 })
-it('latest mounts descriptions only on explicit disclosure', async () => {
+it('latest previews safe descriptions, expands on explicit disclosure', async () => {
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(
 		new Response(
 			JSON.stringify({
@@ -52,7 +52,10 @@ it('latest mounts descriptions only on explicit disclosure', async () => {
 	)
 	render(<PodcastLatest libraryId="lib" />)
 	await screen.findByRole('heading', { name: 'Episode identity' })
-	expect(screen.queryByText('Hidden & safe')).toBeNull()
+	expect(screen.getByText('Hidden & safe')).toBeTruthy()
+	expect(screen.getByText('Read description').closest('details')?.open).toBe(
+		false,
+	)
 	fireEvent.click(screen.getByText('Read description'))
 	await waitFor(() => expect(screen.getByText('Hidden & safe')).toBeTruthy())
 })
