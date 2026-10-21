@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { io } from 'socket.io-client'
 import { initializeAuth, setAuthSocket, useAuth } from './api'
+import { applyProgressSocket } from './features/item/progress'
 import { initializeCast } from './features/player/cast'
 import { Login } from './login'
 import { AlphaNotice } from './routes/__root'
@@ -109,11 +110,13 @@ function App() {
 			'custom_metadata_provider_removed',
 		] as const
 		for (const event of events)
-			socket.on(event, (payload: unknown) =>
+			socket.on(event, (payload: unknown) => {
+				if (useAuth.getState().user?.id !== userId) return
+				applyProgressSocket(event, payload, userId)
 				window.dispatchEvent(
 					new CustomEvent('abs:socket', { detail: { event, payload } }),
-				),
-			)
+				)
+			})
 		const relayStatus = (event: string, message: string) =>
 			window.dispatchEvent(
 				new CustomEvent('abs:socket', {

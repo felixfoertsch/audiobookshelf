@@ -90,6 +90,7 @@ test('failed metadata preserves resume when closing', async ({ page }) => {
 	await openBook(page)
 	await page.getByRole('button', { name: 'Play audiobook' }).click()
 	await expect(page.getByRole('alert')).toContainText('Audio could not load')
+	await page.getByRole('button', { name: 'Player options' }).click()
 	await page.getByRole('button', { name: 'Close player' }).click()
 	await expect.poll(() => closedTime).toBe(8)
 })

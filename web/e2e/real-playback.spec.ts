@@ -36,8 +36,10 @@ async function advancing(page: Page) {
 		.toBeGreaterThan(before + 0.1)
 }
 async function seek(page: Page, value: number) {
+	if (!(await page.getByRole('dialog', { name: 'Player options' }).isVisible()))
+		await page.getByRole('button', { name: 'Player options' }).click()
 	await page
-		.getByLabel('Seek position')
+		.getByLabel('Original position (seconds)')
 		.evaluate((node: HTMLInputElement, target) => {
 			const setter = Object.getOwnPropertyDescriptor(
 				HTMLInputElement.prototype,
@@ -48,6 +50,7 @@ async function seek(page: Page, value: number) {
 			node.dispatchEvent(new Event('input', { bubbles: true }))
 			node.dispatchEvent(new Event('change', { bubbles: true }))
 		}, value)
+	await page.getByLabel('Original position (seconds)').press('Enter')
 }
 
 test.describe('local real-media browser playback', () => {
@@ -160,10 +163,10 @@ test.describe('local real-media browser playback', () => {
 				.first()
 				.click()
 			await advancing(page)
-			await expect(page.getByLabel('Seek position')).toHaveAttribute(
-				'max',
-				String(total),
-			)
+			await page.getByRole('button', { name: 'Player options' }).click()
+			await expect(
+				page.getByLabel('Original position (seconds)'),
+			).toHaveAttribute('max', String(total))
 			// Cross first native file boundary through actual media end, not a synthetic event.
 			await seek(page, book.tracks[0].duration - 0.5)
 			await expect
@@ -176,7 +179,9 @@ test.describe('local real-media browser playback', () => {
 			await advancing(page)
 			await expect
 				.poll(async () =>
-					Number(await page.getByLabel('Seek position').inputValue()),
+					Number(
+						await page.getByLabel('Original position (seconds)').inputValue(),
+					),
 				)
 				.toBeGreaterThanOrEqual(starts[1])
 			await page
@@ -210,7 +215,11 @@ test.describe('local real-media browser playback', () => {
 				await expect
 					.poll(async () =>
 						Math.abs(
-							Number(await page.getByLabel('Seek position').inputValue()) -
+							Number(
+								await page
+									.getByLabel('Original position (seconds)')
+									.inputValue(),
+							) -
 								(starts[index] + local),
 						),
 					)

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { api } from '../../api'
+import { refreshProgress } from './progress'
 import { emptySchema, feedSchema, itemSchema, progressSchema } from './schemas'
 
 export const getItem = (id: string) =>
@@ -12,7 +13,7 @@ export const updateMedia = (id: string, payload: unknown) =>
 		method: 'PATCH',
 		body: JSON.stringify(payload),
 	})
-export const updateProgress = (
+export const writeProgress = (
 	id: string,
 	payload: { isFinished?: boolean; currentTime?: number; duration?: number },
 	episodeId?: string,
@@ -24,7 +25,30 @@ export const updateProgress = (
 			method: 'PATCH',
 			body: JSON.stringify(payload),
 		},
-	)
+	).then((result) => {
+		window.dispatchEvent(
+			new CustomEvent('abs:progress-changed', {
+				detail: { libraryItemId: id },
+			}),
+		)
+		return result
+	})
+export async function updateProgress(
+	id: string,
+	payload: { isFinished?: boolean; currentTime?: number; duration?: number },
+	episodeId?: string,
+): Promise<{ refreshWarning?: string }> {
+	await writeProgress(id, payload, episodeId)
+	try {
+		await refreshProgress()
+		return {}
+	} catch {
+		return {
+			refreshWarning:
+				'Progress saved, but listening status could not refresh. Refresh to verify current status.',
+		}
+	}
+}
 export const checkPodcastFeed = (id: string) =>
 	api(`/api/podcasts/${encodeURIComponent(id)}/checknew`, zEpisodes, {})
 const zEpisodes = z.object({ episodes: z.array(z.unknown()) })

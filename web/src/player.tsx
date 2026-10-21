@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import Hls from 'hls.js'
+import { Ellipsis, Pause, Play } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { create } from 'zustand'
@@ -29,6 +30,14 @@ import {
 import { candidateAt } from './features/player/skipping'
 import { originalTime, trackAt } from './features/player/timeline'
 import { Button } from './shared/components/ui/button'
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from './shared/components/ui/sheet'
 
 const segment = z
 	.object({ start: z.number().nonnegative(), end: z.number().positive() })
@@ -335,6 +344,28 @@ export function Player() {
 		[remote],
 	)
 	const [position, setPosition] = useState(0)
+	const [seekDraft, setSeekDraft] = useState('0')
+	const editingSeek = useRef(false)
+	useEffect(() => {
+		if (!editingSeek.current) setSeekDraft(String(Math.floor(position)))
+	}, [position])
+	const transferring = useRef(false)
+	const [transferBusy, setTransferBusy] = useState(false)
+	async function transfer(target: 'local' | 'cast') {
+		if (transferring.current) return
+		transferring.current = true
+		setTransferBusy(true)
+		try {
+			await handoffPlayback(target)
+		} catch (error) {
+			usePlayer.setState({
+				error: error instanceof Error ? error.message : 'Audio transfer failed',
+			})
+		} finally {
+			transferring.current = false
+			setTransferBusy(false)
+		}
+	}
 	const [settings, setSettings] = useState(readPlayerSettings)
 	function updateSetting(
 		key: 'playbackRate' | 'jumpForwardAmount' | 'jumpBackwardAmount',
@@ -359,6 +390,8 @@ export function Player() {
 		}
 	}
 	const audio = useRef<HTMLAudioElement>(null)
+	const localVolume = useRef({ volume: 1, muted: false })
+	const sourceReady = useRef(false)
 	const trackIndex = useRef(0)
 	const queue = useQueue()
 	const [sleepAt, setSleepAt] = useState<number | null>(null)
@@ -372,7 +405,7 @@ export function Player() {
 				event.metaKey ||
 				(target instanceof HTMLElement &&
 					(target.isContentEditable ||
-						target.closest('input,textarea,select,button,a')))
+						target.closest('input,textarea,select,button,a,audio')))
 			)
 				return
 			if (event.code === 'Space') {
@@ -690,8 +723,12 @@ export function Player() {
 		const ready = () => {
 			if (remote || !active || initialized) return
 			element.currentTime = pendingSeek
-			element.playbackRate = rate
+			element.volume = localVolume.current.volume
+			element.muted = localVolume.current.muted
+			element.defaultPlaybackRate = readPlayerSettings().playbackRate || rate
+			element.playbackRate = element.defaultPlaybackRate
 			initialized = true
+			sourceReady.current = true
 			setPosition(
 				originalTime(
 					session.audioTracks,
@@ -732,6 +769,8 @@ export function Player() {
 		setOptIn(true)
 		let engine: Hls | undefined
 		const loadSource = (nextUrl: URL) => {
+			sourceReady.current = false
+			element.defaultPlaybackRate = readPlayerSettings().playbackRate || rate
 			engine?.destroy()
 			engine = undefined
 			if (
@@ -842,6 +881,7 @@ export function Player() {
 			if (listened > 0) void sync()
 		}, 10000)
 		return () => {
+			sourceReady.current = false
 			active = false
 			clearInterval(timer)
 			clearInterval(syncTimer)
@@ -881,13 +921,15 @@ export function Player() {
 		setPosition(current)
 	}
 	if (!session && !error)
-		return <CastControl remote={false} onTransfer={handoffPlayback} />
+		return (
+			<CastControl remote={false} busy={transferBusy} onTransfer={transfer} />
+		)
 	return (
 		<section
 			aria-label="Audio player"
-			className="fixed inset-x-0 bottom-0 z-20 border-t bg-card p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-lg"
+			className="fixed inset-x-0 bottom-0 z-20 border-t bg-card px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg"
 		>
-			<div className="mx-auto max-h-[60vh] max-w-6xl space-y-2 overflow-y-auto">
+			<div className="mx-auto max-w-6xl space-y-1">
 				{streamMessage && <p role="status">{streamMessage}</p>}
 				{error && (
 					<p role="alert" className="text-destructive">
@@ -911,17 +953,17 @@ export function Player() {
 					</p>
 				)}
 				{session && (
-					<>
-						<div className="flex items-center gap-3">
+					<div className="grid min-w-0 grid-cols-[1fr_auto] items-center gap-x-2 sm:grid-cols-[minmax(0,1fr)_minmax(300px,2fr)_auto]">
+						<div className="flex min-w-0 items-center gap-2">
 							{session.libraryItemId && session.coverPath && (
 								<img
 									alt=""
-									className="size-12 rounded object-cover"
+									className="size-10 shrink-0 rounded object-cover"
 									src={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(session.libraryItemId)}/cover`}
 								/>
 							)}
-							<div>
-								<p className="font-medium">
+							<div className="min-w-0">
+								<p className="truncate text-sm font-medium">
 									{session.libraryItemId ? (
 										<Link
 											className="underline"
@@ -935,506 +977,649 @@ export function Player() {
 									)}
 								</p>
 								{session.displayAuthor && (
-									<p className="text-sm text-muted-foreground">
+									<p className="truncate text-xs text-muted-foreground">
 										{session.displayAuthor}
 									</p>
 								)}
 							</div>
 						</div>
-						<CastControl remote={remote} onTransfer={handoffPlayback} />
-						<div className="flex flex-wrap items-center gap-4">
-							{remote && (
-								<>
-									<Button
-										variant="outline"
-										disabled={!casting.connected}
-										onClick={() => playing(true)}
-									>
-										Play on Cast
-									</Button>
-									<Button
-										variant="outline"
-										disabled={!casting.connected}
-										onClick={() => playing(false)}
-									>
-										Pause Cast
-									</Button>
-								</>
-							)}
-							<audio
-								ref={audio}
-								className={
-									remote ? 'hidden' : 'w-[300px] min-w-0 max-w-full shrink-0'
-								}
-								controls
-								onTimeUpdate={update}
-								onSeeked={update}
-								onError={() =>
-									usePlayer.setState({
-										error:
-											'Audio could not load. Retry playback or retry with transcoding.',
-									})
-								}
-								aria-label="Audio playback"
-							>
-								<track kind="captions" />
-							</audio>
-							{!remote && 'setSinkId' in HTMLMediaElement.prototype && (
-								<Button
-									variant="outline"
-									onClick={() => {
-										const devices = navigator.mediaDevices as MediaDevices & {
-											selectAudioOutput?: () => Promise<MediaDeviceInfo>
-										}
-										if (!devices?.selectAudioOutput) {
-											usePlayer.setState({
-												error:
-													'This browser does not support audio-output selection. Use OS output settings.',
-											})
-											return
-										}
-										void devices
-											.selectAudioOutput()
-											.then((device) =>
-												audio.current?.setSinkId(device.deviceId),
-											)
-											.catch((error) =>
-												usePlayer.setState({
-													error:
-														error instanceof Error
-															? error.message
-															: 'Audio output selection failed',
-												}),
-											)
-									}}
-								>
-									Audio output
-								</Button>
-							)}
-							<label>
-								Playback speed{' '}
-								<select
-									aria-label="Playback speed"
-									className="rounded-md border bg-background p-2"
-									value={settings.playbackRate || 1}
-									onChange={(event) =>
-										updateSetting('playbackRate', Number(event.target.value))
+						<audio
+							ref={audio}
+							className={
+								remote
+									? 'hidden'
+									: 'col-span-2 row-start-2 h-[40px] w-full min-w-0 sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:h-[54px]'
+							}
+							controls
+							onVolumeChange={() => {
+								if (!remote && sourceReady.current && audio.current)
+									localVolume.current = {
+										volume: audio.current.volume,
+										muted: audio.current.muted,
 									}
-								>
-									{[0.75, 1, 1.25, 1.5, 2].map((rate) => (
-										<option key={rate} value={rate}>
-											{rate}×
-										</option>
-									))}
-								</select>
-							</label>
-							<Button
-								variant="outline"
-								onClick={() =>
-									void closeCurrent?.().then(() =>
-										usePlayer.getState().set(null),
-									)
-								}
-							>
-								Close player
-							</Button>
-						</div>
-						<div className="flex flex-wrap items-center gap-2">
-							<Button
-								variant="outline"
-								disabled={!session.chapters?.length}
-								onClick={() =>
-									seekPlayback(
-										[...(session.chapters || [])]
-											.reverse()
-											.find((chapter) => chapter.start < position - 3)?.start ||
-											0,
-									)
-								}
-							>
-								Previous chapter
-							</Button>
-							<Button
-								variant="outline"
-								disabled={
-									!session.chapters?.some((chapter) => chapter.start > position)
-								}
-								onClick={() =>
-									seekPlayback(
-										session.chapters?.find(
-											(chapter) => chapter.start > position,
-										)?.start || session.duration,
-									)
-								}
-							>
-								Next chapter
-							</Button>
-							<Button
-								variant="outline"
-								onClick={() =>
-									seekPlayback(position - (settings.jumpBackwardAmount || 10))
-								}
-							>
-								Back {settings.jumpBackwardAmount || 10} s
-							</Button>
-							<Button
-								variant="outline"
-								onClick={() =>
-									seekPlayback(position + (settings.jumpForwardAmount || 10))
-								}
-							>
-								Forward {settings.jumpForwardAmount || 10} s
-							</Button>
-							<Button
-								variant="outline"
-								disabled={!queue.entries.length}
-								onClick={() =>
-									void playNext().catch((error) =>
-										usePlayer.setState({ error: String(error) }),
-									)
-								}
-							>
-								Next queued
-							</Button>
-							<label>
-								Volume{' '}
-								<input
-									aria-label="Volume"
-									type="range"
-									min="0"
-									max="1"
-									step="0.01"
-									defaultValue="1"
-									onChange={(event) => {
-										if (remote) setCastVolume(Number(event.target.value))
-										else if (audio.current)
-											audio.current.volume = Number(event.target.value)
-									}}
-								/>
-							</label>
-							<label>
-								Sleep{' '}
-								<select
-									aria-label="Sleep timer"
-									className="rounded-md border bg-background p-2"
-									value={
-										sleepChapter !== null
-											? 'chapter'
-											: sleepAt
-												? 'active'
-												: 'off'
-									}
-									onChange={(event) => {
-										if (event.target.value === 'chapter') {
-											setSleepAt(null)
-											setSleepChapter(
-												session.chapters?.find(
-													(chapter) =>
-														chapter.start <= position && chapter.end > position,
-												)?.end ?? session.duration,
-											)
-											return
-										}
-										setSleepChapter(null)
-										const minutes = Number(event.target.value)
-										setSleepAt(
-											minutes > 0 ? Date.now() + minutes * 60000 : null,
+							}}
+							onRateChange={() => {
+								if (!remote && sourceReady.current && audio.current) {
+									try {
+										setSettings(
+											savePlayerSetting(
+												'playbackRate',
+												audio.current.playbackRate,
+											),
 										)
-									}}
+									} catch (error) {
+										usePlayer.setState({ error: String(error) })
+									}
+								}
+							}}
+							onTimeUpdate={update}
+							onSeeked={update}
+							onError={() =>
+								usePlayer.setState({
+									error:
+										'Audio could not load. Retry playback or retry with transcoding.',
+								})
+							}
+							aria-label="Audio playback"
+						>
+							<track kind="captions" />
+						</audio>
+						{remote && (
+							<div className="col-span-2 flex items-center justify-center gap-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
+								<Button
+									variant="ghost"
+									size="icon"
+									disabled={!casting.connected}
+									aria-label="Play on Cast"
+									onClick={() => playing(true)}
 								>
-									<option value="off">Off</option>
-									<option value="chapter">End of current chapter</option>
-									{sleepAt && (
-										<option value="active">
-											Active until{' '}
-											{new Date(sleepAt).getHours().toString().padStart(2, '0')}
-											:
-											{new Date(sleepAt)
-												.getMinutes()
-												.toString()
-												.padStart(2, '0')}
-										</option>
-									)}
-									{[5, 10, 15, 30, 60].map((minutes) => (
-										<option key={minutes} value={minutes}>
-											{minutes} minutes
-										</option>
-									))}
-								</select>
-							</label>
-						</div>
-						<label className="flex items-center gap-3">
-							Original timeline{' '}
-							<span className="relative flex min-w-0 flex-1 items-center">
-								<span
-									aria-hidden="true"
-									className="pointer-events-none absolute inset-x-0 flex h-2"
+									<Play aria-hidden="true" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									disabled={!casting.connected}
+									aria-label="Pause Cast"
+									onClick={() => playing(false)}
 								>
-									{segments.map((s) => (
-										<span
-											key={`${s.start}-${s.end}`}
-											className="absolute h-2 bg-yellow-400"
-											style={{
-												left: `${(s.start / session.duration) * 100}%`,
-												width: `${((s.end - s.start) / session.duration) * 100}%`,
-											}}
-										/>
-									))}
-								</span>
-								<input
-									className="relative w-full accent-primary opacity-75"
-									aria-label="Seek position"
-									aria-valuetext={`${duration(position)} of ${duration(session.duration)}`}
-									type="range"
-									min="0"
-									max={session.duration}
-									step="0.1"
-									value={position}
-									onChange={(event) => {
-										seekPlayback(Number(event.target.value))
-										setPosition(Number(event.target.value))
-									}}
-								/>
-							</span>
-							<span className="text-xs tabular-nums">
-								{duration(position)} / {duration(session.duration)}
-							</span>
-						</label>
-						<details>
-							<summary>Chapters, bookmarks, queue and settings</summary>
-							<div className="flex flex-wrap gap-3 py-2">
-								{(['jumpBackwardAmount', 'jumpForwardAmount'] as const).map(
-									(key) => (
-										<label key={key}>
-											{key === 'jumpBackwardAmount'
-												? 'Jump back (seconds)'
-												: 'Jump forward (seconds)'}
-											<input
-												className="ml-2 w-20 rounded border bg-background p-1"
-												type="number"
-												min="1"
-												max="600"
-												value={settings[key] || 10}
-												onChange={(event) =>
-													updateSetting(key, Number(event.target.value))
-												}
-											/>
-										</label>
-									),
-								)}
+									<Pause aria-hidden="true" />
+								</Button>
 							</div>
-							<div className="max-h-60 space-y-3 overflow-auto py-3">
-								<ol>
-									{session.chapters?.map((chapter) => (
-										<li key={chapter.id}>
+						)}
+						<Sheet
+							onOpenChange={() => {
+								editingSeek.current = false
+								setSeekDraft(String(Math.floor(position)))
+							}}
+						>
+							<SheetTrigger asChild>
+								<Button
+									variant="ghost"
+									size="icon"
+									className="col-start-2 row-start-1 sm:col-start-3"
+									aria-label="Player options"
+									title="Player options"
+								>
+									<Ellipsis aria-hidden="true" />
+								</Button>
+							</SheetTrigger>
+							<SheetContent className="w-full overflow-y-auto p-4 sm:max-w-2xl">
+								<SheetHeader>
+									<SheetTitle>Player options</SheetTitle>
+									<SheetDescription>
+										Chapters, queue, bookmarks and playback settings.
+									</SheetDescription>
+								</SheetHeader>
+								<div className="space-y-4 py-4">
+									<CastControl
+										remote={remote}
+										busy={transferBusy}
+										onTransfer={transfer}
+									/>
+									<div className="flex flex-wrap items-center gap-4">
+										{!remote && 'setSinkId' in HTMLMediaElement.prototype && (
 											<Button
-												variant="link"
-												onClick={() => seekPlayback(chapter.start)}
+												variant="outline"
+												onClick={() => {
+													const devices =
+														navigator.mediaDevices as MediaDevices & {
+															selectAudioOutput?: () => Promise<MediaDeviceInfo>
+														}
+													if (!devices?.selectAudioOutput) {
+														usePlayer.setState({
+															error:
+																'This browser does not support audio-output selection. Use OS output settings.',
+														})
+														return
+													}
+													void devices
+														.selectAudioOutput()
+														.then((device) =>
+															audio.current?.setSinkId(device.deviceId),
+														)
+														.catch((error) =>
+															usePlayer.setState({
+																error:
+																	error instanceof Error
+																		? error.message
+																		: 'Audio output selection failed',
+															}),
+														)
+												}}
 											>
-												{duration(chapter.start)} {chapter.title}
+												Audio output
 											</Button>
-										</li>
-									))}
-								</ol>
-								{session.libraryItemId && !session.episodeId && (
-									<>
+										)}
+										<label>
+											Playback speed{' '}
+											<select
+												aria-label="Playback speed"
+												className="rounded-md border bg-background p-2"
+												value={settings.playbackRate || 1}
+												onChange={(event) =>
+													updateSetting(
+														'playbackRate',
+														Number(event.target.value),
+													)
+												}
+											>
+												{Array.from(
+													{ length: 16 },
+													(_, index) => (index + 1) / 4,
+												).map((rate) => (
+													<option key={rate} value={rate}>
+														{rate}×
+													</option>
+												))}
+											</select>
+										</label>
+										<Button
+											variant="outline"
+											onClick={() =>
+												void closeCurrent?.().then(() =>
+													usePlayer.getState().set(null),
+												)
+											}
+										>
+											Close player
+										</Button>
+									</div>
+									<div className="flex flex-wrap items-center gap-2">
+										<Button
+											variant="outline"
+											disabled={!session.chapters?.length}
+											onClick={() =>
+												seekPlayback(
+													[...(session.chapters || [])]
+														.reverse()
+														.find((chapter) => chapter.start < position - 3)
+														?.start || 0,
+												)
+											}
+										>
+											Previous chapter
+										</Button>
+										<Button
+											variant="outline"
+											disabled={
+												!session.chapters?.some(
+													(chapter) => chapter.start > position,
+												)
+											}
+											onClick={() =>
+												seekPlayback(
+													session.chapters?.find(
+														(chapter) => chapter.start > position,
+													)?.start || session.duration,
+												)
+											}
+										>
+											Next chapter
+										</Button>
+										<Button
+											variant="outline"
+											onClick={() =>
+												seekPlayback(
+													position - (settings.jumpBackwardAmount || 10),
+												)
+											}
+										>
+											Back {settings.jumpBackwardAmount || 10} s
+										</Button>
+										<Button
+											variant="outline"
+											onClick={() =>
+												seekPlayback(
+													position + (settings.jumpForwardAmount || 10),
+												)
+											}
+										>
+											Forward {settings.jumpForwardAmount || 10} s
+										</Button>
+										<Button
+											variant="outline"
+											disabled={!queue.entries.length}
+											onClick={() =>
+												void playNext().catch((error) =>
+													usePlayer.setState({ error: String(error) }),
+												)
+											}
+										>
+											Next queued
+										</Button>
+										{remote && (
+											<label>
+												Volume{' '}
+												<input
+													aria-label="Volume"
+													type="range"
+													min="0"
+													max="1"
+													step="0.01"
+													defaultValue="1"
+													onChange={(event) => {
+														if (remote)
+															setCastVolume(Number(event.target.value))
+														else if (audio.current)
+															audio.current.volume = Number(event.target.value)
+													}}
+												/>
+											</label>
+										)}
+										<label>
+											Sleep{' '}
+											<select
+												aria-label="Sleep timer"
+												className="rounded-md border bg-background p-2"
+												value={
+													sleepChapter !== null
+														? 'chapter'
+														: sleepAt
+															? 'active'
+															: 'off'
+												}
+												onChange={(event) => {
+													if (event.target.value === 'chapter') {
+														setSleepAt(null)
+														setSleepChapter(
+															session.chapters?.find(
+																(chapter) =>
+																	chapter.start <= position &&
+																	chapter.end > position,
+															)?.end ?? session.duration,
+														)
+														return
+													}
+													setSleepChapter(null)
+													const minutes = Number(event.target.value)
+													setSleepAt(
+														minutes > 0 ? Date.now() + minutes * 60000 : null,
+													)
+												}}
+											>
+												<option value="off">Off</option>
+												<option value="chapter">End of current chapter</option>
+												{sleepAt && (
+													<option value="active">
+														Active until{' '}
+														{new Date(sleepAt)
+															.getHours()
+															.toString()
+															.padStart(2, '0')}
+														:
+														{new Date(sleepAt)
+															.getMinutes()
+															.toString()
+															.padStart(2, '0')}
+													</option>
+												)}
+												{[5, 10, 15, 30, 60].map((minutes) => (
+													<option key={minutes} value={minutes}>
+														{minutes} minutes
+													</option>
+												))}
+											</select>
+										</label>
+									</div>
+									{remote && (
+										<label className="flex items-center gap-3">
+											Original timeline{' '}
+											<span className="relative flex min-w-0 flex-1 items-center">
+												<span
+													aria-hidden="true"
+													className="pointer-events-none absolute inset-x-0 flex h-2"
+												>
+													{segments.map((s) => (
+														<span
+															key={`${s.start}-${s.end}`}
+															className="absolute h-2 bg-yellow-400"
+															style={{
+																left: `${(s.start / session.duration) * 100}%`,
+																width: `${((s.end - s.start) / session.duration) * 100}%`,
+															}}
+														/>
+													))}
+												</span>
+												<input
+													className="relative w-full accent-primary opacity-75"
+													aria-label="Seek position"
+													aria-valuetext={`${duration(position)} of ${duration(session.duration)}`}
+													type="range"
+													min="0"
+													max={session.duration}
+													step="0.1"
+													value={position}
+													onChange={(event) => {
+														seekPlayback(Number(event.target.value))
+														setPosition(Number(event.target.value))
+													}}
+												/>
+											</span>
+											<span className="text-xs tabular-nums">
+												{duration(position)} / {duration(session.duration)}
+											</span>
+										</label>
+									)}
+									{!remote && (
 										<form
-											className="flex flex-wrap gap-2"
+											className="flex flex-wrap items-center gap-2 text-sm"
+											onBlur={(event) => {
+												if (
+													!event.currentTarget.contains(event.relatedTarget)
+												) {
+													editingSeek.current = false
+													setSeekDraft(String(Math.floor(position)))
+												}
+											}}
 											onSubmit={(event) => {
 												event.preventDefault()
-												const id = session.libraryItemId
-												if (!id || !bookmarkTitle.trim()) return
-												void api(
-													`/api/me/item/${encodeURIComponent(id)}/bookmark`,
-													z
-														.object({ time: z.number(), title: z.string() })
-														.passthrough(),
-													{
-														method: 'POST',
-														body: JSON.stringify({
-															time: Math.floor(position),
-															title: bookmarkTitle.trim(),
-														}),
-													},
+												const value = Number(seekDraft)
+												if (
+													seekDraft.trim() &&
+													Number.isFinite(value) &&
+													value >= 0 &&
+													value <= session.duration
 												)
-													.then((bookmark) => {
-														setBookmarks((list) => [
-															...list.filter(
-																(entry) => entry.time !== bookmark.time,
-															),
-															bookmark,
-														])
-														setBookmarkTitle('')
-													})
-													.catch((error) =>
-														usePlayer.setState({ error: String(error) }),
-													)
+													seekPlayback(value)
 											}}
 										>
-											<label htmlFor="player-bookmark-title">
-												Bookmark title
+											<label htmlFor="player-original-position">
+												Original position (seconds)
 											</label>
 											<input
-												id="player-bookmark-title"
-												aria-label="Bookmark title"
-												className="rounded-md border bg-background p-2"
-												value={bookmarkTitle}
-												onChange={(event) =>
-													setBookmarkTitle(event.target.value)
-												}
+												aria-label="Original position (seconds)"
+												className="w-28 rounded border bg-background p-2"
+												type="number"
+												min="0"
+												max={session.duration}
+												step="any"
+												id="player-original-position"
 												required
-												maxLength={500}
+												value={seekDraft}
+												onFocus={() => {
+													editingSeek.current = true
+												}}
+												onChange={(event) => setSeekDraft(event.target.value)}
 											/>
-											<Button>Add bookmark</Button>
+											<span>
+												{duration(position)} / {duration(session.duration)}
+											</span>
+											<Button
+												type="submit"
+												onPointerDown={(event) => event.preventDefault()}
+											>
+												Seek
+											</Button>
 										</form>
-										<ul>
-											{bookmarks.map((bookmark) => (
-												<li
-													key={bookmark.time}
-													className="flex items-center gap-2"
-												>
-													<Button
-														variant="link"
-														onClick={() => seekPlayback(bookmark.time)}
-													>
-														{duration(bookmark.time)} {bookmark.title}
-													</Button>
-													<Button
-														variant="outline"
-														onClick={() => {
-															const title = window.prompt(
-																'Bookmark title',
-																bookmark.title,
-															)
-															if (!title?.trim()) return
+									)}
+									<details>
+										<summary>Chapters, bookmarks, queue and settings</summary>
+										<div className="flex flex-wrap gap-3 py-2">
+											{(
+												['jumpBackwardAmount', 'jumpForwardAmount'] as const
+											).map((key) => (
+												<label key={key}>
+													{key === 'jumpBackwardAmount'
+														? 'Jump back (seconds)'
+														: 'Jump forward (seconds)'}
+													<input
+														className="ml-2 w-20 rounded border bg-background p-1"
+														type="number"
+														min="1"
+														max="600"
+														value={settings[key] || 10}
+														onChange={(event) =>
+															updateSetting(key, Number(event.target.value))
+														}
+													/>
+												</label>
+											))}
+										</div>
+										<div className="max-h-60 space-y-3 overflow-auto py-3">
+											<ol>
+												{session.chapters?.map((chapter) => (
+													<li key={chapter.id}>
+														<Button
+															variant="link"
+															onClick={() => seekPlayback(chapter.start)}
+														>
+															{duration(chapter.start)} {chapter.title}
+														</Button>
+													</li>
+												))}
+											</ol>
+											{session.libraryItemId && !session.episodeId && (
+												<>
+													<form
+														className="flex flex-wrap gap-2"
+														onSubmit={(event) => {
+															event.preventDefault()
+															const id = session.libraryItemId
+															if (!id || !bookmarkTitle.trim()) return
 															void api(
-																`/api/me/item/${encodeURIComponent(session.libraryItemId || '')}/bookmark`,
-																z.object({
-																	time: z.number(),
-																	title: z.string(),
-																}),
+																`/api/me/item/${encodeURIComponent(id)}/bookmark`,
+																z
+																	.object({
+																		time: z.number(),
+																		title: z.string(),
+																	})
+																	.passthrough(),
 																{
-																	method: 'PATCH',
+																	method: 'POST',
 																	body: JSON.stringify({
-																		time: bookmark.time,
-																		title: title.trim(),
+																		time: Math.floor(position),
+																		title: bookmarkTitle.trim(),
 																	}),
 																},
 															)
-																.then((updated) =>
-																	setBookmarks((list) =>
-																		list.map((entry) =>
-																			entry.time === updated.time
-																				? updated
-																				: entry,
-																		),
-																	),
-																)
-																.catch((error) =>
-																	usePlayer.setState({ error: String(error) }),
-																)
-														}}
-													>
-														Edit bookmark
-													</Button>
-													<Button
-														variant="outline"
-														onClick={() => {
-															if (
-																!window.confirm(
-																	`Delete bookmark “${bookmark.title}”?`,
-																)
-															)
-																return
-															void api(
-																`/api/me/item/${encodeURIComponent(session.libraryItemId || '')}/bookmark/${bookmark.time}`,
-																z.unknown(),
-																{ method: 'DELETE' },
-															)
-																.then(() =>
-																	setBookmarks((list) =>
-																		list.filter(
+																.then((bookmark) => {
+																	setBookmarks((list) => [
+																		...list.filter(
 																			(entry) => entry.time !== bookmark.time,
 																		),
-																	),
-																)
+																		bookmark,
+																	])
+																	setBookmarkTitle('')
+																})
 																.catch((error) =>
-																	usePlayer.setState({ error: String(error) }),
+																	usePlayer.setState({
+																		error: String(error),
+																	}),
 																)
 														}}
 													>
-														Delete bookmark
-													</Button>
-												</li>
-											))}
-										</ul>
-									</>
-								)}
-								<Button
-									variant="outline"
-									disabled={!queue.entries.length}
-									onClick={() => {
-										if (window.confirm('Clear playback queue?'))
-											useQueue.setState({ entries: [] })
-									}}
-								>
-									Clear queue
-								</Button>
-								<ol>
-									{queue.entries.map((entry, index) => (
-										<li
-											key={entry.queueId}
-											className="flex flex-wrap items-center gap-2"
-										>
-											<span>{entry.title}</span>
+														<label htmlFor="player-bookmark-title">
+															Bookmark title
+														</label>
+														<input
+															id="player-bookmark-title"
+															aria-label="Bookmark title"
+															className="rounded-md border bg-background p-2"
+															value={bookmarkTitle}
+															onChange={(event) =>
+																setBookmarkTitle(event.target.value)
+															}
+															required
+															maxLength={500}
+														/>
+														<Button>Add bookmark</Button>
+													</form>
+													<ul>
+														{bookmarks.map((bookmark) => (
+															<li
+																key={bookmark.time}
+																className="flex items-center gap-2"
+															>
+																<Button
+																	variant="link"
+																	onClick={() => seekPlayback(bookmark.time)}
+																>
+																	{duration(bookmark.time)} {bookmark.title}
+																</Button>
+																<Button
+																	variant="outline"
+																	onClick={() => {
+																		const title = window.prompt(
+																			'Bookmark title',
+																			bookmark.title,
+																		)
+																		if (!title?.trim()) return
+																		void api(
+																			`/api/me/item/${encodeURIComponent(session.libraryItemId || '')}/bookmark`,
+																			z.object({
+																				time: z.number(),
+																				title: z.string(),
+																			}),
+																			{
+																				method: 'PATCH',
+																				body: JSON.stringify({
+																					time: bookmark.time,
+																					title: title.trim(),
+																				}),
+																			},
+																		)
+																			.then((updated) =>
+																				setBookmarks((list) =>
+																					list.map((entry) =>
+																						entry.time === updated.time
+																							? updated
+																							: entry,
+																					),
+																				),
+																			)
+																			.catch((error) =>
+																				usePlayer.setState({
+																					error: String(error),
+																				}),
+																			)
+																	}}
+																>
+																	Edit bookmark
+																</Button>
+																<Button
+																	variant="outline"
+																	onClick={() => {
+																		if (
+																			!window.confirm(
+																				`Delete bookmark “${bookmark.title}”?`,
+																			)
+																		)
+																			return
+																		void api(
+																			`/api/me/item/${encodeURIComponent(session.libraryItemId || '')}/bookmark/${bookmark.time}`,
+																			z.unknown(),
+																			{ method: 'DELETE' },
+																		)
+																			.then(() =>
+																				setBookmarks((list) =>
+																					list.filter(
+																						(entry) =>
+																							entry.time !== bookmark.time,
+																					),
+																				),
+																			)
+																			.catch((error) =>
+																				usePlayer.setState({
+																					error: String(error),
+																				}),
+																			)
+																	}}
+																>
+																	Delete bookmark
+																</Button>
+															</li>
+														))}
+													</ul>
+												</>
+											)}
 											<Button
 												variant="outline"
-												disabled={index === 0}
-												onClick={() => queue.move(index, -1)}
+												disabled={!queue.entries.length}
+												onClick={() => {
+													if (window.confirm('Clear playback queue?'))
+														useQueue.setState({ entries: [] })
+												}}
 											>
-												Move up
+												Clear queue
 											</Button>
-											<Button
-												variant="outline"
-												disabled={index === queue.entries.length - 1}
-												onClick={() => queue.move(index, 1)}
-											>
-												Move down
-											</Button>
-											<Button
-												variant="outline"
-												onClick={() => queue.remove(index)}
-											>
-												Remove
-											</Button>
-										</li>
-									))}
-								</ol>
-							</div>
-						</details>
-						<label className="flex items-center gap-2 text-sm">
-							<input
-								type="checkbox"
-								checked={optIn}
-								disabled={!segments.length}
-								onChange={(event) => setOptIn(event.target.checked)}
-							/>
-							Skip detected inserted audio
-						</label>
-						<p className="text-xs text-muted-foreground">
-							{segments.length
-								? `${segments.length} candidate segments. May include false positives; original audio unchanged. Each candidate skips once.`
-								: 'No applicable candidate segments. Skipping unavailable.'}
-						</p>
-						{!!segments.length && (
-							<p className="text-xs text-muted-foreground">
-								Candidate markers:{' '}
-								{segments
-									.map((s) => `${duration(s.start)}–${duration(s.end)}`)
-									.join(', ')}
-							</p>
-						)}
-					</>
+											<ol>
+												{queue.entries.map((entry, index) => (
+													<li
+														key={entry.queueId}
+														className="flex flex-wrap items-center gap-2"
+													>
+														<span>{entry.title}</span>
+														<Button
+															variant="outline"
+															disabled={index === 0}
+															onClick={() => queue.move(index, -1)}
+														>
+															Move up
+														</Button>
+														<Button
+															variant="outline"
+															disabled={index === queue.entries.length - 1}
+															onClick={() => queue.move(index, 1)}
+														>
+															Move down
+														</Button>
+														<Button
+															variant="outline"
+															onClick={() => queue.remove(index)}
+														>
+															Remove
+														</Button>
+													</li>
+												))}
+											</ol>
+										</div>
+									</details>
+									<label className="flex items-center gap-2 text-sm">
+										<input
+											type="checkbox"
+											checked={optIn}
+											disabled={!segments.length}
+											onChange={(event) => setOptIn(event.target.checked)}
+										/>
+										Skip detected inserted audio
+									</label>
+									<p className="text-xs text-muted-foreground">
+										{segments.length
+											? `${segments.length} candidate segments. May include false positives; original audio unchanged. Each candidate skips once.`
+											: 'No applicable candidate segments. Skipping unavailable.'}
+									</p>
+									{!!segments.length && (
+										<p className="text-xs text-muted-foreground">
+											Candidate markers:{' '}
+											{segments
+												.map((s) => `${duration(s.start)}–${duration(s.end)}`)
+												.join(', ')}
+										</p>
+									)}
+								</div>
+							</SheetContent>
+						</Sheet>
+					</div>
 				)}
 			</div>
 		</section>

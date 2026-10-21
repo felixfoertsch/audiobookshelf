@@ -4,8 +4,10 @@ import { disconnectCast, useCast } from './cast'
 export function CastControl({
 	remote,
 	onTransfer,
+	busy: transferBusy = false,
 }: {
 	remote: boolean
+	busy?: boolean
 	onTransfer: (target: 'local' | 'cast') => Promise<unknown>
 }) {
 	const cast = useCast(),
@@ -47,7 +49,7 @@ export function CastControl({
 			{cast.connected && !remote && (
 				<Button
 					variant="outline"
-					disabled={busy}
+					disabled={busy || transferBusy}
 					onClick={() => void transfer('cast')}
 				>
 					Transfer audio to Cast
@@ -56,7 +58,7 @@ export function CastControl({
 			{remote && (
 				<Button
 					variant="outline"
-					disabled={busy}
+					disabled={busy || transferBusy}
 					onClick={() => void transfer('local')}
 				>
 					Return to local
@@ -65,7 +67,7 @@ export function CastControl({
 			{cast.connected && (
 				<Button
 					variant="outline"
-					disabled={busy}
+					disabled={busy || transferBusy}
 					onClick={() => disconnectCast()}
 				>
 					Disconnect Cast

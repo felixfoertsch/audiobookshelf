@@ -14,6 +14,7 @@ import { PodcastManagementSettings } from '../podcast'
 import { Reader, readerItemSchema } from '../reader'
 import { EpisodeEdit } from './EpisodeEdit'
 import { ItemActions } from './ItemActions'
+import { episodeProgress, refreshProgress } from './progress'
 import type { Item } from './schemas'
 import {
 	checkPodcastFeed,
@@ -31,12 +32,20 @@ export function ItemView({ id }: { id: string }) {
 	)?.download
 	const [item, setItem] = useState<Item | null>(null)
 	const [error, setError] = useState('')
+	const [warning, setWarning] = useState('')
+	const [progressError, setProgressError] = useState('')
+	const [progressUnavailable, setProgressUnavailable] = useState(false)
 	const [busy, setBusy] = useState(false)
 	const [hardDeleteEpisode, setHardDeleteEpisode] = useState(false)
 	const episodeDrafts = useRef(new Map<string, Record<string, string>>())
 	const [page, setPage] = useState(0)
 	const [expanded, setExpanded] = useState<Set<string>>(new Set())
-	const [progress, setProgress] = useState(false)
+	const request = useRef(0)
+	const owner = useRef(user?.id)
+	owner.current = user?.id
+	const [episodeBusy, setEpisodeBusy] = useState<string | null>(null)
+	const bookProgress = episodeProgress(user, id) ?? item?.userMediaProgress
+	const progress = bookProgress?.isFinished ?? false
 	const [reader, setReader] = useState<{
 		fileId?: string
 		keepProgress: boolean
@@ -45,6 +54,7 @@ export function ItemView({ id }: { id: string }) {
 		user as (typeof user & { permissions?: { update?: boolean } }) | null
 	)?.permissions?.update
 	useEffect(() => {
+		const userId = user?.id
 		let active = true
 		setItem(null)
 		setReader(null)
@@ -52,56 +62,64 @@ export function ItemView({ id }: { id: string }) {
 		setPage(0)
 		setExpanded(new Set())
 		setError('')
+		setWarning('')
+		setProgressUnavailable(!!userId)
+		setProgressError('')
 		const reload = () => {
+			const sequence = ++request.current
 			void getItem(id)
 				.then((value) => {
-					if (active) {
+					if (
+						active &&
+						owner.current === userId &&
+						sequence === request.current
+					)
 						setItem(value)
-						setProgress(value.userMediaProgress?.isFinished ?? false)
-					}
 				})
-				.catch((error) => {
-					if (active)
+				.catch((error: unknown) => {
+					if (active && sequence === request.current)
 						setError(
 							error instanceof Error ? error.message : 'Item update failed',
 						)
 				})
 		}
+		const reloadProgress = async () => {
+			try {
+				await refreshProgress()
+				if (active && owner.current === userId) {
+					setProgressUnavailable(false)
+					setProgressError('')
+					setWarning('')
+				}
+			} catch (error) {
+				if (active && owner.current === userId) {
+					setProgressUnavailable(true)
+					setProgressError(
+						error instanceof Error ? error.message : 'Progress update failed',
+					)
+				}
+			}
+		}
 		const receive = (event: Event) => {
-			if (
-				!(event instanceof CustomEvent) ||
-				!event.detail ||
-				typeof event.detail !== 'object'
-			)
-				return
-			const detail = event.detail as { event?: unknown; payload?: unknown }
-			if (
-				[
-					'item_updated',
-					'user_item_progress_updated',
-					'reconnect',
-					'init',
-				].includes(String(detail.event))
-			)
+			if (!(event instanceof CustomEvent)) return
+			const detail = event.detail as {
+				event?: unknown
+				payload?: { id?: unknown }
+			} | null
+			if (detail?.event === 'item_updated' && detail.payload?.id === id)
 				reload()
+			if (detail?.event === 'init' || detail?.event === 'reconnect')
+				void reloadProgress()
 		}
 		window.addEventListener('abs:socket', receive)
-		void getItem(id)
-			.then((value) => {
-				if (active) {
-					setItem(value)
-					setProgress(value.userMediaProgress?.isFinished ?? false)
-				}
-			})
-			.catch((e) => {
-				if (active)
-					setError(e instanceof Error ? e.message : 'Could not load item')
-			})
+		if (userId) void reloadProgress()
+		reload()
 		return () => {
 			active = false
+			request.current++
 			window.removeEventListener('abs:socket', receive)
 		}
-	}, [id])
+	}, [id, user?.id])
 	if (!item)
 		return (
 			<section aria-busy="true">
@@ -116,15 +134,40 @@ export function ItemView({ id }: { id: string }) {
 		Math.max(0, Math.ceil(episodes.length / 25) - 1),
 	)
 	async function action(run: () => Promise<unknown>) {
+		const userId = user?.id
+		const sequence = ++request.current
 		setBusy(true)
 		setError('')
 		try {
-			await run()
-			setItem(await getItem(id))
+			const result = await run()
+			if (owner.current === userId && result && typeof result === 'object')
+				setWarning(
+					'refreshWarning' in result ? String(result.refreshWarning || '') : '',
+				)
+			const value = await getItem(id)
+			if (owner.current === userId && sequence === request.current)
+				setItem(value)
 		} catch (e) {
-			setError(e instanceof Error ? e.message : 'Action failed')
+			if (owner.current === userId && sequence === request.current)
+				setError(e instanceof Error ? e.message : 'Action failed')
 		} finally {
-			setBusy(false)
+			if (owner.current === userId) setBusy(false)
+		}
+	}
+	async function finishEpisode(episodeId: string, isFinished: boolean) {
+		const userId = user?.id
+		setEpisodeBusy(episodeId)
+		setError('')
+		try {
+			const result = await updateProgress(id, { isFinished }, episodeId)
+			if (owner.current === userId) setWarning(result?.refreshWarning || '')
+		} catch (error) {
+			if (owner.current === userId)
+				setError(
+					error instanceof Error ? error.message : 'Progress update failed',
+				)
+		} finally {
+			if (owner.current === userId) setEpisodeBusy(null)
 		}
 	}
 	async function play(episodeId?: string) {
@@ -223,10 +266,9 @@ export function ItemView({ id }: { id: string }) {
 								variant="outline"
 								disabled={busy}
 								onClick={() =>
-									void action(async () => {
-										await updateProgress(id, { isFinished: !progress })
-										setProgress(!progress)
-									})
+									void action(() =>
+										updateProgress(id, { isFinished: !progress }),
+									)
 								}
 							>
 								{progress ? 'Mark unfinished' : 'Mark finished'}
@@ -284,6 +326,10 @@ export function ItemView({ id }: { id: string }) {
 						Read {file.metadata?.filename || 'supplementary ebook'}
 					</Button>
 				))}
+			{!!(warning || user?.progressWarning) && (
+				<p role="status">{warning || String(user?.progressWarning || '')}</p>
+			)}
+			{progressError && <p role="alert">{progressError}</p>}
 			{error && (
 				<p role="alert" className="text-destructive">
 					{error}
@@ -334,10 +380,10 @@ export function ItemView({ id }: { id: string }) {
 			{metadata.abridged === true && <p>Abridged</p>}
 			{item.isMissing && <p role="alert">Item files missing</p>}
 			{item.isInvalid && <p role="alert">Item files invalid</p>}
-			{item.userMediaProgress && (
+			{item.mediaType === 'book' && bookProgress && (
 				<p>
-					Progress {Math.round((item.userMediaProgress.progress || 0) * 100)}% ·{' '}
-					{duration(item.userMediaProgress.currentTime || 0)} listened
+					Progress {Math.round((bookProgress.progress || 0) * 100)}% ·{' '}
+					{duration(bookProgress.currentTime || 0)} listened
 				</p>
 			)}
 			{metadata.description && (
@@ -354,161 +400,181 @@ export function ItemView({ id }: { id: string }) {
 					<ol className="space-y-3">
 						{episodes
 							.slice(episodePage * 25, (episodePage + 1) * 25)
-							.map((ep) => (
-								<li key={ep.id} className="min-w-0 space-y-2 border-b py-3">
-									<div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-										<div className="min-w-0 flex-1">
-											<h3 className="font-medium">
-												{ep.title ?? 'Untitled episode'}
-											</h3>
-											<p className="text-sm text-muted-foreground">
-												{ep.duration != null
-													? duration(ep.duration)
-													: ep.audioFile?.duration != null
-														? duration(ep.audioFile.duration)
-														: 'Audio unavailable'}
-												{ep.publishedAt
-													? ` · ${new Date(ep.publishedAt).toISOString().slice(0, 10)}`
-													: ''}
-											</p>
-										</div>
-										<div className="flex flex-wrap gap-2">
-											<Button
-												disabled={busy || !ep.audioFile}
-												onClick={() => void play(ep.id)}
-											>
-												Play
-											</Button>
-											<Button
-												variant="outline"
-												disabled={busy || !ep.audioFile}
-												onClick={() =>
-													enqueueEpisode(id, ep.id, ep.title ?? 'Episode')
-												}
-											>
-												Queue
-											</Button>
-											<WorkflowSheet
-												title="Episode controls"
-												description={ep.title ?? 'Untitled episode'}
-											>
-												<div className="flex flex-wrap gap-2">
-													{error && <p role="alert">{error}</p>}
-													<Button
-														variant="outline"
-														disabled={busy}
-														onClick={() =>
-															void action(() =>
-																updateProgress(id, { isFinished: true }, ep.id),
-															)
-														}
-													>
-														Mark finished
-													</Button>
-													<Button
-														variant="outline"
-														disabled={busy}
-														onClick={() => {
-															if (
-																window.confirm(
-																	'Reset episode progress and mark unfinished?',
-																)
-															)
-																void action(() =>
-																	updateProgress(
-																		id,
-																		{ isFinished: false, currentTime: 0 },
-																		ep.id,
-																	),
-																)
-														}}
-													>
-														Reset progress
-													</Button>
-													{canDownload && ep.audioFile?.ino && (
-														<a
-															className="inline-flex items-center underline"
-															href={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(id)}/file/${encodeURIComponent(ep.audioFile.ino)}/download${localStorage.getItem('token') ? `?token=${encodeURIComponent(localStorage.getItem('token') || '')}` : ''}`}
-															download
+							.map((ep) => {
+								const progress = episodeProgress(user, id, ep.id)
+								return (
+									<li key={ep.id} className="min-w-0 space-y-2 border-b py-3">
+										<div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+											<div className="min-w-0 flex-1">
+												<h3 className="font-medium">
+													{ep.title ?? 'Untitled episode'}
+												</h3>
+												<p className="text-sm text-muted-foreground">
+													{ep.duration != null
+														? duration(ep.duration)
+														: ep.audioFile?.duration != null
+															? duration(ep.audioFile.duration)
+															: 'Audio unavailable'}
+													{ep.publishedAt
+														? ` · ${new Date(ep.publishedAt).toISOString().slice(0, 10)}`
+														: ''}
+												</p>
+												<p className="text-sm">
+													{progress?.isFinished
+														? 'Finished'
+														: progress?.currentTime || progress?.progress
+															? 'In progress'
+															: progressUnavailable ||
+																	warning ||
+																	user?.progressWarning
+																? 'Status unavailable'
+																: 'Unplayed'}
+												</p>
+											</div>
+											<div className="flex flex-wrap gap-2">
+												<Button
+													disabled={busy || !ep.audioFile}
+													onClick={() => void play(ep.id)}
+												>
+													Play
+												</Button>
+												<Button
+													variant="outline"
+													disabled={episodeBusy !== null}
+													onClick={() =>
+														void (progress?.isFinished &&
+														(progress.currentTime || 0) > 0
+															? window.confirm(
+																	'Mark unfinished? This resets the saved listening position to the beginning.',
+																) && finishEpisode(ep.id, false)
+															: finishEpisode(ep.id, !progress?.isFinished))
+													}
+												>
+													{progress?.isFinished
+														? 'Mark unfinished'
+														: 'Mark finished'}
+												</Button>
+												<WorkflowSheet
+													title="Episode controls"
+													description={ep.title ?? 'Untitled episode'}
+												>
+													<div className="flex flex-wrap gap-2">
+														{error && <p role="alert">{error}</p>}
+														<Button
+															variant="outline"
+															disabled={busy || !ep.audioFile}
+															onClick={() =>
+																enqueueEpisode(id, ep.id, ep.title ?? 'Episode')
+															}
 														>
-															Download audio
-														</a>
-													)}
-													{!!(
-														user?.permissions as
-															| { delete?: boolean }
-															| undefined
-													)?.delete && (
-														<>
-															<label className="flex basis-full gap-2">
-																<input
-																	type="checkbox"
-																	checked={hardDeleteEpisode}
-																	onChange={(event) =>
-																		setHardDeleteEpisode(event.target.checked)
-																	}
-																/>
-																Also delete audio file from filesystem when
-																deleting an episode
-															</label>
-															<Button
-																variant="destructive"
-																disabled={busy}
-																onClick={() => {
-																	if (
-																		window.confirm(
-																			`Delete episode “${ep.title ?? 'Untitled episode'}”?${hardDeleteEpisode ? ' This also permanently deletes its audio file from the filesystem.' : ' Audio file stays on the filesystem.'}`,
-																		)
+															Queue
+														</Button>
+
+														<Button
+															variant="outline"
+															disabled={busy}
+															onClick={() => {
+																if (
+																	window.confirm(
+																		'Reset episode progress and mark unfinished?',
 																	)
-																		void action(() =>
-																			deleteEpisode(
-																				id,
-																				ep.id,
-																				hardDeleteEpisode,
-																			),
-																		)
-																}}
+																)
+																	void action(() =>
+																		updateProgress(
+																			id,
+																			{ isFinished: false, currentTime: 0 },
+																			ep.id,
+																		),
+																	)
+															}}
+														>
+															Reset progress
+														</Button>
+														{canDownload && ep.audioFile?.ino && (
+															<a
+																className="inline-flex items-center underline"
+																href={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(id)}/file/${encodeURIComponent(ep.audioFile.ino)}/download${localStorage.getItem('token') ? `?token=${encodeURIComponent(localStorage.getItem('token') || '')}` : ''}`}
+																download
 															>
-																Delete
-															</Button>
-														</>
+																Download audio
+															</a>
+														)}
+														{!!(
+															user?.permissions as
+																| { delete?: boolean }
+																| undefined
+														)?.delete && (
+															<>
+																<label className="flex basis-full gap-2">
+																	<input
+																		type="checkbox"
+																		checked={hardDeleteEpisode}
+																		onChange={(event) =>
+																			setHardDeleteEpisode(event.target.checked)
+																		}
+																	/>
+																	Also delete audio file from filesystem when
+																	deleting an episode
+																</label>
+																<Button
+																	variant="destructive"
+																	disabled={busy}
+																	onClick={() => {
+																		if (
+																			window.confirm(
+																				`Delete episode “${ep.title ?? 'Untitled episode'}”?${hardDeleteEpisode ? ' This also permanently deletes its audio file from the filesystem.' : ' Audio file stays on the filesystem.'}`,
+																			)
+																		)
+																			void action(() =>
+																				deleteEpisode(
+																					id,
+																					ep.id,
+																					hardDeleteEpisode,
+																				),
+																			)
+																	}}
+																>
+																	Delete
+																</Button>
+															</>
+														)}
+													</div>
+													{canUpdate && (
+														<EpisodeEdit
+															itemId={id}
+															episode={ep}
+															drafts={episodeDrafts.current}
+															onSaved={() => void action(async () => {})}
+														/>
 													)}
-												</div>
-											</WorkflowSheet>
-											{canUpdate && (
-												<EpisodeEdit
-													itemId={id}
-													episode={ep}
-													drafts={episodeDrafts.current}
-													onSaved={() => void action(async () => {})}
-												/>
-											)}
+												</WorkflowSheet>
+											</div>
 										</div>
-									</div>
-									{ep.subtitle && <p className="text-sm">{ep.subtitle}</p>}
-									{ep.description && (
-										<div>
-											<Button
-												variant="link"
-												aria-expanded={expanded.has(ep.id)}
-												onClick={() =>
-													setExpanded((current) => {
-														const next = new Set(current)
-														if (next.has(ep.id)) next.delete(ep.id)
-														else next.add(ep.id)
-														return next
-													})
-												}
-											>
-												{expanded.has(ep.id) ? 'Read less' : 'Read more'}
-											</Button>
-											{expanded.has(ep.id) && (
-												<RichText text={ep.description} className="text-sm" />
-											)}
-										</div>
-									)}
-								</li>
-							))}
+										{ep.subtitle && <p className="text-sm">{ep.subtitle}</p>}
+										{ep.description && (
+											<div>
+												<Button
+													variant="link"
+													aria-expanded={expanded.has(ep.id)}
+													onClick={() =>
+														setExpanded((current) => {
+															const next = new Set(current)
+															if (next.has(ep.id)) next.delete(ep.id)
+															else next.add(ep.id)
+															return next
+														})
+													}
+												>
+													{expanded.has(ep.id) ? 'Read less' : 'Read more'}
+												</Button>
+												{expanded.has(ep.id) && (
+													<RichText text={ep.description} className="text-sm" />
+												)}
+											</div>
+										)}
+									</li>
+								)
+							})}
 					</ol>
 					<nav
 						aria-label="Episode pages"

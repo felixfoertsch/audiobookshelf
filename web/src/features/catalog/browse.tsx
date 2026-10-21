@@ -1,7 +1,7 @@
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
-import { api, useAuth } from '../../api'
+import { api, getAuthGeneration, useAuth } from '../../api'
 import { duration, episodeSchema, itemSchema } from '../../catalog'
 import { playEpisode, playQueue } from '../../player'
 import { Button } from '../../shared/components/ui/button'
@@ -15,6 +15,9 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from '../../shared/components/ui/sidebar'
+import { episodeProgress, refreshProgress } from '../item/progress'
+import { getItem, writeProgress } from '../item/service'
+import { WorkflowSheet } from '../item/WorkflowSheet'
 import {
 	type BrowseSearch,
 	browseSearch,
@@ -32,6 +35,131 @@ import {
 } from './browse-api'
 import { persistSearch, useCoverSize, useShelfPosition } from './preferences'
 import { SelectionTools } from './selection-tools'
+
+export async function updateSelectedProgress(
+	ids: string[],
+	podcast: boolean,
+	isFinished: boolean,
+	options: {
+		owner: string
+		generation: number
+		isActive: () => boolean
+		onProgress: (written: number, skipped: number, remaining: number) => void
+	},
+) {
+	let written = 0
+	let skipped = 0
+	let failed = 0
+	let error = ''
+	const targets: { id: string; episodeId?: string }[] = []
+	const current = () =>
+		options.isActive() &&
+		useAuth.getState().user?.id === options.owner &&
+		getAuthGeneration() === options.generation
+	try {
+		await refreshProgress()
+	} catch {
+		throw new Error(
+			'Could not verify listening status; refresh before bulk changes',
+		)
+	}
+	if (!current())
+		return {
+			written: 0,
+			skipped: 0,
+			failed: 0,
+			remaining: ids.length,
+			error: '',
+			refreshWarning: '',
+			cancelled: true,
+		}
+	if (useAuth.getState().user?.progressWarning)
+		throw new Error(
+			'Could not verify listening status; refresh before bulk changes',
+		)
+	for (const id of ids) {
+		if (!current()) break
+		if (podcast) {
+			const item = await getItem(id)
+			for (const episode of item.media.episodes || [])
+				targets.push({ id, episodeId: episode.id })
+		} else targets.push({ id })
+	}
+	if (!isFinished && current()) {
+		const resets = targets.filter((target) => {
+			const existing = episodeProgress(
+				useAuth.getState().user,
+				target.id,
+				target.episodeId,
+			)
+			return existing?.isFinished && (existing.currentTime || 0) > 0
+		}).length
+		if (
+			resets &&
+			!window.confirm(
+				`Mark unfinished? This resets saved listening positions to the beginning for ${resets} finished ${resets === 1 ? 'episode or book' : 'episodes or books'}.`,
+			)
+		)
+			return {
+				written: 0,
+				skipped: 0,
+				failed: 0,
+				remaining: targets.length,
+				error: '',
+				refreshWarning: '',
+				cancelled: true,
+			}
+	}
+	for (const target of targets) {
+		if (!current()) break
+		const existing = episodeProgress(
+			useAuth.getState().user,
+			target.id,
+			target.episodeId,
+		)
+		if (
+			(isFinished && existing?.isFinished) ||
+			(!isFinished && !existing?.isFinished)
+		)
+			skipped++
+		else {
+			try {
+				await writeProgress(target.id, { isFinished }, target.episodeId)
+				written++
+			} catch (cause) {
+				failed++
+				error = cause instanceof Error ? cause.message : 'Progress write failed'
+				break
+			}
+		}
+		options.onProgress(
+			written,
+			skipped,
+			targets.length - written - skipped - failed,
+		)
+	}
+	let refreshWarning = ''
+	if (
+		written &&
+		useAuth.getState().user?.id === options.owner &&
+		getAuthGeneration() === options.generation
+	) {
+		try {
+			await refreshProgress()
+		} catch {
+			refreshWarning = 'Changes saved, but listening status could not refresh.'
+		}
+	}
+	return {
+		written,
+		skipped,
+		failed,
+		remaining: targets.length - written - skipped - failed,
+		error,
+		refreshWarning,
+		cancelled: !current(),
+	}
+}
 
 export const LibraryNameContext = createContext('')
 
@@ -82,19 +210,60 @@ function currentFilterLabel(filter: string) {
 export function useCatalogRefresh() {
 	const router = useRouter()
 	useEffect(() => {
+		let timer = 0
+		let batchOwner: string | null = null
+		const schedule = () => {
+			window.clearTimeout(timer)
+			timer = window.setTimeout(() => void router.invalidate(), 80)
+		}
 		const refresh = (event: Event) => {
-			const name: unknown = (event as CustomEvent<{ event: string }>).detail
-				?.event
+			const detail = (
+				event as CustomEvent<{ event?: unknown; payload?: unknown }>
+			).detail
+			const name = detail?.event
 			if (
 				typeof name === 'string' &&
-				/^(reconnect|init|library_|item_|items_|author_|series_|collection_|playlist_|user_item_progress|rss_feed_|share_)/.test(
+				/^(reconnect|init|library_|item_|items_|author_|series_|collection_|playlist_|rss_feed_|share_)/.test(
 					name,
 				)
 			)
-				void router.invalidate()
+				schedule()
+			if (name === 'user_updated' && !batchOwner) {
+				const user = useAuth.getState().user
+				if (
+					user &&
+					typeof detail.payload === 'object' &&
+					detail.payload !== null &&
+					'id' in detail.payload &&
+					detail.payload.id === user.id
+				)
+					schedule()
+			}
+			if (name === 'user_item_progress_updated' && !batchOwner) schedule()
+		}
+		const progress = () => {
+			if (!batchOwner) schedule()
+		}
+		const batch = (event: Event) => {
+			if (!(event instanceof CustomEvent)) return
+			const detail = event.detail as { active?: boolean; owner?: string }
+			if (detail.active && detail.owner === useAuth.getState().user?.id) {
+				batchOwner = detail.owner || null
+				window.clearTimeout(timer)
+			} else if (!detail.active && detail.owner === batchOwner) {
+				batchOwner = null
+				if (detail.owner === useAuth.getState().user?.id) schedule()
+			}
 		}
 		window.addEventListener('abs:socket', refresh)
-		return () => window.removeEventListener('abs:socket', refresh)
+		window.addEventListener('abs:progress-changed', progress)
+		window.addEventListener('abs:progress-batch', batch)
+		return () => {
+			window.clearTimeout(timer)
+			window.removeEventListener('abs:socket', refresh)
+			window.removeEventListener('abs:progress-changed', progress)
+			window.removeEventListener('abs:progress-batch', batch)
+		}
 	}, [router])
 }
 export function LibraryNav({
@@ -309,19 +478,19 @@ export function EntryCard({
 				</Link>
 			) : item ? (
 				<>
-					{view !== 'list' && item.media.coverPath && (
-						<img
-							className="aspect-square w-full rounded-md bg-muted object-contain"
-							loading="lazy"
-							alt=""
-							src={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(item.id)}/cover?token=${encodeURIComponent(localStorage.getItem('token') || '')}`}
-						/>
-					)}
 					<Link
 						to="/item/$id"
 						params={{ id: item.id }}
 						className="block text-primary"
 					>
+						{view !== 'list' && item.media.coverPath && (
+							<img
+								className="aspect-square w-full rounded-md bg-muted object-contain"
+								loading="lazy"
+								alt=""
+								src={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(item.id)}/cover?token=${encodeURIComponent(localStorage.getItem('token') || '')}`}
+							/>
+						)}
 						<Heading className="font-semibold text-foreground">
 							{episode?.title || name}
 						</Heading>
@@ -683,9 +852,89 @@ export function BrowsePage({
 	const navigate = useNavigate()
 	const router = useRouter()
 	const [selected, setSelected] = useState<string[]>([])
+	const [selectMode, setSelectMode] = useState(false)
+	const [actionsOpen, setActionsOpen] = useState(false)
 	const [error, setError] = useState('')
 	const [pending, setPending] = useState(false)
 	const [collections, setCollections] = useState<Entry[]>([])
+	const [progressStatus, setProgressStatus] = useState('')
+	const progressCancel = useRef<(() => void) | null>(null)
+	useEffect(() => () => progressCancel.current?.(), [])
+	const runProgress = async (isFinished: boolean) => {
+		const owner = useAuth.getState().user?.id
+		if (!owner) return
+		let active = true
+		progressCancel.current = () => {
+			active = false
+		}
+		const generation = getAuthGeneration()
+		setPending(true)
+		setError('')
+		setProgressStatus('')
+		window.dispatchEvent(
+			new CustomEvent('abs:progress-batch', {
+				detail: { active: true, owner },
+			}),
+		)
+		try {
+			const result = await updateSelectedProgress(
+				selected,
+				podcast,
+				isFinished,
+				{
+					owner,
+					generation,
+					isActive: () => active,
+					onProgress: (written, skipped, remaining) => {
+						if (
+							!active ||
+							useAuth.getState().user?.id !== owner ||
+							getAuthGeneration() !== generation
+						)
+							return
+						setProgressStatus(
+							`${written} written · ${skipped} skipped · ${remaining} remaining`,
+						)
+					},
+				},
+			)
+			if (
+				useAuth.getState().user?.id !== owner ||
+				getAuthGeneration() !== generation
+			)
+				return
+			setProgressStatus(
+				`${result.written} written · ${result.failed} failed · ${result.skipped} skipped · ${result.remaining} remaining${result.cancelled ? ' · Cancelled' : ''}${result.refreshWarning ? ` · ${result.refreshWarning}` : ''}`,
+			)
+			if (
+				useAuth.getState().user?.id !== owner ||
+				getAuthGeneration() !== generation
+			)
+				return
+			if (result.error) setError(result.error)
+			if (active && !result.failed && result.remaining === 0) {
+				setSelected([])
+				setActionsOpen(false)
+			}
+		} catch (cause) {
+			setError(
+				cause instanceof Error ? cause.message : 'Progress update failed',
+			)
+			if (
+				useAuth.getState().user?.id === owner &&
+				getAuthGeneration() === generation
+			)
+				setProgressStatus(`Progress operation stopped · selection retained`)
+		} finally {
+			window.dispatchEvent(
+				new CustomEvent('abs:progress-batch', {
+					detail: { active: false, owner },
+				}),
+			)
+			progressCancel.current = null
+			setPending(false)
+		}
+	}
 	useEffect(() => {
 		if (!selected.length || podcast) return
 		let active = true
@@ -739,12 +988,16 @@ export function BrowsePage({
 			params: { library, id: section },
 			search: { ...search, page: 0, ...patch },
 		})
+	useEffect(() => {
+		if (!selected.length) setActionsOpen(false)
+	}, [selected.length])
 	const run = async (action: () => Promise<unknown>) => {
 		setError('')
 		setPending(true)
 		try {
 			await action()
 			setSelected([])
+			setActionsOpen(false)
 			await router.invalidate()
 		} catch (e) {
 			setError(e instanceof Error ? e.message : 'Action failed')
@@ -755,6 +1008,7 @@ export function BrowsePage({
 	return (
 		<section className="space-y-5">
 			<CatalogHeading title={section ? humanLabel(section) : 'Library'} />
+			{progressStatus && <p role="status">{progressStatus}</p>}
 
 			<div className="flex flex-wrap gap-4">
 				{sorts.length > 0 && (
@@ -1024,77 +1278,103 @@ export function BrowsePage({
 				</Button>
 			)}
 			{!section && (
-				<div className="flex flex-wrap gap-2">
-					<Button
-						variant="outline"
-						onClick={() =>
-							setSelected(
-								data.results.filter((e) => 'media' in e).map((e) => e.id),
-							)
-						}
-					>
-						Select page
-					</Button>
-					<Button variant="outline" onClick={() => setSelected([])}>
-						Clear selection ({selected.length})
-					</Button>
-					{selected.length > 0 && (
+				<div className="flex flex-wrap items-center gap-2">
+					{!selectMode ? (
+						<Button variant="outline" onClick={() => setSelectMode(true)}>
+							Select
+						</Button>
+					) : (
 						<>
 							<Button
-								disabled={pending}
-								onClick={() =>
-									void run(() =>
-										api('/api/me/progress/batch/update', z.unknown(), {
-											method: 'PATCH',
-											body: JSON.stringify(
-												selected.map((libraryItemId) => ({
-													libraryItemId,
-													isFinished: true,
-												})),
-											),
-										}),
-									)
-								}
+								variant="outline"
+								onClick={() => {
+									progressCancel.current?.()
+									setActionsOpen(false)
+									setSelectMode(false)
+									setSelected([])
+								}}
 							>
-								Mark finished
+								Done
 							</Button>
 							<Button
-								disabled={pending}
+								variant="outline"
 								onClick={() =>
-									void run(() =>
-										api('/api/me/progress/batch/update', z.unknown(), {
-											method: 'PATCH',
-											body: JSON.stringify(
-												selected.map((libraryItemId) => ({
-													libraryItemId,
-													isFinished: false,
-												})),
-											),
-										}),
+									setSelected(
+										data.results
+											.filter((entry) => 'media' in entry)
+											.map((entry) => entry.id),
 									)
 								}
 							>
-								Mark unfinished
+								Select page
 							</Button>
-							{!podcast && (
+							<Button variant="outline" onClick={() => setSelected([])}>
+								Clear selection ({selected.length})
+							</Button>
+							<span role="status" aria-live="polite">
+								{selected.length} selected
+							</span>
+						</>
+					)}
+					{selectMode && selected.length > 0 && (
+						<WorkflowSheet
+							title="More actions"
+							description={`${selected.length} selected items`}
+							open={actionsOpen}
+							onOpenChange={setActionsOpen}
+						>
+							<div className="space-y-3">
 								<Button
 									disabled={pending}
-									onClick={() =>
-										void run(() =>
-											playQueue(
-												selected.map((libraryItemId) => ({ libraryItemId })),
-											),
-										)
-									}
+									onClick={() => void runProgress(true)}
 								>
-									Play selected
+									{podcast ? 'Mark all episodes finished' : 'Mark finished'}
 								</Button>
-							)}
-							{allowed && (
-								<Link to="/batch" search={{ ids: selected.join(',') }}>
-									Batch edit
-								</Link>
-							)}
+								<Button
+									disabled={pending}
+									onClick={() => void runProgress(false)}
+								>
+									{podcast ? 'Mark all episodes unfinished' : 'Mark unfinished'}
+								</Button>
+								{pending && (
+									<Button
+										variant="outline"
+										onClick={() => progressCancel.current?.()}
+									>
+										Cancel
+									</Button>
+								)}
+
+								{!podcast && (
+									<Button
+										disabled={pending}
+										onClick={() =>
+											void run(() =>
+												playQueue(
+													selected.map((libraryItemId) => ({
+														libraryItemId,
+													})),
+												),
+											)
+										}
+									>
+										Play selected
+									</Button>
+								)}
+								{allowed && (
+									<Link to="/batch" search={{ ids: selected.join(',') }}>
+										Batch edit
+									</Link>
+								)}
+								<SelectionTools
+									library={library}
+									ids={selected}
+									podcast={podcast}
+									pending={pending}
+									run={run}
+								/>
+							</div>
+
 							{admin &&
 								['scan'].map((action) => (
 									<Button
@@ -1109,7 +1389,9 @@ export function BrowsePage({
 												void run(() =>
 													api(`/api/items/batch/${action}`, z.unknown(), {
 														method: 'POST',
-														body: JSON.stringify({ libraryItemIds: selected }),
+														body: JSON.stringify({
+															libraryItemIds: selected,
+														}),
 													}),
 												)
 										}}
@@ -1181,14 +1463,7 @@ export function BrowsePage({
 									</Button>
 								</form>
 							)}
-							<SelectionTools
-								library={library}
-								ids={selected}
-								podcast={podcast}
-								pending={pending}
-								run={run}
-							/>
-						</>
+						</WorkflowSheet>
 					)}
 				</div>
 			)}
@@ -1209,7 +1484,7 @@ export function BrowsePage({
 						entry={{ ...entry, _type: section }}
 						view={search.view}
 						select={
-							!section && 'media' in entry
+							selectMode && !section && 'media' in entry
 								? {
 										checked: selected.includes(entry.id),
 										toggle: () =>

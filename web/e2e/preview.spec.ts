@@ -53,6 +53,7 @@ for (const prefix of ['', '/abs'])
 				),
 			)
 			.toBeGreaterThan(8)
+		await page.getByRole('button', { name: 'Player options' }).click()
 		await expect(
 			page.getByRole('checkbox', { name: 'Skip detected inserted audio' }),
 		).toBeEnabled()
@@ -73,6 +74,7 @@ for (const prefix of ['', '/abs'])
 		await expect
 			.poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
 			.toBeGreaterThan(5.9)
+		await page.keyboard.press('Escape')
 		await page.goBack()
 		await expect(audio).toBeVisible()
 		await page
@@ -98,6 +100,7 @@ for (const prefix of ['', '/abs'])
 			node.currentTime = 7
 			node.pause()
 		})
+		await page.getByRole('button', { name: 'Player options' }).click()
 		await page.getByRole('button', { name: 'Close player' }).click()
 		await expect(page.getByLabel('Audio playback')).toHaveCount(0)
 		const observations = (await (
@@ -207,7 +210,7 @@ for (const width of [320, 390, 1280])
 			expect(
 				await player.evaluate((node) => node.scrollWidth <= node.clientWidth),
 			).toBe(true)
-			await expect(page.getByLabel('Seek position')).toBeInViewport()
+			await expect(page.getByLabel('Audio playback')).toBeInViewport()
 			const mountedAudio = await page
 				.getByLabel('Audio playback')
 				.elementHandle()
@@ -231,7 +234,7 @@ for (const width of [320, 390, 1280])
 			expect(
 				await player.evaluate((node) => node.scrollWidth <= node.clientWidth),
 			).toBe(true)
-			await expect(page.getByLabel('Seek position')).toBeInViewport()
+			await expect(page.getByLabel('Audio playback')).toBeInViewport()
 			await page.screenshot({
 				path: testInfo.outputPath(`player-${width}-${theme}.png`),
 			})

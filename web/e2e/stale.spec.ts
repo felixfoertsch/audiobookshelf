@@ -32,6 +32,7 @@ test('cached page candidates never override fresh stale session', async ({
 	await expect
 		.poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
 		.toBeGreaterThan(0.1)
+	await page.getByRole('button', { name: 'Player options' }).click()
 	await expect(
 		page.getByRole('checkbox', { name: 'Skip detected inserted audio' }),
 	).toBeDisabled()

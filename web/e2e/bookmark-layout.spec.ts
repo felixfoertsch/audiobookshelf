@@ -53,6 +53,7 @@ for (const width of [320, 390])
 					audio.evaluate((node: HTMLAudioElement) => node.currentTime),
 				)
 				.toBeGreaterThan(0)
+			await page.getByRole('button', { name: 'Player options' }).click()
 			await page
 				.getByText('Chapters, bookmarks, queue and settings', { exact: true })
 				.click()

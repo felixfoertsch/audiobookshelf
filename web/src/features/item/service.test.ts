@@ -34,6 +34,7 @@ it('sends media, progress, episode edits and validates feed check payloads', asy
 		.mockResolvedValueOnce(
 			new Response(JSON.stringify({ id: 'p1', isFinished: true })),
 		)
+		.mockResolvedValueOnce(new Response(JSON.stringify({ mediaProgress: [] })))
 		.mockResolvedValueOnce(new Response('OK'))
 		.mockResolvedValueOnce(
 			new Response(JSON.stringify({ episodes: [{ id: 'ep1' }] })),
@@ -52,6 +53,7 @@ it('sends media, progress, episode edits and validates feed check payloads', asy
 			JSON.stringify({ metadata: { title: 'Edited' } }),
 		],
 		['/api/me/progress/i', 'PATCH', JSON.stringify({ isFinished: true })],
+		['/api/me/progress', undefined, undefined],
 		[
 			'/api/podcasts/i/episode/ep1',
 			'PATCH',
@@ -59,4 +61,22 @@ it('sends media, progress, episode edits and validates feed check payloads', asy
 		],
 		['/api/podcasts/i/checknew', undefined, undefined],
 	])
+})
+
+it('reports successful write separately from failed refresh and still invalidates', async () => {
+	const receive = vi.fn()
+	window.addEventListener('abs:progress-changed', receive)
+	vi.stubGlobal(
+		'fetch',
+		vi
+			.fn()
+			.mockResolvedValueOnce(new Response('OK'))
+			.mockResolvedValueOnce(
+				new Response('refresh unavailable', { status: 500 }),
+			),
+	)
+	const result = await updateProgress('show', { isFinished: true }, 'ep')
+	expect(result.refreshWarning).toContain('saved')
+	expect(receive).toHaveBeenCalledTimes(1)
+	window.removeEventListener('abs:progress-changed', receive)
 })
