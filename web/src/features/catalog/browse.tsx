@@ -795,7 +795,7 @@ export function SearchForm({
 						maxLength={200}
 					/>
 				</label>
-				<Button className="self-end" type="submit">
+				<Button className="sr-only" type="submit">
 					Search
 				</Button>
 			</form>

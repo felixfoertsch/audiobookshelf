@@ -480,6 +480,16 @@ export function ItemView({ id }: { id: string }) {
 							.slice(episodePage * 25, (episodePage + 1) * 25)
 							.map((ep) => {
 								const progress = episodeProgress(user, id, ep.id)
+								const seconds = ep.duration ?? ep.audioFile?.duration
+								const remaining = seconds
+									? Math.max(
+											0,
+											seconds -
+												(!progress?.isFinished
+													? (progress?.currentTime ?? 0)
+													: 0),
+										)
+									: 0
 								return (
 									<li key={ep.id} className="min-w-0 space-y-2 border-b py-3">
 										<div className="flex flex-col items-stretch gap-3">
@@ -495,9 +505,13 @@ export function ItemView({ id }: { id: string }) {
 													{ep.title ?? 'Untitled episode'}
 												</h3>
 
-												{ep.subtitle && (
-													<p className="text-sm">{ep.subtitle}</p>
-												)}
+												{ep.subtitle &&
+													!ep.description
+														?.replace(/<[^>]*>/g, '')
+														.trim()
+														.startsWith(ep.subtitle.trim()) && (
+														<p className="text-sm">{ep.subtitle}</p>
+													)}
 												{ep.description && (
 													<div>
 														<RichText
@@ -520,7 +534,9 @@ export function ItemView({ id }: { id: string }) {
 																})
 															}
 														>
-															{expanded.has(ep.id) ? 'Read less' : 'Read more'}
+															{expanded.has(ep.id)
+																? 'Read less'
+																: 'Read description'}
 														</Button>
 													</div>
 												)}
@@ -549,22 +565,19 @@ export function ItemView({ id }: { id: string }) {
 													className="rounded-full"
 													aria-label={`Play ${ep.title ?? 'episode'}`}
 													disabled={busy || !ep.audioFile}
+													title={
+														!ep.audioFile
+															? 'Episode audio is not downloaded'
+															: busy
+																? 'Starting playback'
+																: undefined
+													}
 													onClick={() => void play(ep.id)}
 												>
 													<Play aria-hidden="true" className="size-3" />
-													{Math.ceil(
-														Math.max(
-															0,
-															(ep.duration ?? ep.audioFile?.duration ?? 0) -
-																(!progress?.isFinished
-																	? (progress?.currentTime ?? 0)
-																	: 0),
-														) / 60,
-													)}{' '}
-													min
-													{!progress?.isFinished && progress?.currentTime
-														? ' left'
-														: ''}
+													{seconds
+														? `${remaining < 60 ? '<1' : Math.ceil(remaining / 60)} min${!progress?.isFinished && progress?.currentTime ? ' left' : ''}`
+														: 'Play'}
 												</Button>
 												<DropdownMenu>
 													<DropdownMenuTrigger asChild>

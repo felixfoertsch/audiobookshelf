@@ -79,10 +79,12 @@ it('bounds episode pages, reaches last page, and discloses descriptions', {
 	expect(screen.getAllByText('Episode description')).toHaveLength(25)
 	expect(
 		screen
-			.getAllByRole('button', { name: 'Read more' })[0]
+			.getAllByRole('button', { name: 'Read description' })[0]
 			.getAttribute('aria-expanded'),
 	).toBe('false')
-	fireEvent.click(screen.getAllByRole('button', { name: 'Read more' })[0])
+	fireEvent.click(
+		screen.getAllByRole('button', { name: 'Read description' })[0],
+	)
 	expect(
 		screen
 			.getByRole('button', { name: 'Read less' })
@@ -92,7 +94,7 @@ it('bounds episode pages, reaches last page, and discloses descriptions', {
 	expect(screen.getAllByText('Episode description')).toHaveLength(25)
 	expect(
 		screen
-			.getAllByRole('button', { name: 'Read more' })[0]
+			.getAllByRole('button', { name: 'Read description' })[0]
 			.getAttribute('aria-expanded'),
 	).toBe('false')
 	const next = screen.getByRole('button', { name: 'Next episodes' })

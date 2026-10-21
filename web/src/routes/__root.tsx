@@ -416,10 +416,10 @@ export function Layout({
 							{routeError ? <RouteError {...routeError} /> : <Outlet />}
 						</LibraryNameContext.Provider>
 					</div>
+					<RouteDebugOverlay path={pathname} />
+					<Player />
 				</SidebarInset>
 			</SidebarProvider>
-			<RouteDebugOverlay path={pathname} />
-			<Player />
 			<footer className="px-5 pb-80 text-center text-xs text-muted-foreground">
 				Audiobookshelf · Modern frontend {frontendPackage.version} · Original
 				timeline · No offline media cache

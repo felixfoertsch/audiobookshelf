@@ -7,11 +7,13 @@ for (const width of [390, 1280]) {
 			await page.setViewportSize({ width, height: 1000 })
 			await page.emulateMedia({ colorScheme })
 			const show = items.find((item) => item.id === 'podcast-1')
-			if (!show) throw new Error('Missing podcast fixture')
+			if (!show || !('episodes' in show.media))
+				throw new Error('Missing podcast fixture')
+			const episodes = show.media.episodes
 			await page.route('**/api/libraries/podcasts/recent-episodes?*', (route) =>
 				route.fulfill({
 					json: {
-						episodes: show.media.episodes.map((episode) => ({
+						episodes: episodes.map((episode) => ({
 							...episode,
 							libraryItemId: show.id,
 							podcast: { metadata: show.media.metadata },

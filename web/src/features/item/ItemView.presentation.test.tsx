@@ -26,8 +26,17 @@ vi.mock('./service', () => ({
 				language: 'en',
 			},
 			episodes: [
-				{ id: 'old', publishedAt: 1000, audioFile: {} },
-				{ id: 'new', publishedAt: 2000, audioFile: {} },
+				{
+					id: 'old',
+					title: 'Old',
+					publishedAt: 1000,
+					duration: 12,
+					audioFile: {},
+					subtitle: 'Same text',
+					description: 'Same text continued',
+				},
+				{ id: 'new', title: 'New', publishedAt: 2000, audioFile: {} },
+				{ id: 'missing', title: 'Missing', publishedAt: 500 },
 			],
 		},
 	}),
@@ -39,7 +48,18 @@ it('plays newest publication, discloses hero description, uses decimal size unit
 		await screen.findByRole('button', { name: 'Play latest episode' }),
 	)
 	expect(play).toHaveBeenCalledWith('show', 'new')
-	expect(screen.getByText('2 episodes')).toBeTruthy()
+	expect(screen.getByText('3 episodes')).toBeTruthy()
+	expect(
+		screen.getByRole('button', { name: 'Play Old' }).textContent,
+	).toContain('<1 min')
+	expect(screen.getByRole('button', { name: 'Play New' }).textContent).toBe(
+		'Play',
+	)
+	expect(
+		screen.getByRole('button', { name: 'Play Missing' }).getAttribute('title'),
+	).toBe('Episode audio is not downloaded')
+	expect(screen.queryByText('Same text')).toBeNull()
+	expect(screen.getByRole('button', { name: 'Read description' })).toBeTruthy()
 	expect(screen.getByRole('heading', { name: 'Information' })).toBeTruthy()
 	expect(
 		screen.getByText(
