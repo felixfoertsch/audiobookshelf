@@ -160,6 +160,7 @@ it.each([false, true])(
 				filters={{}}
 			/>,
 		)
+		fireEvent.click(screen.getByRole('button', { name: 'View options' }))
 		expect(
 			screen.queryByRole('option', { name: 'Author first last' }) !== null,
 		).toBe(!podcast)
@@ -188,6 +189,7 @@ it('hides item-only controls on entity pages and labels sections', async () => {
 	expect(
 		screen.getByRole('heading', { level: 1, name: 'Authors' }),
 	).toBeTruthy()
+	fireEvent.click(screen.getByRole('button', { name: 'View options' }))
 	for (const name of ['Filter', 'View', 'Cover size', 'Group series'])
 		expect(screen.queryByLabelText(name)).toBeNull()
 	expect(screen.getByRole('option', { name: 'Book count' })).toBeTruthy()
@@ -242,6 +244,7 @@ it('keeps legacy query controls truthful without offering them as normal choices
 			filters={{}}
 		/>,
 	)
+	fireEvent.click(screen.getByRole('button', { name: 'View options' }))
 	expect(
 		(screen.getByLabelText('Sort') as HTMLSelectElement).selectedOptions[0]
 			.textContent,
@@ -283,6 +286,7 @@ it('restores selected legacy query labels on reload and history back', async () 
 	const router = createRouter({ routeTree: root.addChildren([route]), history })
 	await router.load()
 	render(<RouterProvider router={router} />)
+	fireEvent.click(screen.getByRole('button', { name: 'View options' }))
 	const selected = () =>
 		(screen.getByLabelText('Sort') as HTMLSelectElement).selectedOptions[0]
 			.textContent

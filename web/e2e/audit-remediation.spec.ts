@@ -309,6 +309,9 @@ for (const prefix of ['', '/abs']) {
 			`${prefix}/new/library/podcasts/bookshelf?filter=feed-open&sort=media.metadata.title`,
 		)
 		await expect(card('Counted show')).toContainText('489 episodes')
+		await page
+			.getByRole('button', { name: 'View options', exact: true })
+			.click()
 		const filter = page.getByRole('combobox', { name: 'Filter', exact: true })
 		await expect(filter).toHaveValue('feed-open')
 		await expect(filter.locator('option:checked')).not.toHaveText('feed-open')
@@ -329,6 +332,9 @@ for (const prefix of ['', '/abs']) {
 		await expect(page.getByRole('heading', { level: 1 })).toContainText(
 			'Authors',
 		)
+		await page
+			.getByRole('button', { name: 'View options', exact: true })
+			.click()
 		await expect(
 			page.getByRole('combobox', { name: /^(Filter|Cover size|View)$/ }),
 		).toHaveCount(0)

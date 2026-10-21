@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, SlidersHorizontal } from 'lucide-react'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, getAuthGeneration, useAuth } from '../../api'
@@ -8,6 +8,14 @@ import { playEpisode, playQueue } from '../../player'
 import { Button } from '../../shared/components/ui/button'
 import { Input } from '../../shared/components/ui/input'
 import { NativeSelect } from '../../shared/components/ui/native-select'
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from '../../shared/components/ui/sheet'
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -1077,208 +1085,241 @@ export function BrowsePage({
 			<CatalogHeading title={section ? humanLabel(section) : 'Library'} />
 			{progressStatus && <p role="status">{progressStatus}</p>}
 
-			<div className="flex flex-wrap items-end gap-2 text-xs text-muted-foreground [&_label]:min-w-0 [&_label]:space-y-1 [&_select]:h-8 [&_select]:max-w-44 [&_select]:text-xs">
-				{sorts.length > 0 && (
-					<>
-						{' '}
-						<label htmlFor="catalog-sort">
-							Sort
-							<NativeSelect
-								id="catalog-sort"
-								className="block"
-								value={search.sort}
-								onChange={(e) => update({ sort: e.target.value })}
-							>
-								{!sorts.some(([value]) => value === search.sort) && (
-									<option disabled value={search.sort}>
-										Current sort:{' '}
-										{sortOptions.find(
-											([value]) => value === search.sort,
-										)?.[1] || humanLabel(search.sort)}
-									</option>
-								)}
-								{sorts.map(([value, name]) => (
-									<option key={value} value={value}>
-										{name}
-									</option>
-								))}
-							</NativeSelect>
-						</label>
-						<label htmlFor="catalog-order">
-							Order
-							<NativeSelect
-								id="catalog-order"
-								className="block"
-								value={search.desc}
-								onChange={(e) => update({ desc: e.target.value })}
-							>
-								<option value="0">Ascending</option>
-								<option value="1">Descending</option>
-							</NativeSelect>
-						</label>
-					</>
-				)}
-				{(itemView || seriesView) && (
-					<label htmlFor="catalog-filter">
-						Filter
-						<NativeSelect
-							id="catalog-filter"
-							className="max-w-64"
-							value={search.filter}
-							onChange={(e) => update({ filter: e.target.value })}
-						>
-							<option value="all">All</option>
-							{!podcast &&
-								['finished', 'not-finished', 'in-progress', 'not-started'].map(
-									(v) => (
-										<option key={v} value={`progress.${encodeFilter(v)}`}>
-											{humanLabel(v)}
-										</option>
-									),
-								)}
-							{itemView && <option value="issues">Issues</option>}
-							{(seriesView
-								? []
-								: podcast
-									? ['feed-open', 'explicit']
-									: ['feed-open', 'share-open', 'abridged', 'explicit']
-							).map((value) => (
-								<option key={value} value={value}>
-									{humanLabel(value)}
-								</option>
-							))}
-							{Object.entries(
-								podcast || seriesView
-									? {}
-									: {
-											tracks: ['none', 'single', 'multi'],
-											ebooks: [
-												'ebook',
-												'no-ebook',
-												'supplementary',
-												'no-supplementary',
-											],
-											missing: [
-												'asin',
-												'isbn',
-												'authors',
-												'chapters',
-												'cover',
-												'description',
-												'genres',
-												'language',
-												'narrators',
-												'publishedYear',
-												'publisher',
-												'series',
-												'subtitle',
-												'tags',
-											],
-										},
-							).map(([group, values]) => (
-								<optgroup key={group} label={humanLabel(group)}>
-									{values.map((value) => (
-										<option
-											key={value}
-											value={`${group}.${encodeFilter(value)}`}
-										>
-											{humanLabel(value)}
-										</option>
-									))}
-								</optgroup>
-							))}
-							{Object.entries(filters)
-								.filter(
-									([group, value]) =>
-										Array.isArray(value) &&
-										(podcast
-											? ['genres', 'tags', 'languages'].includes(group)
-											: seriesView
-												? [
-														'genres',
-														'tags',
-														'authors',
-														'narrators',
-														'publishers',
-														'languages',
-													].includes(group)
-												: true),
-								)
-								.map(([group, values]) => (
-									<optgroup key={group} label={humanLabel(group)}>
-										{(values as (string | { id: string; name: string })[]).map(
-											(value) => {
-												const label =
-													typeof value === 'string' ? value : value.name
-												const id = typeof value === 'string' ? value : value.id
-												return (
-													<option
-														key={id}
-														value={`${group}.${encodeFilter(id)}`}
-													>
-														{label}
+			<div className="flex items-center gap-2">
+				{(sorts.length > 0 || itemView || seriesView) && (
+					<Sheet>
+						<SheetTrigger asChild>
+							<Button variant="outline" size="sm">
+								<SlidersHorizontal aria-hidden="true" />
+								View options
+							</Button>
+						</SheetTrigger>
+						<SheetContent className="w-full overflow-y-auto p-4 sm:max-w-md">
+							<SheetHeader>
+								<SheetTitle>View options</SheetTitle>
+								<SheetDescription>
+									Sort, filter and display this library.
+								</SheetDescription>
+							</SheetHeader>
+							<div className="grid gap-4 py-4 text-sm [&_label]:min-w-0 [&_label]:space-y-1 [&_select]:w-full">
+								{sorts.length > 0 && (
+									<>
+										{' '}
+										<label htmlFor="catalog-sort">
+											Sort
+											<NativeSelect
+												id="catalog-sort"
+												className="block"
+												value={search.sort}
+												onChange={(e) => update({ sort: e.target.value })}
+											>
+												{!sorts.some(([value]) => value === search.sort) && (
+													<option disabled value={search.sort}>
+														Current sort:{' '}
+														{sortOptions.find(
+															([value]) => value === search.sort,
+														)?.[1] || humanLabel(search.sort)}
 													</option>
+												)}
+												{sorts.map(([value, name]) => (
+													<option key={value} value={value}>
+														{name}
+													</option>
+												))}
+											</NativeSelect>
+										</label>
+										<label htmlFor="catalog-order">
+											Order
+											<NativeSelect
+												id="catalog-order"
+												className="block"
+												value={search.desc}
+												onChange={(e) => update({ desc: e.target.value })}
+											>
+												<option value="0">Ascending</option>
+												<option value="1">Descending</option>
+											</NativeSelect>
+										</label>
+									</>
+								)}
+								{(itemView || seriesView) && (
+									<label htmlFor="catalog-filter">
+										Filter
+										<NativeSelect
+											id="catalog-filter"
+											className="max-w-64"
+											value={search.filter}
+											onChange={(e) => update({ filter: e.target.value })}
+										>
+											<option value="all">All</option>
+											{!podcast &&
+												[
+													'finished',
+													'not-finished',
+													'in-progress',
+													'not-started',
+												].map((v) => (
+													<option key={v} value={`progress.${encodeFilter(v)}`}>
+														{humanLabel(v)}
+													</option>
+												))}
+											{itemView && <option value="issues">Issues</option>}
+											{(seriesView
+												? []
+												: podcast
+													? ['feed-open', 'explicit']
+													: ['feed-open', 'share-open', 'abridged', 'explicit']
+											).map((value) => (
+												<option key={value} value={value}>
+													{humanLabel(value)}
+												</option>
+											))}
+											{Object.entries(
+												podcast || seriesView
+													? {}
+													: {
+															tracks: ['none', 'single', 'multi'],
+															ebooks: [
+																'ebook',
+																'no-ebook',
+																'supplementary',
+																'no-supplementary',
+															],
+															missing: [
+																'asin',
+																'isbn',
+																'authors',
+																'chapters',
+																'cover',
+																'description',
+																'genres',
+																'language',
+																'narrators',
+																'publishedYear',
+																'publisher',
+																'series',
+																'subtitle',
+																'tags',
+															],
+														},
+											).map(([group, values]) => (
+												<optgroup key={group} label={humanLabel(group)}>
+													{values.map((value) => (
+														<option
+															key={value}
+															value={`${group}.${encodeFilter(value)}`}
+														>
+															{humanLabel(value)}
+														</option>
+													))}
+												</optgroup>
+											))}
+											{Object.entries(filters)
+												.filter(
+													([group, value]) =>
+														Array.isArray(value) &&
+														(podcast
+															? ['genres', 'tags', 'languages'].includes(group)
+															: seriesView
+																? [
+																		'genres',
+																		'tags',
+																		'authors',
+																		'narrators',
+																		'publishers',
+																		'languages',
+																	].includes(group)
+																: true),
 												)
-											},
-										)}
-									</optgroup>
-								))}
-							<option hidden disabled value={search.filter}>
-								Current filter: {currentFilterLabel(search.filter)}
-							</option>
-						</NativeSelect>
-					</label>
-				)}
-				{itemView && (
-					<>
-						{' '}
-						<label>
-							Cover size
-							<input
-								className="block"
-								type="range"
-								min={60}
-								max={220}
-								step={20}
-								value={coverSize.size}
-								onChange={(event) =>
-									coverSize.setSize(Number(event.target.value))
-								}
-							/>
-						</label>
-						<label htmlFor="catalog-view">
-							View
-							<NativeSelect
-								id="catalog-view"
-								className="block"
-								value={search.view}
-								onChange={(e) =>
-									update({ view: e.target.value as BrowseSearch['view'] })
-								}
-							>
-								<option value="grid">Grid</option>
-								<option value="list">List</option>
-								<option value="detail">Detailed</option>
-							</NativeSelect>
-						</label>
-						{!podcast && (
-							<label className="self-center">
-								<input
-									type="checkbox"
-									checked={search.collapse === '1'}
-									onChange={(e) =>
-										update({ collapse: e.target.checked ? '1' : '0' })
-									}
-								/>{' '}
-								Group series
-							</label>
-						)}{' '}
-					</>
+												.map(([group, values]) => (
+													<optgroup key={group} label={humanLabel(group)}>
+														{(
+															values as (
+																| string
+																| { id: string; name: string }
+															)[]
+														).map((value) => {
+															const label =
+																typeof value === 'string' ? value : value.name
+															const id =
+																typeof value === 'string' ? value : value.id
+															return (
+																<option
+																	key={id}
+																	value={`${group}.${encodeFilter(id)}`}
+																>
+																	{label}
+																</option>
+															)
+														})}
+													</optgroup>
+												))}
+											<option hidden disabled value={search.filter}>
+												Current filter: {currentFilterLabel(search.filter)}
+											</option>
+										</NativeSelect>
+									</label>
+								)}
+								{itemView && (
+									<>
+										{' '}
+										<label>
+											Cover size
+											<input
+												className="block"
+												type="range"
+												min={60}
+												max={220}
+												step={20}
+												value={coverSize.size}
+												onChange={(event) =>
+													coverSize.setSize(Number(event.target.value))
+												}
+											/>
+										</label>
+										<label htmlFor="catalog-view">
+											View
+											<NativeSelect
+												id="catalog-view"
+												className="block"
+												value={search.view}
+												onChange={(e) =>
+													update({
+														view: e.target.value as BrowseSearch['view'],
+													})
+												}
+											>
+												<option value="grid">Grid</option>
+												<option value="list">List</option>
+												<option value="detail">Detailed</option>
+											</NativeSelect>
+										</label>
+										{!podcast && (
+											<label className="self-center">
+												<input
+													type="checkbox"
+													checked={search.collapse === '1'}
+													onChange={(e) =>
+														update({ collapse: e.target.checked ? '1' : '0' })
+													}
+												/>{' '}
+												Group series
+											</label>
+										)}{' '}
+									</>
+								)}
+							</div>
+						</SheetContent>
+					</Sheet>
 				)}
 				{!section && (
 					<div className="flex flex-wrap items-center gap-2">
 						{!selectMode ? (
-							<Button variant="outline" onClick={() => setSelectMode(true)}>
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => setSelectMode(true)}
+							>
 								Select
 							</Button>
 						) : (

@@ -22,6 +22,37 @@ for (const width of [390, 1280])
 					view === 'home' ? 'Home' : 'Library',
 				)
 				await expect(page.locator('main article').first()).toBeVisible()
+				if (view === 'library') {
+					const options = page.getByRole('button', {
+						name: 'View options',
+						exact: true,
+					})
+					const select = page.getByRole('button', {
+						name: 'Select',
+						exact: true,
+					})
+					const optionsBox = await options.boundingBox()
+					const selectBox = await select.boundingBox()
+					expect(optionsBox?.y).toBe(selectBox?.y)
+					await expect(page.getByLabel('Sort', { exact: true })).toHaveCount(0)
+					await options.click()
+					await expect(
+						page.getByRole('dialog', { name: 'View options' }),
+					).toBeVisible()
+					for (const name of ['Sort', 'Order', 'Filter', 'View'])
+						await expect(
+							page.getByRole('combobox', { name, exact: true }),
+						).toBeVisible()
+					await expect(
+						page.getByRole('slider', { name: 'Cover size', exact: true }),
+					).toBeVisible()
+					await page
+						.getByRole('combobox', { name: 'Sort', exact: true })
+						.selectOption('addedAt')
+					await expect(page).toHaveURL(/sort=addedAt/)
+					await page.keyboard.press('Escape')
+					await expect(options).toBeFocused()
+				}
 				await expect
 					.poll(() =>
 						page.evaluate(
