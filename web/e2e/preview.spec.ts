@@ -176,20 +176,25 @@ for (const width of [320, 390, 1280])
 			await signIn(page)
 			await chooseTheme(page, theme)
 			await chooseLibrary(page, 'books')
-			await expect
-				.poll(() =>
-					page
-						.locator('img')
-						.evaluateAll((images) =>
-							images.every(
-								(image) =>
-									image instanceof HTMLImageElement &&
-									image.complete &&
-									image.naturalWidth > 0,
-							),
+			// Shelves intentionally lazy-load offscreen artwork; expose every cover before checking it.
+			const images = page.locator('img')
+			for (const image of await images.all()) {
+				await image.scrollIntoViewIfNeeded()
+				await expect
+					.poll(() =>
+						image.evaluate(
+							(node: HTMLImageElement) =>
+								node.complete && node.naturalWidth > 0,
 						),
-				)
-				.toBe(true)
+					)
+					.toBe(true)
+			}
+			await page.evaluate(() => {
+				for (const node of document.querySelectorAll<HTMLElement>('*')) {
+					if (node.scrollLeft) node.scrollLeft = 0
+				}
+				window.scrollTo(0, 0)
+			})
 			expect(
 				await page.evaluate(
 					() => document.documentElement.scrollWidth <= innerWidth,
