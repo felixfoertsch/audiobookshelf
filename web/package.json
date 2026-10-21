@@ -1,7 +1,7 @@
 {
 	"name": "audiobookshelf-modern-preview",
 	"private": true,
-	"version": "2026.10.21.4",
+	"version": "2026.10.21.5",
 	"type": "module",
 	"packageManager": "bun@1.4.3",
 	"scripts": {

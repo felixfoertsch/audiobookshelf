@@ -18,6 +18,11 @@ Audit basis: Classic `client/pages` (42 Vue files), `client/nuxt.config.js`, def
 
 Paths below are relative to actual external `RouterBasePath`. Every leaf has exact modern partner `/new` + old path (`/` becomes `/new/`), with search/hash preserved. No pluralization redesign. Existing preview `/new/libraries/:libraryId` and `/new/items/:itemId` are temporary noncanonical paths; later implementation must move internal links/loaders to `/new/library/:library` and `/new/item/:id`, retaining plural paths only as explicit compatibility redirects. This audit changes no routes.
 
+## Integrated surface updates
+
+- Podcast detail and latest-episode rows expose source-bound ad-analysis status, live authorized queue updates and admin/root-only retry. A no-difference result does not rule out shared or baked-in ads. Reading status never queues analysis.
+- Audiobook tools group metadata embedding and M4B encoding controls; chapter, track, episode editor and RSS layouts retain responsive light/dark coverage. These changes do not certify full Classic parity; ledger statuses remain unchanged.
+
 ## Route ledger
 
 Status: **U** = unverified, whether absent or partially present. All rows U. `P1`–`P8` identify suggested owner slices below. Permission shorthand: **A** authenticated; **M** admin/root; **U/D/L/X** existing update/delete/download/upload permissions. Library visibility, explicit-content and tag restrictions apply throughout. UI gates must match existing server authorization, not replace it. **E** on every row means loading, empty, denied, missing/deleted, request failure and retry/recovery paths; never render failed load as successful empty result. State specifics below supplement E.
