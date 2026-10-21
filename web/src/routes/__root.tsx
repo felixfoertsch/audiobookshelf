@@ -58,14 +58,21 @@ import {
 } from '../shared/components/ui/sidebar'
 
 function ShellSidebarTrigger() {
-	const { openMobile } = useSidebar()
+	const { openMobile, open, isMobile } = useSidebar()
 	const trigger = useRef<HTMLButtonElement>(null)
 	const wasOpen = useRef(false)
 	useEffect(() => {
 		if (wasOpen.current && !openMobile) trigger.current?.focus()
 		wasOpen.current = openMobile
 	}, [openMobile])
-	return <SidebarTrigger ref={trigger} />
+	return (
+		<SidebarTrigger
+			ref={trigger}
+			className={
+				!isMobile && !open ? 'fixed top-2 left-2 z-40 bg-card' : 'md:hidden'
+			}
+		/>
+	)
 }
 
 export function AlphaNotice() {
@@ -395,11 +402,11 @@ export function Layout({
 						</DropdownMenu>
 					</SidebarFooter>
 				</Sidebar>
-				<SidebarInset className="min-w-0">
+				<SidebarInset className="min-w-0 md:peer-data-[state=collapsed]:[--sidebar-width:0px]">
 					<AlphaNotice />
-					<header className="flex items-center gap-2 border-b px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] md:hidden">
+					<header className="flex items-center gap-2 border-b px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] md:contents">
 						<ShellSidebarTrigger />
-						<span className="truncate text-sm font-medium">
+						<span className="truncate text-sm font-medium md:hidden">
 							{currentLibrary?.name || 'Audiobookshelf'}
 						</span>
 					</header>

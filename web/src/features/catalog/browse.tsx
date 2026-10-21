@@ -795,7 +795,7 @@ export function SearchForm({
 						maxLength={200}
 					/>
 				</label>
-				<Button className="sr-only" type="submit">
+				<Button className="sr-only focus:not-sr-only" type="submit">
 					Search
 				</Button>
 			</form>
@@ -1085,7 +1085,7 @@ export function BrowsePage({
 			<CatalogHeading title={section ? humanLabel(section) : 'Library'} />
 			{progressStatus && <p role="status">{progressStatus}</p>}
 
-			<div className="flex items-center gap-2">
+			<div className="flex flex-wrap items-center gap-2">
 				{(sorts.length > 0 || itemView || seriesView) && (
 					<Sheet>
 						<SheetTrigger asChild>

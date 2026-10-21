@@ -300,7 +300,11 @@ export function ItemView({ id }: { id: string }) {
 							{[
 								...(metadata.genres ?? []),
 								...(item.mediaType === 'podcast'
-									? [`${episodes.length} episodes`]
+									? [
+											media.episodes
+												? `${episodes.length} episodes`
+												: 'Episode count unavailable',
+										]
 									: []),
 							].join(' · ')}
 						</p>
@@ -470,7 +474,7 @@ export function ItemView({ id }: { id: string }) {
 					{duration(bookProgress.currentTime || 0)} listened
 				</p>
 			)}
-			{item.mediaType === 'podcast' && (
+			{item.mediaType === 'podcast' && media.episodes && (
 				<section className="space-y-3">
 					<h2 className="text-2xl font-semibold">Episodes</h2>
 

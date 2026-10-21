@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { ItemView } from './ItemView'
 
 const play = vi.hoisted(() => vi.fn())
+const fixture = vi.hoisted(() => ({ episodesKnown: true }))
 vi.mock('../../api', () => ({
 	useAuth: (select: (state: { user: null }) => unknown) =>
 		select({ user: null }),
@@ -25,23 +26,34 @@ vi.mock('./service', () => ({
 				description: 'Show description',
 				language: 'en',
 			},
-			episodes: [
-				{
-					id: 'old',
-					title: 'Old',
-					publishedAt: 1000,
-					duration: 12,
-					audioFile: {},
-					subtitle: 'Same text',
-					description: 'Same text continued',
-				},
-				{ id: 'new', title: 'New', publishedAt: 2000, audioFile: {} },
-				{ id: 'missing', title: 'Missing', publishedAt: 500 },
-			],
+			episodes: fixture.episodesKnown
+				? [
+						{
+							id: 'old',
+							title: 'Old',
+							publishedAt: 1000,
+							duration: 12,
+							audioFile: {},
+							subtitle: 'Same text',
+							description: 'Same text continued',
+						},
+						{ id: 'new', title: 'New', publishedAt: 2000, audioFile: {} },
+						{ id: 'missing', title: 'Missing', publishedAt: 500 },
+					]
+				: undefined,
 		},
 	}),
 }))
-afterEach(cleanup)
+afterEach(() => {
+	cleanup()
+	fixture.episodesKnown = true
+})
+it('does not report missing episode data as zero', async () => {
+	fixture.episodesKnown = false
+	render(<ItemView id="show" />)
+	expect(await screen.findByText('Episode count unavailable')).toBeTruthy()
+	expect(screen.queryByText('0 episodes')).toBeNull()
+})
 it('plays newest publication, discloses hero description, uses decimal size units', async () => {
 	render(<ItemView id="show" />)
 	fireEvent.click(
