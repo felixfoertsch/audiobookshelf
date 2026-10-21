@@ -1,9 +1,16 @@
 import { expect, test } from '@playwright/test'
 import { chooseTheme } from './shell-controls'
 
+test.beforeEach(async ({ page }) => {
+	const cdp = await page.context().newCDPSession(page)
+	await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 })
+})
 for (const width of [390, 1280])
 	for (const theme of ['light', 'dark'])
 		test(`audit tools layout ${width} ${theme}`, async ({ page }) => {
+			// Enable interception before navigation, not in a separate protocol turn
+			// immediately before Enter. Under load the chooser can open first.
+			const chooser = page.waitForEvent('filechooser')
 			await page.setViewportSize({ width, height: 848 })
 			await page.route('**/abs/api/feeds', (route) =>
 				route.fulfill({
@@ -59,9 +66,10 @@ for (const width of [390, 1280])
 					await page
 						.getByRole('button', { name: 'Upload cover', exact: true })
 						.focus()
-					const chooser = page.waitForEvent('filechooser')
 					await page.keyboard.press('Enter')
-					await chooser
+					expect(await (await chooser).element().getAttribute('type')).toBe(
+						'file',
+					)
 				}
 				await expect
 					.poll(() =>

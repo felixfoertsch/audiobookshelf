@@ -4,6 +4,8 @@ import { items } from './data'
 test('episode analysis states, tooltip and admin queue use synthetic API', async ({
 	page,
 }) => {
+	const cdp = await page.context().newCDPSession(page)
+	await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 })
 	const source = items.find((item) => item.id === 'podcast-1')
 	if (!source || !('episodes' in source.media))
 		throw new Error('Missing podcast fixture')
@@ -71,6 +73,13 @@ test('episode analysis states, tooltip and admin queue use synthetic API', async
 		}),
 	).toBeVisible()
 	const same = page.getByRole('img', { name: 'No inserted ads found' })
+	// Focus can scroll the row into view; Radix closes tooltips on that scroll.
+	await same.scrollIntoViewIfNeeded()
+	// Scroll events arrive before the next rendering frame, after the scroll command returns.
+	await page.evaluate(
+		() =>
+			new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+	)
 	await same.focus()
 	await expect(page.getByRole('tooltip')).toContainText(
 		'Shared or baked-in ads can remain undetected',
