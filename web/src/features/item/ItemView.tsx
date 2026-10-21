@@ -33,6 +33,7 @@ import {
 	SheetTrigger,
 } from '../../shared/components/ui/sheet'
 import { PodcastManagementSettings } from '../podcast'
+import { AdAnalysisStatus } from '../podcast/AdAnalysisStatus'
 import { Reader, readerItemSchema } from '../reader'
 import { EpisodeEdit } from './EpisodeEdit'
 import { ItemActions } from './ItemActions'
@@ -565,6 +566,17 @@ export function ItemView({ id }: { id: string }) {
 												</p>
 											</div>
 											<div className="flex flex-wrap gap-2">
+												<AdAnalysisStatus
+													itemId={id}
+													episode={ep}
+													enabled={
+														(
+															item.extraData as
+																| { adAnalysisEnabled?: boolean }
+																| undefined
+														)?.adAnalysisEnabled === true
+													}
+												/>
 												<Button
 													className="rounded-full"
 													aria-label={`Play ${ep.title ?? 'episode'}`}

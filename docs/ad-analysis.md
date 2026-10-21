@@ -32,6 +32,27 @@ This authorizes public podcast title/author searches at Apple and gpodder.net, u
 
 Successful new downloads enqueue automatically. Retry an existing episode with `POST /api/podcasts/:id/episode/:episodeId/ad-analysis`, JSON `{}`. Response 202 means queued; 409 means disabled, duplicate, or queue full. Queue holds at most 32 jobs, concurrency one. Jobs are not durable; interrupted `running` results require explicit retry.
 
+### Modern episode status
+
+Modern podcast detail and Latest episodes show one analysis icon when the show opts in; disabled shows show none. Classic Vue episode rows remain unchanged. Labels/tooltips use localization-ready English fallbacks and accessible names. Candidate tooltip lists original-timeline break ranges; green never means verified ad-free.
+
+| State | Public source | Modern label / action |
+| --- | --- | --- |
+| Not analysed | No result, downloaded audio | Not analysed; admin/root can queue |
+| Queued / running | In-memory matching-source job | Analysis queued / Analysis running; spinning icon honors reduced motion |
+| Candidates | `candidates` | Inserted audio found: N breaks, total seconds; tooltip lists ranges, not advertising proof |
+| Compared, no difference | `no_difference`, reason `no_inserted_audio` | No inserted ads found; shared/baked-in ads may remain undetected |
+| Inconclusive | `inconclusive` | Analysis inconclusive; admin/root can retry |
+| Unsupported / unmatched | `unsupported`, no downloaded audio, `duration_limit`, or no matching catalog episode | Cannot analyse episode; grey link-off, explanatory tooltip |
+| Failed | `failed` / `cancelled` | Analysis failed; admin/root can retry |
+| Outdated | `stale` | Analysis outdated; admin/root can retry |
+
+Legacy `inconclusive` results with an actual `samples[].status: no_inserted_audio` comparison normalize to `no_difference` on read, without changing stored evidence. Candidates, failures and stale results retain precedence. Identical fingerprints alone still do not prove absence of inserted ads. Recent episode JSON exposes `adAnalysisEnabled` from the parent show. Reads never enqueue.
+
+`episode_ad_analysis` Socket.IO events carry `{ libraryItemId, episodeId, adAnalysis, adAnalysisEnabled }` on queue, start, completion and disable/cancellation, filtered through library-item access. Queued/running reads override prior stored results only for matching source signatures; completed reads still reject changed playback sources. Jobs remain in memory only, not durable across restart. Existing per-episode POST keeps server-enforced admin/root permission and show consent. Modern UI offers queue actions only for not analysed, inconclusive, failed and outdated states; queue failures remain visible and retryable.
+
+Synthetic browser coverage verifies three candidate breaks, compared/no-difference caveat, queuing and live event updates. Live Lateral 209 (three breaks), 210 (compared/no difference), and an unanalysed episode still require experiment deployment verification; local tests do not claim that acceptance.
+
 ### Retained comparison corpus
 
 Completed comparisons persist under `global.MetadataPath/ad-analysis-corpus` (the configured experiment `METADATA_PATH`), separate from originals and ordinary item metadata. Each version stores exact downloaded audio, its SHA-256, raw uint32 fingerprint JSON and SHA-256, algorithm/version, provider, transport route, ISO collection timestamp, measured decoded duration and byte lengths. No URLs, credentials, addresses or original audio copies enter this corpus. Same URL can supply new versions on later explicit runs. Exact audio or fingerprint duplicates do not consume another slot.

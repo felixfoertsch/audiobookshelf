@@ -15,6 +15,7 @@ import {
 } from '../../shared/components/ui/dropdown-menu'
 import { episodeProgress, refreshProgress } from '../item/progress'
 import { updateProgress } from '../item/service'
+import { AdAnalysisStatus } from './AdAnalysisStatus'
 import { OpmlImport } from './opml'
 
 const searchSchema = z.array(
@@ -646,6 +647,7 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 												: 'Unplayed'}
 								</p>
 								<div className="mt-2 flex flex-wrap gap-2">
+									<AdAnalysisStatus itemId={e.libraryItemId} episode={e} />
 									<Button
 										className="rounded-full"
 										aria-label={`Play ${e.title || 'episode'}`}

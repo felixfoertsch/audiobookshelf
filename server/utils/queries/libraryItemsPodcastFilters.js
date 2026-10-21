@@ -548,6 +548,7 @@ module.exports = {
       const oldPodcastJson = ep.podcast.toOldJSON(ep.podcast.libraryItem.id)
 
       const oldPodcastEpisodeJson = ep.toOldJSONExpanded(ep.podcast.libraryItem.id)
+      oldPodcastEpisodeJson.adAnalysisEnabled = ep.podcast.libraryItem.extraData?.adAnalysisEnabled === true
 
       oldPodcastEpisodeJson.podcast = oldPodcastJson
       oldPodcastEpisodeJson.libraryId = ep.podcast.libraryItem.libraryId

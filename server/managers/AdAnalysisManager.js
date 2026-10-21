@@ -57,7 +57,19 @@ function signature(audioFile) {
   return JSON.stringify(audioFile || null)
 }
 
-function publicResult(episode) {
+function jobPayload(item, episode, status, adAnalysis = null) {
+  return { libraryItemId: item.id, episodeId: episode.id, adAnalysis: adAnalysis || { version: 1, status, reason: null, segments: [] }, adAnalysisEnabled: item.extraData?.adAnalysisEnabled === true }
+}
+
+function publicResult(episode, itemId) {
+  const key = itemId ? `${itemId}:${episode.id}` : null
+  const queued = key && module.exports.queue.find((job) => job.key === key)
+  const running = key && module.exports.activeEpisodes.has(key)
+  const job = queued || (key && module.exports.activeJobs.get(key))
+  if (job) {
+    if (job.sourceSignature === signature(episode.audioFile)) return { version: 1, status: running ? 'running' : 'queued', reason: null, segments: [] }
+    return { version: 1, status: 'stale', reason: 'source_changed', segments: [] }
+  }
   const result = episode.extraData?.adAnalysis
   if (!result) return null
   let unchanged = false
@@ -67,7 +79,12 @@ function publicResult(episode) {
   } catch { /* Deleted or inaccessible files cannot carry applicable tags. */ }
   if (!unchanged || result.sourceSignature !== signature(episode.audioFile)) return { version: 1, status: 'stale', reason: 'source_changed', segments: [] }
   const { sourceSignature, sourceStat, ...json } = result
-  return structuredClone(json)
+  const publicJson = structuredClone(json)
+  if (publicJson.status === 'inconclusive' && !publicJson.segments?.length && publicJson.samples?.some((sample) => sample.status === 'no_inserted_audio')) {
+    publicJson.status = 'no_difference'
+    publicJson.reason = 'no_inserted_audio'
+  }
+  return publicJson
 }
 
 // Redirects revalidate each destination. Only analysis opts into this proxy;
@@ -156,15 +173,25 @@ class AdAnalysisManager {
     this.keys = new Set()
     this.running = false
     this.active = new Map()
+    this.activeJobs = new Map()
+    this.activeEpisodes = new Set()
+  }
+
+  emit(payload) {
+    require('../SocketAuthority').libraryItemDataEmitter('episode_ad_analysis', payload.libraryItemId, payload).catch(() => {})
   }
 
   cancel(itemId) {
     this.queue = this.queue.filter((job) => {
       if (job.itemId !== itemId) return true
       this.keys.delete(job.key)
+      this.emit({ libraryItemId: itemId, episodeId: job.episodeId, adAnalysis: { version: 1, status: 'cancelled', reason: null, segments: [] }, adAnalysisEnabled: false })
       return false
     })
     this.active.get(itemId)?.abort()
+    for (const [key, job] of this.activeJobs) {
+      if (job.itemId === itemId) this.emit({ libraryItemId: itemId, episodeId: job.episodeId, adAnalysis: { version: 1, status: 'cancelled', reason: null, segments: [] }, adAnalysisEnabled: false })
+    }
   }
 
   enqueue(item, episode) {
@@ -174,6 +201,7 @@ class AdAnalysisManager {
     if (this.keys.has(key) || this.keys.size >= 32) return false
     this.keys.add(key)
     this.queue.push({ itemId: item.id, episodeId: episode.id, path, sourceSignature: signature(episode.audioFile), key })
+    this.emit(jobPayload(item, episode, 'queued'))
     setTimeout(() => this.drain(), 0)
     return true
   }
@@ -202,6 +230,9 @@ class AdAnalysisManager {
     if (!initial) return
     const controller = new AbortController()
     this.active.set(job.itemId, controller)
+    this.activeJobs.set(job.key, job)
+    this.activeEpisodes.add(job.key)
+    this.emit(jobPayload(initial.item, initial.episode, 'running'))
     let sourceStat
     const checkpoint = async () => {
       if (controller.signal.aborted || !(await load())) throw new Error('cancelled')
@@ -342,21 +373,33 @@ class AdAnalysisManager {
       }
       result.segments = combineSegments(result.segments)
       result.diversity = { requests: extras, distinctFingerprints: fingerprints.size, uniqueUrls: audioUrls.size }
-      result.status = result.segments.length ? 'candidates' : 'inconclusive'
-      result.reason = result.segments.length ? 'candidate_insertions_not_advertising_proof' : fingerprints.size < 2 ? 'insufficient_diversity' : 'no_safe_candidates'
+      const comparedSamples = result.samples.filter((sample) => sample.method)
+      const noMatchingCatalogs = result.catalogs.length > 0 && result.catalogs.every((catalog) => ['empty', 'no_matching_episode'].includes(catalog.status))
+      if (!result.segments.length && !comparedSamples.length && noMatchingCatalogs) {
+        result.status = 'unsupported'
+        result.reason = 'no_matching_episode'
+      } else {
+        result.status = result.segments.length ? 'candidates' : result.samples.some((sample) => sample.status === 'no_inserted_audio') ? 'no_difference' : 'inconclusive'
+        result.reason = result.segments.length ? 'candidate_insertions_not_advertising_proof' : result.status === 'no_difference' ? 'no_inserted_audio' : fingerprints.size < 2 ? 'insufficient_diversity' : 'no_safe_candidates'
+      }
     } catch (error) {
-      result.status = error.message === 'cancelled' || controller.signal.aborted ? 'cancelled' : error.message === 'unsupported_runtime' ? 'unsupported' : 'failed'
+      result.status = error.message === 'cancelled' || controller.signal.aborted ? 'cancelled' : ['unsupported_runtime', 'duration_limit'].includes(error.message) ? 'unsupported' : 'failed'
       result.reason = ['corpus_unavailable', 'unsupported_runtime', 'duration_limit', 'duration_or_decode_mismatch', 'incomplete_fingerprint', 'unsafe_public_metadata'].includes(error.message) ? error.message : 'analysis_failed'
       result.segments = []
     } finally {
       this.active.delete(job.itemId)
+      this.activeJobs.delete(job.key)
+      this.activeEpisodes.delete(job.key)
       if (dir) await fs.promises.rm(dir, { recursive: true, force: true })
       if (hash && await sha256(job.path).catch(() => null) !== hash) {
         result.status = 'stale'
         result.reason = 'source_changed'
         result.segments = []
       }
-      if (!controller.signal.aborted) await save()
+      if (!controller.signal.aborted && await save()) {
+        const current = await load()
+        if (current) this.emit(jobPayload(current.item, current.episode, result.status, publicResult(current.episode, current.item.id)))
+      }
     }
   }
 }

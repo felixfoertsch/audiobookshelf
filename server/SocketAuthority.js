@@ -109,6 +109,15 @@ class SocketAuthority {
     }
   }
 
+  async libraryItemDataEmitter(evt, libraryItemId, data) {
+    const libraryItem = await Database.libraryItemModel.getExpandedById(libraryItemId)
+    if (!libraryItem) return
+    for (const socketId in this.clients) {
+      const client = this.clients[socketId]
+      if (client.user?.checkCanAccessLibraryItem(libraryItem)) client.socket.emit(evt, data)
+    }
+  }
+
   /**
    * Emits event with library items to all clients that can access the library items
    * Note: Emits toOldJSONExpanded()

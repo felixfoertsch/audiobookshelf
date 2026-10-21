@@ -77,6 +77,7 @@ function App() {
 			'item_removed',
 			'items_updated',
 			'items_added',
+			'episode_ad_analysis',
 			'user_updated',
 			'user_online',
 			'user_offline',
