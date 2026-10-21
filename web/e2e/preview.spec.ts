@@ -176,6 +176,10 @@ for (const width of [320, 390, 1280])
 			await signIn(page)
 			await chooseTheme(page, theme)
 			await chooseLibrary(page, 'books')
+			await expect(page).toHaveURL(/\/library\/books$/)
+			await expect(
+				page.getByRole('heading', { name: 'The Glass Orchard', exact: true }),
+			).toBeVisible()
 			// Shelves intentionally lazy-load offscreen artwork; expose every cover before checking it.
 			const images = page.locator('img')
 			for (const image of await images.all()) {
