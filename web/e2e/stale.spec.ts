@@ -27,7 +27,9 @@ test('cached page candidates never override fresh stale session', async ({
 		.first()
 		.click()
 	await expect(page).toHaveURL('/new/item/podcast-1')
-	await page.getByRole('button', { name: 'Play', exact: true }).first().click()
+	await page
+		.getByRole('button', { name: 'Play latest episode', exact: true })
+		.click()
 	const audio = page.getByLabel('Audio playback')
 	await expect
 		.poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))

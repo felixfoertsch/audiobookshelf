@@ -30,7 +30,7 @@ for (const prefix of ['', '/abs']) {
 			.first()
 			.click()
 		await page
-			.getByRole('button', { name: 'Play', exact: true })
+			.getByRole('button', { name: 'Play latest episode', exact: true })
 			.first()
 			.click()
 		const audio = page.getByLabel('Audio playback')
@@ -170,7 +170,7 @@ for (const prefix of ['', '/abs']) {
 			.first()
 			.click()
 		await page
-			.getByRole('button', { name: 'Play', exact: true })
+			.getByRole('button', { name: 'Play latest episode', exact: true })
 			.first()
 			.click()
 		await expect

@@ -181,7 +181,7 @@ test('unavailable files and missing detail stay truthful', async ({ page }) => {
 	).toBeDisabled()
 	await page.goto('/new/item/podcast-1')
 	await expect(
-		page.getByRole('button', { name: 'Play', exact: true }).nth(1),
+		page.getByRole('button', { name: 'Play A Map of Rain', exact: true }),
 	).toBeDisabled()
 	await page.goto('/new/item/missing')
 	await expect(page.getByRole('alert')).toContainText('Item not found')

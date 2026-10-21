@@ -99,7 +99,9 @@ test.describe('local real-media browser playback', () => {
 						exact: true,
 					}),
 				})
-				await row.getByRole('button', { name: 'Play', exact: true }).click()
+				await row
+					.getByRole('button', { name: `Play ${episode.title}`, exact: true })
+					.click()
 				await advancing(page)
 				await seek(page, episode.duration * 0.6)
 				await advancing(page)
