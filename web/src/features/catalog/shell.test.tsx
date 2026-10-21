@@ -21,6 +21,8 @@ vi.mock('../../catalog', async (original) => ({
 }))
 vi.mock('../../player', () => ({
 	Player: () => <div>Protected player</div>,
+	usePlayer: (select: (state: { session: null }) => unknown) =>
+		select({ session: null }),
 	playEpisode: vi.fn(),
 	playQueue: vi.fn(),
 }))

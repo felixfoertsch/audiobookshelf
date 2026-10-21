@@ -18,6 +18,8 @@ vi.mock('../../catalog', async (original) => ({
 }))
 vi.mock('../../player', () => ({
 	Player: () => null,
+	usePlayer: (select: (state: { session: null }) => unknown) =>
+		select({ session: null }),
 	playEpisode: vi.fn(),
 	playQueue: vi.fn(),
 }))

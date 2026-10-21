@@ -337,6 +337,7 @@ export async function login(username: string, password: string) {
 	return result.user
 }
 export async function logout(allDevices = false) {
+	window.dispatchEvent(new Event('abs:logout-start'))
 	await beforeLogout?.()
 	const result = await api(
 		allDevices ? '/logout?allDevices=1' : '/logout',

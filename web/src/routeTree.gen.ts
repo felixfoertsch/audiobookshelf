@@ -31,6 +31,7 @@ import { Route as ConfigRssFeedsRouteImport } from './routes/config.rss-feeds'
 import { Route as ConfigSessionsRouteImport } from './routes/config.sessions'
 import { Route as ConfigStatsRouteImport } from './routes/config.stats'
 import { Route as ConfigUsersRouteImport } from './routes/config.users'
+import { Route as DebugIssuesRouteImport } from './routes/debug.issues'
 import { Route as ItemIdRouteImport } from './routes/item.$id'
 import { Route as ItemsItemIdRouteImport } from './routes/items.$itemId'
 import { Route as LibrariesLibraryIdRouteImport } from './routes/libraries.$libraryId'
@@ -169,6 +170,11 @@ const ConfigUsersRoute = ConfigUsersRouteImport.update({
   id: '/users',
   path: '/users',
   getParentRoute: () => ConfigRoute,
+} as any)
+const DebugIssuesRoute = DebugIssuesRouteImport.update({
+  id: '/debug/issues',
+  path: '/debug/issues',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ItemIdRoute = ItemIdRouteImport.update({
   id: '/item/$id',
@@ -343,6 +349,7 @@ export interface FileRoutesByFullPath {
   '/config/sessions': typeof ConfigSessionsRoute
   '/config/stats': typeof ConfigStatsRoute
   '/config/users': typeof ConfigUsersRouteWithChildren
+  '/debug/issues': typeof DebugIssuesRoute
   '/item/$id': typeof ItemIdRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/libraries/$libraryId': typeof LibrariesLibraryIdRoute
@@ -392,6 +399,7 @@ export interface FileRoutesByTo {
   '/config/rss-feeds': typeof ConfigRssFeedsRoute
   '/config/sessions': typeof ConfigSessionsRoute
   '/config/stats': typeof ConfigStatsRoute
+  '/debug/issues': typeof DebugIssuesRoute
   '/item/$id': typeof ItemIdRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/libraries/$libraryId': typeof LibrariesLibraryIdRoute
@@ -444,6 +452,7 @@ export interface FileRoutesById {
   '/config/sessions': typeof ConfigSessionsRoute
   '/config/stats': typeof ConfigStatsRoute
   '/config/users': typeof ConfigUsersRouteWithChildren
+  '/debug/issues': typeof DebugIssuesRoute
   '/item/$id': typeof ItemIdRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/libraries/$libraryId': typeof LibrariesLibraryIdRoute
@@ -498,6 +507,7 @@ export interface FileRouteTypes {
     | '/config/sessions'
     | '/config/stats'
     | '/config/users'
+    | '/debug/issues'
     | '/item/$id'
     | '/items/$itemId'
     | '/libraries/$libraryId'
@@ -547,6 +557,7 @@ export interface FileRouteTypes {
     | '/config/rss-feeds'
     | '/config/sessions'
     | '/config/stats'
+    | '/debug/issues'
     | '/item/$id'
     | '/items/$itemId'
     | '/libraries/$libraryId'
@@ -598,6 +609,7 @@ export interface FileRouteTypes {
     | '/config/sessions'
     | '/config/stats'
     | '/config/users'
+    | '/debug/issues'
     | '/item/$id'
     | '/items/$itemId'
     | '/libraries/$libraryId'
@@ -639,6 +651,7 @@ export interface RootRouteChildren {
   UploadRoute: typeof UploadRoute
   AuthorIdRoute: typeof AuthorIdRoute
   CollectionIdRoute: typeof CollectionIdRoute
+  DebugIssuesRoute: typeof DebugIssuesRoute
   ItemIdRoute: typeof ItemIdRoute
   ItemsItemIdRoute: typeof ItemsItemIdRoute
   LibrariesLibraryIdRoute: typeof LibrariesLibraryIdRoute
@@ -816,6 +829,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/config/users'
       preLoaderRoute: typeof ConfigUsersRouteImport
       parentRoute: typeof ConfigRoute
+    }
+    '/debug/issues': {
+      id: '/debug/issues'
+      path: '/debug/issues'
+      fullPath: '/debug/issues'
+      preLoaderRoute: typeof DebugIssuesRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/item/$id': {
       id: '/item/$id'
@@ -1110,6 +1130,7 @@ const rootRouteChildren: RootRouteChildren = {
   UploadRoute: UploadRoute,
   AuthorIdRoute: AuthorIdRoute,
   CollectionIdRoute: CollectionIdRoute,
+  DebugIssuesRoute: DebugIssuesRoute,
   ItemIdRoute: ItemIdRoute,
   ItemsItemIdRoute: ItemsItemIdRoute,
   LibrariesLibraryIdRoute: LibrariesLibraryIdRoute,

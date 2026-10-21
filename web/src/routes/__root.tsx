@@ -16,6 +16,7 @@ import {
 	SearchForm,
 } from '../features/catalog/browse'
 import { ServerActivity } from '../features/catalog/server-activity'
+import { DebugMenu, RouteDebugOverlay } from '../features/debug'
 import { Player } from '../player'
 import { Button } from '../shared/components/ui/button'
 import {
@@ -320,6 +321,14 @@ export function Layout({
 										<Link to="/config">Settings</Link>
 									</DropdownMenuItem>
 								)}
+								{admin && (
+									<>
+										<DebugMenu />
+										<DropdownMenuItem asChild>
+											<Link to="/debug/issues">Debug issues</Link>
+										</DropdownMenuItem>
+									</>
+								)}
 								<DropdownMenuItem asChild>
 									<Link to="/account" className="min-w-0">
 										<span className="truncate">{user.username} · Account</span>
@@ -370,6 +379,7 @@ export function Layout({
 					</div>
 				</SidebarInset>
 			</SidebarProvider>
+			<RouteDebugOverlay path={pathname} />
 			<Player />
 			<footer className="px-5 pb-80 text-center text-xs text-muted-foreground">
 				Audiobookshelf · Modern frontend {frontendPackage.version} · Original

@@ -42,10 +42,12 @@
   "dependencies": {
     "axios": "^0.27.2",
     "cookie-parser": "^1.4.6",
+    "debug-overlay": "https://git.felixfoertsch.de/felixfoertsch/debug-overlay/releases/download/v2026.10.21.2/debug-overlay-2026.10.21.2.tgz",
     "express": "^4.17.1",
     "express-rate-limit": "^7.5.1",
     "express-session": "^1.17.3",
     "graceful-fs": "^4.2.10",
+    "hono": "4.12.9",
     "htmlparser2": "^8.0.1",
     "ipaddr.js": "1.9.1",
     "lru-cache": "^10.0.3",

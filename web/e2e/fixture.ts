@@ -1,8 +1,12 @@
 // Synthetic server only. No ABS connection or production writes.
 
 import { once } from 'node:events'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { createDebugMiddleware } from 'debug-overlay/express'
 import { z } from 'zod'
 import { items, libraries, playable } from './data'
 import {
@@ -659,7 +663,32 @@ async function handleRequest(request: Request) {
 	return new Response('Not found', { status: 404 })
 }
 
+const debugDirectory = mkdtempSync(join(tmpdir(), 'abs-debug-browser-'))
+const debugAdapter = createDebugMiddleware({
+	dbPath: join(debugDirectory, 'debug-overlay.sqlite'),
+	authorize: (request) => {
+		const token = request.headers.authorization?.replace(/^Bearer /, '')
+		return fixtureUsers.some(
+			(user) =>
+				user.accessToken === token &&
+				['admin', 'root'].includes(user.type) &&
+				user.isActive,
+		)
+	},
+	routes: ['/', '/debug/issues', '/item/book-1', '/library/books'],
+})
 const server = createServer(async (incoming, outgoing) => {
+	const debugMatch = /^\/(?:abs\/)?api\/debug(?=\/|\?|$)/.exec(
+		incoming.url || '',
+	)
+	if (debugMatch) {
+		incoming.url = incoming.url?.slice(debugMatch[0].length) || '/'
+		await debugAdapter(incoming, outgoing, () => {
+			outgoing.writeHead(503)
+			outgoing.end('Debug unavailable')
+		})
+		return
+	}
 	try {
 		const method = incoming.method || 'GET'
 		const rawPath = (incoming.url || '/').split('?')[0]
@@ -846,7 +875,11 @@ onFixtureUserUpdated((user) => {
 server.listen(Number(process.env.FIXTURE_PORT || 4179), '127.0.0.1')
 function shutdown() {
 	for (const io of socketServers) io.disconnectSockets(true)
-	server.close(() => process.exit(0))
+	server.close(() => {
+		debugAdapter.close()
+		rmSync(debugDirectory, { recursive: true, force: true })
+		process.exit(0)
+	})
 	server.closeAllConnections()
 }
 process.on('SIGTERM', shutdown)

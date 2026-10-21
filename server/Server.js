@@ -352,6 +352,8 @@ class Server {
     // Skip JSON parsing for internal-api routes
     router.use(/^(?!\/internal-api).*/, express.json({ limit: '10mb' }))
 
+    this.debugOverlay = require('./utils/debugOverlay')(Database, global.ConfigPath)
+    router.use('/api/debug', this.authMiddleware.bind(this), this.debugOverlay)
     router.use('/api', this.auth.ifAuthNeeded(this.authMiddleware.bind(this)), this.apiRouter.router)
     router.use('/hls', this.hlsRouter.router)
     router.use('/public', this.publicRouter.router)
@@ -571,6 +573,7 @@ class Server {
     Logger.info('[Server] Closing HTTP Server')
     await new Promise((resolve) => this.server.close(resolve))
     Logger.info('[Server] HTTP Server Closed')
+    this.debugOverlay?.close()
   }
 }
 module.exports = Server
