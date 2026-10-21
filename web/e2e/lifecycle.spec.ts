@@ -1,12 +1,14 @@
 import { expect, test } from '@playwright/test'
-import { appMenu, signOut } from './shell-controls'
+import { appMenu, closeSidebar, openSidebar, signOut } from './shell-controls'
 
 async function openBook(page: import('@playwright/test').Page) {
 	await page.goto('/new/')
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+	await openSidebar(page)
 	await expect(appMenu(page)).toBeVisible()
+	await closeSidebar(page)
 	await page.goto('/new/item/book-1')
 	await expect(
 		page.getByRole('heading', { name: 'The Glass Orchard', exact: true }),
@@ -18,6 +20,10 @@ test('local logout closes playback before revocation and stays signed out', asyn
 	await openBook(page)
 	await page.getByRole('button', { name: 'Play audiobook' }).click()
 	await expect(page.getByLabel('Audio playback')).toBeVisible()
+	// Keep short fixture audio from ending while refresh is deliberately blocked.
+	await page
+		.getByLabel('Audio playback')
+		.evaluate((audio: HTMLAudioElement) => audio.pause())
 	let releaseRefresh!: () => void
 	let refreshStarted!: () => void
 	const started = new Promise<void>((resolve) => {
@@ -35,6 +41,7 @@ test('local logout closes playback before revocation and stays signed out', asyn
 		await release
 		await route.fulfill({ response })
 	})
+	await openSidebar(page)
 	await appMenu(page).click()
 	await page.getByRole('menuitem', { name: /Account$/ }).click()
 	await started

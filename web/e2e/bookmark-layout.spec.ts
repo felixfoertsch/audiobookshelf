@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { appMenu, chooseTheme } from './shell-controls'
+import { appMenu, chooseTheme, openSidebar } from './shell-controls'
 
 for (const width of [320, 390])
 	for (const theme of ['light', 'dark']) {
@@ -11,6 +11,7 @@ for (const width of [320, 390])
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+			await openSidebar(page)
 			await expect(appMenu(page).first()).toBeVisible()
 			await page.goto('/new/item/book-1')
 			await chooseTheme(page, theme)

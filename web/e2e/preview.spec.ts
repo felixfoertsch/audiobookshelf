@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { appMenu, chooseLibrary, chooseTheme } from './shell-controls'
+import {
+	appMenu,
+	chooseLibrary,
+	chooseTheme,
+	closeSidebar,
+	openSidebar,
+} from './shell-controls'
 
 async function signIn(page: import('@playwright/test').Page, prefix = '') {
 	await page.goto(`${prefix}/new/`)
@@ -12,7 +18,9 @@ async function signIn(page: import('@playwright/test').Page, prefix = '') {
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+	await openSidebar(page)
 	await expect(appMenu(page)).toBeVisible()
+	await closeSidebar(page)
 	await expect(page).toHaveURL(new RegExp(`${prefix}/new/library/podcasts$`))
 	await expect(
 		page.getByRole('link', { name: 'Open Classic', exact: true }),
@@ -141,7 +149,9 @@ test('permission error and range contract', async ({ page, request }) => {
 	await expect(page.getByRole('alert').first()).toContainText(
 		'Permission denied',
 	)
+	await openSidebar(page)
 	await expect(appMenu(page)).toBeVisible()
+	await closeSidebar(page)
 	await expect(
 		page.getByRole('button', { name: 'Sign in', exact: true }),
 	).toHaveCount(0)

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { items } from './data'
+import { closeSidebar, openSidebar } from './shell-controls'
 
 for (const prefix of ['', '/abs']) {
 	for (const width of [320, 390, 1036, 1280]) {
@@ -60,9 +61,11 @@ for (const prefix of ['', '/abs']) {
 				await page.getByLabel('Username', { exact: true }).fill('admin')
 				await page.getByLabel('Password', { exact: true }).fill('password')
 				await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+				await openSidebar(page)
 				await expect(
 					page.getByRole('searchbox', { name: 'Search library' }),
 				).toBeVisible()
+				await closeSidebar(page)
 				await page.goto(`${prefix}/new/item/podcast-1`)
 				await page
 					.getByRole('button', { name: 'Next episodes', exact: true })

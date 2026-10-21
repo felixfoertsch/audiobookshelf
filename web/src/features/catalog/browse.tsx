@@ -269,14 +269,19 @@ export function useCatalogRefresh() {
 export function LibraryNav({
 	library,
 	podcast = false,
+	icons = {},
 }: {
 	library: string
 	podcast?: boolean
+	icons?: Record<string, React.ReactNode>
 }) {
 	const { setOpenMobile } = useSidebar()
 	const router = useRouter()
 	useEffect(
-		() => router.subscribe('onResolved', () => setOpenMobile(false)),
+		() =>
+			router.subscribe('onBeforeNavigate', ({ hrefChanged }) => {
+				if (hrefChanged) setOpenMobile(false)
+			}),
 		[router, setOpenMobile],
 	)
 	const user = useAuth((state) => state.user)
@@ -294,6 +299,7 @@ export function LibraryNav({
 								activeOptions={{ exact: true, includeSearch: false }}
 								activeProps={{ 'data-active': true }}
 							>
+								{icons.Home}
 								Home
 							</Link>
 						</SidebarMenuButton>
@@ -306,6 +312,7 @@ export function LibraryNav({
 									params={{ library }}
 									activeProps={{ 'data-active': true }}
 								>
+									{icons['Latest episodes']}
 									Latest episodes
 								</Link>
 							</SidebarMenuButton>
@@ -319,6 +326,7 @@ export function LibraryNav({
 									params={{ library }}
 									activeProps={{ 'data-active': true }}
 								>
+									{icons['Add podcast']}
 									Add podcast
 								</Link>
 							</SidebarMenuButton>
@@ -337,6 +345,7 @@ export function LibraryNav({
 								activeOptions={{ exact: true, includeSearch: false }}
 								activeProps={{ 'data-active': true }}
 							>
+								{icons.Library}
 								Library
 							</Link>
 						</SidebarMenuButton>
@@ -351,6 +360,7 @@ export function LibraryNav({
 										activeOptions={{ exact: true, includeSearch: false }}
 										activeProps={{ 'data-active': true }}
 									>
+										{icons[id]}
 										{humanLabel(id)}
 									</Link>
 								</SidebarMenuButton>
@@ -364,6 +374,7 @@ export function LibraryNav({
 									params={{ library }}
 									activeProps={{ 'data-active': true }}
 								>
+									{icons.Narrators}
 									Narrators
 								</Link>
 							</SidebarMenuButton>
@@ -381,6 +392,7 @@ export function LibraryNav({
 								params={{ library, id: 'playlists' }}
 								activeProps={{ 'data-active': true }}
 							>
+								{icons.Playlists}
 								Playlists
 							</Link>
 						</SidebarMenuButton>
@@ -399,6 +411,7 @@ export function LibraryNav({
 										params={{ library }}
 										activeProps={{ 'data-active': true }}
 									>
+										{icons['Download queue']}
 										Download queue
 									</Link>
 								) : (
@@ -407,6 +420,7 @@ export function LibraryNav({
 										params={{ library }}
 										activeProps={{ 'data-active': true }}
 									>
+										{icons.Statistics}
 										Statistics
 									</Link>
 								)}

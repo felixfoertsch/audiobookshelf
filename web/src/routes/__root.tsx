@@ -6,6 +6,21 @@ import {
 	useNavigate,
 	useRouterState,
 } from '@tanstack/react-router'
+import {
+	ChartNoAxesColumn,
+	ChevronDown,
+	Download,
+	Folder,
+	Headphones,
+	House,
+	Library,
+	ListMusic,
+	Mic,
+	Plus,
+	Search,
+	UserRound,
+	Users,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import frontendPackage from '../../package.json'
 import { getAuthGeneration, logout, useAuth } from '../api'
@@ -32,13 +47,11 @@ import {
 import {
 	Sidebar,
 	SidebarContent,
+	SidebarFooter,
 	SidebarGroup,
 	SidebarGroupLabel,
 	SidebarHeader,
 	SidebarInset,
-	SidebarMenu,
-	SidebarMenuButton,
-	SidebarMenuItem,
 	SidebarProvider,
 	SidebarTrigger,
 	useSidebar,
@@ -218,17 +231,22 @@ export function Layout({
 				Skip to content
 			</a>
 			<SidebarProvider>
-				<Sidebar>
-					<SidebarHeader>
+				<Sidebar className="z-30 [&_[data-slot=sidebar-menu-button]]:rounded-lg [&_[data-active=true]]:bg-sidebar-accent [&_[data-active=true]_svg]:text-primary">
+					<SidebarHeader className="gap-4 px-4 pt-6 pb-2">
 						<Link to="/" className="px-2 text-lg font-semibold">
 							Audiobookshelf
 						</Link>
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<Button variant="outline" className="w-full justify-between">
+								<Button
+									variant="ghost"
+									size="sm"
+									className="w-full min-w-0 justify-between text-sidebar-foreground"
+								>
 									<span className="truncate">
 										Library: {currentLibrary?.name || 'Choose library'}
 									</span>
+									<ChevronDown aria-hidden="true" className="size-4 shrink-0" />
 								</Button>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent
@@ -254,38 +272,12 @@ export function Layout({
 								</DropdownMenuRadioGroup>
 							</DropdownMenuContent>
 						</DropdownMenu>
-					</SidebarHeader>
-					<SidebarContent>
 						{currentLibrary && (
-							<LibraryNav
-								library={currentLibrary.id}
-								podcast={currentLibrary.mediaType === 'podcast'}
-							/>
-						)}
-						<SidebarGroup>
-							<SidebarGroupLabel>Account</SidebarGroupLabel>
-							<SidebarMenu>
-								<SidebarMenuItem>
-									<SidebarMenuButton asChild>
-										<Link to="/account">Account</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							</SidebarMenu>
-						</SidebarGroup>
-						<SidebarGroup>
-							<SidebarGroupLabel>
-								{admin ? 'Administration' : 'About server'}
-							</SidebarGroupLabel>
-							<ServerActivity />
-						</SidebarGroup>
-					</SidebarContent>
-				</Sidebar>
-				<SidebarInset className="min-w-0">
-					<AlphaNotice />
-					<header className="flex flex-wrap items-center gap-3 border-b bg-card px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-						<ShellSidebarTrigger />
-						<div className="min-w-0 basis-40 flex-1">
-							{currentLibrary && (
+							<div className="relative [&_label]:text-[0px] [&_input]:h-8 [&_input]:pl-8 [&_input]:text-sm [&_button]:h-8 [&_button]:px-2 [&_button]:text-xs">
+								<Search
+									aria-hidden="true"
+									className="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground"
+								/>
 								<SearchForm
 									key={currentLibrary.id}
 									library={currentLibrary.id}
@@ -296,16 +288,54 @@ export function Layout({
 											: ''
 									}
 								/>
-							)}
-						</div>{' '}
+							</div>
+						)}
+					</SidebarHeader>
+					<SidebarContent>
+						{currentLibrary && (
+							<LibraryNav
+								library={currentLibrary.id}
+								podcast={currentLibrary.mediaType === 'podcast'}
+								icons={{
+									Home: <House />,
+									'Latest episodes': <Headphones />,
+									'Add podcast': <Plus />,
+									Library: <Library />,
+									series: <ListMusic />,
+									authors: <Users />,
+									collections: <Folder />,
+									Narrators: <Mic />,
+									Playlists: <ListMusic />,
+									'Download queue': <Download />,
+									Statistics: <ChartNoAxesColumn />,
+								}}
+							/>
+						)}
+					</SidebarContent>
+					<SidebarFooter className="border-t p-3">
+						<SidebarGroup className="p-0">
+							<SidebarGroupLabel>
+								{admin ? 'Administration' : 'About server'}
+							</SidebarGroupLabel>
+							<ServerActivity />
+						</SidebarGroup>
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<Button variant="outline" className="max-w-full">
+								<Button
+									variant="ghost"
+									className="w-full min-w-0 justify-start text-sidebar-foreground"
+								>
+									<UserRound aria-hidden="true" className="size-4 shrink-0" />
 									<span className="truncate">{user.username} · Menu</span>
+									<ChevronDown
+										aria-hidden="true"
+										className="ml-auto size-4 shrink-0"
+									/>
 								</Button>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent
-								align="end"
+								align="start"
+								side="top"
 								className="max-w-[calc(100vw-2rem)]"
 							>
 								<DropdownMenuItem asChild>
@@ -363,6 +393,15 @@ export function Layout({
 								</DropdownMenuItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
+					</SidebarFooter>
+				</Sidebar>
+				<SidebarInset className="min-w-0">
+					<AlphaNotice />
+					<header className="flex items-center gap-2 border-b px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] md:hidden">
+						<ShellSidebarTrigger />
+						<span className="truncate text-sm font-medium">
+							{currentLibrary?.name || 'Audiobookshelf'}
+						</span>
 					</header>
 					<div
 						id="content"

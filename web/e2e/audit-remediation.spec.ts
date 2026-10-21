@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, test } from '@playwright/test'
 import { items } from './data'
-import { chooseTheme } from './shell-controls'
+import { chooseTheme, closeSidebar, openSidebar } from './shell-controls'
 
 const source = items.find((item) => item.id === 'podcast-1')
 if (!source || !('episodes' in source.media))
@@ -45,9 +45,11 @@ async function signIn(page: Page, prefix: string, username = 'listener') {
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 	await expect(page).not.toHaveURL(/\/login(?:[?#]|$)/)
+	await openSidebar(page)
 	await expect(
 		page.getByRole('searchbox', { name: 'Search library' }),
 	).toBeVisible()
+	await closeSidebar(page)
 }
 async function noOverflow(page: Page) {
 	await expect

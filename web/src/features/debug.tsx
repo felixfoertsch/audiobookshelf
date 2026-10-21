@@ -10,6 +10,7 @@ import { useEffect } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../api'
 import { usePlayer } from '../player'
+import { Button } from '../shared/components/ui/button'
 import { DropdownMenuCheckboxItem } from '../shared/components/ui/dropdown-menu'
 import 'debug-overlay/styles.css'
 
@@ -70,7 +71,7 @@ export function RouteDebugOverlay({ path }: { path: string }) {
 			const player = document.querySelector('[aria-label="Audio player"]')
 			document.documentElement.style.setProperty(
 				'--debug-overlay-bottom',
-				`${playerVisible ? player?.getBoundingClientRect().height || 0 : 0}px`,
+				`${playerVisible && player ? Math.max(0, window.innerHeight - player.getBoundingClientRect().top) : 0}px`,
 			)
 		}
 		const resize = new ResizeObserver(update)
@@ -98,11 +99,10 @@ export function DebugIssues() {
 		return <p role="alert">Permission denied.</p>
 	if (!enabled)
 		return (
-			<section>
-				<p>Debug is disabled.</p>
-				<button type="button" onClick={() => configure(!!identity())}>
-					Enable debug
-				</button>
+			<section className="space-y-4">
+				<h1 className="text-3xl font-semibold">Debug issues</h1>
+				<p className="text-muted-foreground">Debug is disabled.</p>
+				<Button onClick={() => configure(!!identity())}>Enable debug</Button>
 			</section>
 		)
 	return <DebugDashboard routeHref={href} renderLink={renderLink} />

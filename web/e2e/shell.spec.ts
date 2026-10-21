@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { appMenu, chooseLibrary, chooseTheme } from './shell-controls'
+import {
+	appMenu,
+	chooseLibrary,
+	chooseTheme,
+	closeSidebar,
+	openSidebar,
+} from './shell-controls'
 
 for (const width of [320, 390, 1036, 1280])
 	test(`single shell ownership, menu keyboard and sidebar ${width}`, async ({
@@ -10,7 +16,9 @@ for (const width of [320, 390, 1036, 1280])
 		await page.getByLabel('Username', { exact: true }).fill('listener')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+		await openSidebar(page)
 		await expect(appMenu(page)).toBeVisible()
+		await closeSidebar(page)
 		await expect(page.getByRole('main')).toHaveCount(1)
 		await expect(
 			page.getByRole('link', { name: 'Skip to content' }),
@@ -29,13 +37,10 @@ for (const width of [320, 390, 1036, 1280])
 			'/library/podcasts/search?q=Garden',
 		]) {
 			await page.goto(`/new${path}`)
+			await openSidebar(page)
 			await expect(
 				page.getByRole('searchbox', { name: 'Search library', exact: true }),
 			).toHaveCount(1)
-			if (width < 768)
-				await page
-					.getByRole('button', { name: 'Toggle Sidebar', exact: true })
-					.click()
 			await expect(
 				page.getByRole('navigation', { name: 'Library', exact: true }),
 			).toHaveCount(1)
@@ -45,15 +50,16 @@ for (const width of [320, 390, 1036, 1280])
 						.getByRole('navigation', { name: 'Library', exact: true })
 						.getByRole('link', { name: 'Library', exact: true }),
 				).toHaveAttribute('aria-current', 'page')
+			if (path.includes('search?'))
+				await expect(page.getByRole('searchbox')).toHaveValue('Garden')
 			if (width < 768) {
 				await page.keyboard.press('Escape')
 				await expect(
 					page.getByRole('button', { name: 'Toggle Sidebar', exact: true }),
 				).toBeFocused()
 			}
-			if (path.includes('search?'))
-				await expect(page.getByRole('searchbox')).toHaveValue('Garden')
 		}
+		await openSidebar(page)
 		await appMenu(page).focus()
 		await page.keyboard.press('ArrowDown')
 		await expect(page.getByRole('menu')).toBeVisible()
@@ -68,15 +74,14 @@ for (const width of [320, 390, 1036, 1280])
 		await expect(appMenu(page)).toBeFocused()
 		await chooseLibrary(page, 'books')
 		await expect(page).toHaveURL(/\/new\/library\/books$/)
+		await openSidebar(page)
 		await expect(page.getByRole('searchbox')).toHaveValue('')
 		await page.getByRole('searchbox').fill('Glass')
 		await page.getByRole('button', { name: 'Search', exact: true }).click()
 		await expect(page).toHaveURL(/\/library\/books\/search\?q=Glass$/)
+		await openSidebar(page)
 		await expect(page.getByRole('searchbox')).toHaveValue('Glass')
 		if (width < 768) {
-			await page
-				.getByRole('button', { name: 'Toggle Sidebar', exact: true })
-				.click()
 			await page
 				.getByRole('navigation', { name: 'Library', exact: true })
 				.getByRole('link', { name: 'Home', exact: true })
@@ -111,6 +116,7 @@ for (const width of [320, 390, 1036, 1280])
 			})
 		})
 		await page.reload()
+		await openSidebar(page)
 		await expect(appMenu(page)).toBeVisible()
 		for (const theme of ['light', 'dark']) {
 			await chooseTheme(page, theme)
@@ -118,6 +124,7 @@ for (const width of [320, 390, 1036, 1280])
 			await expect(page.locator('html')).toHaveClass(
 				theme === 'dark' ? /dark/ : /^(?!.*dark)/,
 			)
+			await openSidebar(page)
 			await appMenu(page).click()
 			const colors = await page.getByRole('menu').evaluate((menu) => {
 				const root = getComputedStyle(document.documentElement)
@@ -130,6 +137,7 @@ for (const width of [320, 390, 1036, 1280])
 			})
 			expect(colors.actual).toBe(colors.expected)
 			await page.keyboard.press('Escape')
+			await closeSidebar(page)
 			if (width >= 768) {
 				const sidebarColors = await page
 					.locator('[data-slot="sidebar-inner"]')
