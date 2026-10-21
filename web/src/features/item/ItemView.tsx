@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { Check, Circle, Ellipsis, Play } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../api'
 import { duration } from '../../catalog'
@@ -10,6 +11,12 @@ import {
 } from '../../player'
 import { RichText } from '../../shared/components/RichText'
 import { Button } from '../../shared/components/ui/button'
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from '../../shared/components/ui/dropdown-menu'
 import { PodcastManagementSettings } from '../podcast'
 import { Reader, readerItemSchema } from '../reader'
 import { EpisodeEdit } from './EpisodeEdit'
@@ -39,6 +46,7 @@ export function ItemView({ id }: { id: string }) {
 	const [hardDeleteEpisode, setHardDeleteEpisode] = useState(false)
 	const episodeDrafts = useRef(new Map<string, Record<string, string>>())
 	const [page, setPage] = useState(0)
+	const [descriptionOpen, setDescriptionOpen] = useState(false)
 	const [expanded, setExpanded] = useState<Set<string>>(new Set())
 	const request = useRef(0)
 	const owner = useRef(user?.id)
@@ -61,6 +69,7 @@ export function ItemView({ id }: { id: string }) {
 		episodeDrafts.current.clear()
 		setPage(0)
 		setExpanded(new Set())
+		setDescriptionOpen(false)
 		setError('')
 		setWarning('')
 		setProgressUnavailable(!!userId)
@@ -198,19 +207,19 @@ export function ItemView({ id }: { id: string }) {
 				/>
 			)}
 
-			<header className="flex flex-col gap-5 sm:flex-row">
+			<header className="flex flex-col gap-6 sm:flex-row sm:gap-8">
 				{media.coverPath && (
 					<img
-						className="w-52 self-start rounded-md object-cover"
+						className="aspect-square w-60 max-w-full self-center rounded-xl object-cover shadow-sm sm:w-72 sm:self-start"
 						src={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(id)}/cover`}
 						alt={`${metadata.title ?? 'Item'} cover`}
 					/>
 				)}
-				<div className="min-w-0 space-y-2">
+				<div className="min-w-0 flex-1 space-y-3">
 					<p className="text-sm text-muted-foreground">
 						{item.mediaType === 'book' ? 'Audiobook' : 'Podcast'}
 					</p>
-					<h1 className="text-3xl font-semibold">
+					<h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
 						{metadata.title ?? 'Untitled'}
 					</h1>
 					{metadata.subtitle && <p className="text-xl">{metadata.subtitle}</p>}
@@ -229,25 +238,64 @@ export function ItemView({ id }: { id: string }) {
 							{s.sequence ? ` #${s.sequence}` : ''}
 						</p>
 					))}
-					{!!metadata.genres?.length && (
+					{(!!metadata.genres?.length || item.mediaType === 'podcast') && (
 						<p className="text-sm text-muted-foreground">
-							{metadata.genres.join(' · ')}
+							{[
+								...(metadata.genres ?? []),
+								...(item.mediaType === 'podcast'
+									? [`${episodes.length} episodes`]
+									: []),
+							].join(' · ')}
 						</p>
 					)}
 					{media.duration != null && <p>Duration {duration(media.duration)}</p>}
 					{item.mediaType === 'book' && !media.numAudioFiles && (
 						<p id="audio-unavailable">Audio unavailable</p>
 					)}
+					{metadata.description && (
+						<div>
+							<RichText
+								text={metadata.description}
+								className={
+									descriptionOpen
+										? 'text-sm'
+										: 'line-clamp-3 text-sm text-muted-foreground'
+								}
+							/>
+							<Button
+								variant="link"
+								className="h-auto px-0"
+								aria-expanded={descriptionOpen}
+								onClick={() => setDescriptionOpen(!descriptionOpen)}
+							>
+								{descriptionOpen ? 'Less' : 'More'}
+							</Button>
+						</div>
+					)}
 					<div className="flex flex-wrap gap-2">
+						{item.mediaType === 'podcast' && episodes.length > 0 && (
+							<Button
+								className="rounded-full px-6"
+								disabled={busy || !episodes[0]?.audioFile}
+								onClick={() => void play(episodes[0]?.id)}
+							>
+								<Play aria-hidden="true" className="size-4" />
+								Play latest episode
+							</Button>
+						)}
 						{item.mediaType === 'book' && (
 							<Button
+								className="rounded-full px-6"
 								disabled={busy || !media.numAudioFiles}
 								aria-describedby={
 									!media.numAudioFiles ? 'audio-unavailable' : undefined
 								}
 								onClick={() => void play()}
 							>
-								Play audiobook
+								<Play aria-hidden="true" className="size-4" />
+								{bookProgress?.currentTime && !progress
+									? 'Resume audiobook'
+									: 'Play audiobook'}
 							</Button>
 						)}
 						{item.mediaType === 'book' && (
@@ -273,6 +321,26 @@ export function ItemView({ id }: { id: string }) {
 							>
 								{progress ? 'Mark unfinished' : 'Mark finished'}
 							</Button>
+						)}
+						{item.mediaType === 'podcast' && admin && (
+							<PodcastManagementSettings key={`${user?.id}:${id}`} itemId={id}>
+								{(content) => (
+									<WorkflowSheet
+										title="Podcast settings"
+										description={metadata.title ?? 'Podcast'}
+									>
+										<Button
+											variant="outline"
+											disabled={busy}
+											onClick={() => void action(() => checkPodcastFeed(id))}
+										>
+											Check feed
+										</Button>
+										{error && <p role="alert">{error}</p>}
+										{content}
+									</WorkflowSheet>
+								)}
+							</PodcastManagementSettings>
 						)}
 					</div>
 				</div>
@@ -335,47 +403,6 @@ export function ItemView({ id }: { id: string }) {
 					{error}
 				</p>
 			)}
-			{item.mediaType === 'podcast' && admin && (
-				<PodcastManagementSettings key={`${user?.id}:${id}`} itemId={id}>
-					{(content) => (
-						<WorkflowSheet
-							title="Podcast settings"
-							description={metadata.title ?? 'Podcast'}
-						>
-							<Button
-								variant="outline"
-								disabled={busy}
-								onClick={() => void action(() => checkPodcastFeed(id))}
-							>
-								Check feed
-							</Button>
-							{error && <p role="alert">{error}</p>}
-							{content}
-						</WorkflowSheet>
-					)}
-				</PodcastManagementSettings>
-			)}
-			<dl className="grid grid-cols-2 gap-2 text-sm">
-				{[
-					['Published', metadata.publishedYear],
-					['Publisher', metadata.publisher],
-					['Language', metadata.language],
-					['ISBN', metadata.isbn],
-					['ASIN', metadata.asin],
-					['Size (bytes)', media.size],
-					['Path', item.path],
-				]
-					.filter(
-						([, value]) =>
-							typeof value === 'string' || typeof value === 'number',
-					)
-					.map(([label, value]) => (
-						<div key={String(label)}>
-							<dt className="font-medium">{String(label)}</dt>
-							<dd className="break-all">{String(value)}</dd>
-						</div>
-					))}
-			</dl>
 			{metadata.explicit === true && <p>Explicit content</p>}
 			{metadata.abridged === true && <p>Abridged</p>}
 			{item.isMissing && <p role="alert">Item files missing</p>}
@@ -385,12 +412,6 @@ export function ItemView({ id }: { id: string }) {
 					Progress {Math.round((bookProgress.progress || 0) * 100)}% ·{' '}
 					{duration(bookProgress.currentTime || 0)} listened
 				</p>
-			)}
-			{metadata.description && (
-				<section>
-					<h2 className="text-xl font-semibold">Description</h2>
-					<RichText text={metadata.description} />
-				</section>
 			)}
 			{item.mediaType === 'podcast' && (
 				<section className="space-y-3">
@@ -406,20 +427,26 @@ export function ItemView({ id }: { id: string }) {
 									<li key={ep.id} className="min-w-0 space-y-2 border-b py-3">
 										<div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
 											<div className="min-w-0 flex-1">
-												<h3 className="font-medium">
+												{ep.publishedAt ? (
+													<p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+														{new Date(ep.publishedAt)
+															.toISOString()
+															.slice(0, 10)}
+													</p>
+												) : null}
+												<h3 className="font-semibold">
 													{ep.title ?? 'Untitled episode'}
 												</h3>
-												<p className="text-sm text-muted-foreground">
-													{ep.duration != null
-														? duration(ep.duration)
-														: ep.audioFile?.duration != null
-															? duration(ep.audioFile.duration)
-															: 'Audio unavailable'}
-													{ep.publishedAt
-														? ` · ${new Date(ep.publishedAt).toISOString().slice(0, 10)}`
-														: ''}
-												</p>
-												<p className="text-sm">
+
+												<p className="flex items-center gap-1 text-xs text-muted-foreground">
+													{progress?.isFinished ? (
+														<Check aria-hidden="true" className="size-3" />
+													) : (
+														<Circle
+															aria-hidden="true"
+															className="size-2 fill-current"
+														/>
+													)}
 													{progress?.isFinished
 														? 'Finished'
 														: progress?.currentTime || progress?.progress
@@ -433,27 +460,54 @@ export function ItemView({ id }: { id: string }) {
 											</div>
 											<div className="flex flex-wrap gap-2">
 												<Button
+													className="rounded-full"
+													aria-label={`Play ${ep.title ?? 'episode'}`}
 													disabled={busy || !ep.audioFile}
 													onClick={() => void play(ep.id)}
 												>
-													Play
+													<Play aria-hidden="true" className="size-3" />
+													{Math.ceil(
+														Math.max(
+															0,
+															(ep.duration ?? ep.audioFile?.duration ?? 0) -
+																(!progress?.isFinished
+																	? (progress?.currentTime ?? 0)
+																	: 0),
+														) / 60,
+													)}{' '}
+													min
+													{!progress?.isFinished && progress?.currentTime
+														? ' left'
+														: ''}
 												</Button>
-												<Button
-													variant="outline"
-													disabled={episodeBusy !== null}
-													onClick={() =>
-														void (progress?.isFinished &&
-														(progress.currentTime || 0) > 0
-															? window.confirm(
-																	'Mark unfinished? This resets the saved listening position to the beginning.',
-																) && finishEpisode(ep.id, false)
-															: finishEpisode(ep.id, !progress?.isFinished))
-													}
-												>
-													{progress?.isFinished
-														? 'Mark unfinished'
-														: 'Mark finished'}
-												</Button>
+												<DropdownMenu>
+													<DropdownMenuTrigger asChild>
+														<Button
+															variant="ghost"
+															size="icon"
+															aria-label={`More actions for ${ep.title ?? 'episode'}`}
+														>
+															<Ellipsis aria-hidden="true" />
+														</Button>
+													</DropdownMenuTrigger>
+													<DropdownMenuContent align="end">
+														<DropdownMenuItem
+															disabled={episodeBusy !== null}
+															onSelect={() =>
+																void (progress?.isFinished &&
+																(progress.currentTime || 0) > 0
+																	? window.confirm(
+																			'Mark unfinished? This resets the saved listening position to the beginning.',
+																		) && finishEpisode(ep.id, false)
+																	: finishEpisode(ep.id, !progress?.isFinished))
+															}
+														>
+															{progress?.isFinished
+																? 'Mark unfinished'
+																: 'Mark finished'}
+														</DropdownMenuItem>
+													</DropdownMenuContent>
+												</DropdownMenu>
 												<WorkflowSheet
 													title="Episode controls"
 													description={ep.title ?? 'Untitled episode'}
@@ -567,9 +621,14 @@ export function ItemView({ id }: { id: string }) {
 												>
 													{expanded.has(ep.id) ? 'Read less' : 'Read more'}
 												</Button>
-												{expanded.has(ep.id) && (
-													<RichText text={ep.description} className="text-sm" />
-												)}
+												<RichText
+													text={ep.description}
+													className={
+														expanded.has(ep.id)
+															? 'text-sm'
+															: 'line-clamp-2 text-sm text-muted-foreground'
+													}
+												/>
 											</div>
 										)}
 									</li>
@@ -626,6 +685,35 @@ export function ItemView({ id }: { id: string }) {
 					</ol>
 				</section>
 			)}
+			<section className="space-y-3 border-t pt-5">
+				<h2 className="text-xl font-semibold">Information</h2>
+				<dl className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
+					{[
+						['Published', metadata.publishedYear],
+						['Publisher', metadata.publisher],
+						['Language', metadata.language],
+						['ISBN', metadata.isbn],
+						['ASIN', metadata.asin],
+						[
+							'Size',
+							media.size == null
+								? undefined
+								: `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(media.size / (media.size >= 1e9 ? 1e9 : 1e6))} ${media.size >= 1e9 ? 'GB' : 'MB'}`,
+						],
+						['Path', item.path],
+					]
+						.filter(
+							([, value]) =>
+								typeof value === 'string' || typeof value === 'number',
+						)
+						.map(([label, value]) => (
+							<div key={String(label)}>
+								<dt className="font-medium">{String(label)}</dt>
+								<dd className="break-all">{String(value)}</dd>
+							</div>
+						))}
+				</dl>
+			</section>
 			<ItemActions item={item} onChanged={() => void action(async () => {})} />
 		</article>
 	)
