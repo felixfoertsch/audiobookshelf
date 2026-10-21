@@ -1,4 +1,5 @@
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
+import { ChevronRight } from 'lucide-react'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, getAuthGeneration, useAuth } from '../../api'
@@ -166,10 +167,11 @@ export const LibraryNameContext = createContext('')
 function CatalogHeading({ title }: { title: string }) {
 	const libraryName = useContext(LibraryNameContext)
 	return (
-		<header>
-			<h1 className="text-3xl font-semibold">
-				{libraryName ? `${libraryName} · ${title}` : title}
-			</h1>
+		<header className="space-y-1">
+			{libraryName && (
+				<p className="text-sm text-muted-foreground">{libraryName}</p>
+			)}
+			<h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
 		</header>
 	)
 }
@@ -472,7 +474,7 @@ export function EntryCard({
 		entity?.title ||
 		'Untitled'
 	return (
-		<article className="min-w-0 space-y-1.5 rounded-lg p-2 text-sm [&_p]:text-muted-foreground [overflow-wrap:anywhere]">
+		<article className="min-w-0 space-y-1 text-sm [&_p]:text-muted-foreground [overflow-wrap:anywhere]">
 			{select && (
 				<label className="flex gap-2">
 					<input
@@ -495,75 +497,79 @@ export function EntryCard({
 					<Link
 						to="/item/$id"
 						params={{ id: item.id }}
-						className="block text-primary"
+						className="block space-y-2 rounded-md focus-visible:outline-2 focus-visible:outline-ring"
 					>
 						{view !== 'list' && item.media.coverPath && (
 							<img
-								className="aspect-square w-full rounded-md bg-muted object-contain"
+								className="aspect-square w-full rounded-lg bg-muted object-cover"
 								loading="lazy"
 								alt=""
 								src={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(item.id)}/cover?token=${encodeURIComponent(localStorage.getItem('token') || '')}`}
 							/>
 						)}
-						<Heading className="font-semibold text-foreground">
+						<Heading className="line-clamp-2 text-sm font-medium text-foreground">
 							{episode?.title || name}
 						</Heading>
 					</Link>
-					{episode && <p>{name}</p>}
-					<p>
-						{item.media.metadata.author ||
-							item.media.metadata.authorName ||
-							item.media.metadata.authors?.map((a) => a.name).join(', ')}
+					<p className="truncate">
+						{episode
+							? name
+							: item.media.metadata.author ||
+								item.media.metadata.authorName ||
+								item.media.metadata.authors?.map((a) => a.name).join(', ')}
 					</p>
-					{item.mediaType === 'podcast'
-						? item.media.numEpisodes != null && (
-								<p>
-									{item.media.numEpisodes}{' '}
-									{item.media.numEpisodes === 1 ? 'episode' : 'episodes'}
-								</p>
+					{episode
+						? recentDuration != null && (
+								<p className="truncate text-xs">{duration(recentDuration)}</p>
 							)
-						: item.media.duration != null && (
-								<p>{duration(item.media.duration)}</p>
-							)}
-					{recent?.success &&
-						((!episode && recent.data.title) || recentDuration != null) && (
-							<p>
-								{!episode && recent.data.title}
-								{!episode && recent.data.title && recentDuration != null
-									? ' · '
-									: ''}
-								{recentDuration != null && duration(recentDuration)}
-							</p>
-						)}
+						: item.mediaType === 'podcast'
+							? item.media.numEpisodes != null && (
+									<p className="truncate text-xs">
+										{item.media.numEpisodes.toLocaleString()}{' '}
+										{item.media.numEpisodes === 1 ? 'episode' : 'episodes'}
+									</p>
+								)
+							: item.media.duration != null && (
+									<p className="truncate text-xs">
+										{duration(item.media.duration)}
+									</p>
+								)}
 
 					{item.isMissing && <p role="status">Missing media files</p>}
 					{item.isInvalid && <p role="status">Invalid media files</p>}
-					{item.numEpisodesIncomplete != null && (
-						<p>
-							{item.numEpisodesIncomplete} unfinished{' '}
-							{item.numEpisodesIncomplete === 1 ? 'episode' : 'episodes'}
-						</p>
-					)}
-					{item.rssFeed && (
-						<p>
-							RSS feed open
-							{item.rssFeed.feedUrl && (
-								<>
-									{' '}
-									·{' '}
-									<a
-										className="underline"
-										href={item.rssFeed.feedUrl}
-										target="_blank"
-										rel="noreferrer"
-									>
-										Feed
-									</a>
-								</>
+					{(item.numEpisodesIncomplete != null ||
+						item.rssFeed ||
+						item.mediaItemShare) && (
+						<details className="text-xs text-muted-foreground">
+							<summary className="cursor-pointer">Details</summary>
+							{item.numEpisodesIncomplete != null && (
+								<p>
+									{item.numEpisodesIncomplete} unfinished{' '}
+									{item.numEpisodesIncomplete === 1 ? 'episode' : 'episodes'}
+								</p>
 							)}
-						</p>
+							{item.rssFeed && (
+								<p>
+									RSS feed open
+									{item.rssFeed.feedUrl && (
+										<>
+											{' '}
+											·{' '}
+											<a
+												className="underline"
+												href={item.rssFeed.feedUrl}
+												target="_blank"
+												rel="noreferrer"
+											>
+												Feed
+											</a>
+										</>
+									)}
+								</p>
+							)}
+							{item.mediaItemShare && <p>Public share active</p>}
+						</details>
 					)}
-					{item.mediaItemShare && <p>Public share active</p>}
 
 					{view === 'detail' && (
 						<>
@@ -575,7 +581,7 @@ export function EntryCard({
 				</>
 			) : (
 				<>
-					<Heading className="font-semibold">
+					<Heading className="line-clamp-2 text-sm font-medium">
 						<EntityLink entry={entry} library={library}>
 							{name}
 						</EntityLink>
@@ -585,7 +591,9 @@ export function EntryCard({
 							{entity.numBooks} {entity.numBooks === 1 ? 'book' : 'books'}
 						</p>
 					)}
-					<p>{entity?.description}</p>
+					<p className={view === 'detail' ? undefined : 'line-clamp-1'}>
+						{entity?.description}
+					</p>
 				</>
 			)}
 		</article>
@@ -638,7 +646,7 @@ export function HomePage({
 		localStorage.setItem('currentLibraryId', library)
 	}, [library])
 	return (
-		<section className="space-y-6">
+		<section className="min-w-0 space-y-8">
 			<CatalogHeading title="Home" />
 
 			{!data.length && (
@@ -646,8 +654,53 @@ export function HomePage({
 			)}
 			{data.map((shelf) => (
 				<section key={shelf.id} className="space-y-3">
-					<h2 className="text-2xl font-semibold">{shelf.label}</h2>
-					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+					<h2 className="text-xl font-semibold">
+						{shelf.id === 'newest-episodes' ? (
+							<Link
+								className="inline-flex items-center gap-1"
+								to="/library/$library/podcast/latest"
+								params={{ library }}
+							>
+								{shelf.label}
+								<ChevronRight
+									aria-hidden="true"
+									className="size-4 text-muted-foreground"
+								/>
+							</Link>
+						) : shelf.id === 'recently-added' ? (
+							<Link
+								className="inline-flex items-center gap-1"
+								to="/library/$library/bookshelf"
+								params={{ library }}
+								search={{ sort: 'addedAt', desc: '1' }}
+							>
+								{shelf.label}
+								<ChevronRight
+									aria-hidden="true"
+									className="size-4 text-muted-foreground"
+								/>
+							</Link>
+						) : ['recent-series', 'newest-authors'].includes(shelf.id) ? (
+							<Link
+								className="inline-flex items-center gap-1"
+								to="/library/$library/bookshelf/$id"
+								params={{
+									library,
+									id: shelf.id === 'recent-series' ? 'series' : 'authors',
+								}}
+								search={{ sort: 'addedAt', desc: '1' }}
+							>
+								{shelf.label}
+								<ChevronRight
+									aria-hidden="true"
+									className="size-4 text-muted-foreground"
+								/>
+							</Link>
+						) : (
+							shelf.label
+						)}
+					</h2>
+					<div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [&>article]:w-[140px] [&>article]:shrink-0 [&>article]:snap-start sm:[&>article]:w-[160px]">
 						{shelf.entities.map((entry) => (
 							<EntryCard
 								key={entry.id}
@@ -1024,7 +1077,7 @@ export function BrowsePage({
 			<CatalogHeading title={section ? humanLabel(section) : 'Library'} />
 			{progressStatus && <p role="status">{progressStatus}</p>}
 
-			<div className="flex flex-wrap gap-4">
+			<div className="flex flex-wrap items-end gap-2 text-xs text-muted-foreground [&_label]:min-w-0 [&_label]:space-y-1 [&_select]:h-8 [&_select]:max-w-44 [&_select]:text-xs">
 				{sorts.length > 0 && (
 					<>
 						{' '}
@@ -1222,6 +1275,198 @@ export function BrowsePage({
 						)}{' '}
 					</>
 				)}
+				{!section && (
+					<div className="flex flex-wrap items-center gap-2">
+						{!selectMode ? (
+							<Button variant="outline" onClick={() => setSelectMode(true)}>
+								Select
+							</Button>
+						) : (
+							<>
+								<Button
+									variant="outline"
+									onClick={() => {
+										progressCancel.current?.()
+										setActionsOpen(false)
+										setSelectMode(false)
+										setSelected([])
+									}}
+								>
+									Done
+								</Button>
+								<Button
+									variant="outline"
+									onClick={() =>
+										setSelected(
+											data.results
+												.filter((entry) => 'media' in entry)
+												.map((entry) => entry.id),
+										)
+									}
+								>
+									Select page
+								</Button>
+								<Button variant="outline" onClick={() => setSelected([])}>
+									Clear selection ({selected.length})
+								</Button>
+								<span role="status" aria-live="polite">
+									{selected.length} selected
+								</span>
+							</>
+						)}
+						{selectMode && selected.length > 0 && (
+							<WorkflowSheet
+								title="More actions"
+								description={`${selected.length} selected items`}
+								open={actionsOpen}
+								onOpenChange={setActionsOpen}
+							>
+								<div className="space-y-3">
+									<Button
+										disabled={pending}
+										onClick={() => void runProgress(true)}
+									>
+										{podcast ? 'Mark all episodes finished' : 'Mark finished'}
+									</Button>
+									<Button
+										disabled={pending}
+										onClick={() => void runProgress(false)}
+									>
+										{podcast
+											? 'Mark all episodes unfinished'
+											: 'Mark unfinished'}
+									</Button>
+									{pending && (
+										<Button
+											variant="outline"
+											onClick={() => progressCancel.current?.()}
+										>
+											Cancel
+										</Button>
+									)}
+
+									{!podcast && (
+										<Button
+											disabled={pending}
+											onClick={() =>
+												void run(() =>
+													playQueue(
+														selected.map((libraryItemId) => ({
+															libraryItemId,
+														})),
+													),
+												)
+											}
+										>
+											Play selected
+										</Button>
+									)}
+									{allowed && (
+										<Link to="/batch" search={{ ids: selected.join(',') }}>
+											Batch edit
+										</Link>
+									)}
+									<SelectionTools
+										library={library}
+										ids={selected}
+										podcast={podcast}
+										pending={pending}
+										run={run}
+									/>
+								</div>
+
+								{admin &&
+									['scan'].map((action) => (
+										<Button
+											key={action}
+											disabled={pending}
+											onClick={() => {
+												if (
+													window.confirm(
+														`${action === 'scan' ? 'Rescan' : 'Quick match'} ${selected.length} selected items?`,
+													)
+												)
+													void run(() =>
+														api(`/api/items/batch/${action}`, z.unknown(), {
+															method: 'POST',
+															body: JSON.stringify({
+																libraryItemIds: selected,
+															}),
+														}),
+													)
+											}}
+										>
+											{action === 'scan' ? 'Rescan' : 'Quick match'}
+										</Button>
+									))}
+								{admin && !podcast && (
+									<Button
+										disabled={pending}
+										onClick={() => {
+											if (
+												window.confirm(
+													'Embed metadata in selected audio files? This changes media files.',
+												)
+											)
+												void run(() =>
+													api('/api/tools/batch/embed-metadata', z.unknown(), {
+														method: 'POST',
+														body: JSON.stringify({ libraryItemIds: selected }),
+													}),
+												)
+										}}
+									>
+										Embed metadata
+									</Button>
+								)}
+								{allowed && !podcast && (
+									<form
+										className="flex gap-2"
+										onSubmit={(event) => {
+											event.preventDefault()
+											const id = new FormData(event.currentTarget).get(
+												'collection',
+											)
+											if (typeof id === 'string' && id)
+												void run(() =>
+													api(
+														`/api/collections/${encodeURIComponent(id)}/batch/add`,
+														z.unknown(),
+														{
+															method: 'POST',
+															body: JSON.stringify({ books: selected }),
+														},
+													),
+												)
+										}}
+									>
+										<label htmlFor="catalog-collection">
+											Collection
+											<NativeSelect
+												id="catalog-collection"
+												name="collection"
+												required
+												className="block"
+											>
+												<option value="">Choose collection</option>
+												{collections.map((entry) => (
+													<option key={entry.id} value={entry.id}>
+														{typeof entry.name === 'string'
+															? entry.name
+															: entry.id}
+													</option>
+												))}
+											</NativeSelect>
+										</label>
+										<Button type="submit" disabled={pending}>
+											Add selected to collection
+										</Button>
+									</form>
+								)}
+							</WorkflowSheet>
+						)}
+					</div>
+				)}
 			</div>
 			{['collections', 'playlists'].includes(section) && (
 				<form
@@ -1291,202 +1536,13 @@ export function BrowsePage({
 					Remove all items with issues
 				</Button>
 			)}
-			{!section && (
-				<div className="flex flex-wrap items-center gap-2">
-					{!selectMode ? (
-						<Button variant="outline" onClick={() => setSelectMode(true)}>
-							Select
-						</Button>
-					) : (
-						<>
-							<Button
-								variant="outline"
-								onClick={() => {
-									progressCancel.current?.()
-									setActionsOpen(false)
-									setSelectMode(false)
-									setSelected([])
-								}}
-							>
-								Done
-							</Button>
-							<Button
-								variant="outline"
-								onClick={() =>
-									setSelected(
-										data.results
-											.filter((entry) => 'media' in entry)
-											.map((entry) => entry.id),
-									)
-								}
-							>
-								Select page
-							</Button>
-							<Button variant="outline" onClick={() => setSelected([])}>
-								Clear selection ({selected.length})
-							</Button>
-							<span role="status" aria-live="polite">
-								{selected.length} selected
-							</span>
-						</>
-					)}
-					{selectMode && selected.length > 0 && (
-						<WorkflowSheet
-							title="More actions"
-							description={`${selected.length} selected items`}
-							open={actionsOpen}
-							onOpenChange={setActionsOpen}
-						>
-							<div className="space-y-3">
-								<Button
-									disabled={pending}
-									onClick={() => void runProgress(true)}
-								>
-									{podcast ? 'Mark all episodes finished' : 'Mark finished'}
-								</Button>
-								<Button
-									disabled={pending}
-									onClick={() => void runProgress(false)}
-								>
-									{podcast ? 'Mark all episodes unfinished' : 'Mark unfinished'}
-								</Button>
-								{pending && (
-									<Button
-										variant="outline"
-										onClick={() => progressCancel.current?.()}
-									>
-										Cancel
-									</Button>
-								)}
 
-								{!podcast && (
-									<Button
-										disabled={pending}
-										onClick={() =>
-											void run(() =>
-												playQueue(
-													selected.map((libraryItemId) => ({
-														libraryItemId,
-													})),
-												),
-											)
-										}
-									>
-										Play selected
-									</Button>
-								)}
-								{allowed && (
-									<Link to="/batch" search={{ ids: selected.join(',') }}>
-										Batch edit
-									</Link>
-								)}
-								<SelectionTools
-									library={library}
-									ids={selected}
-									podcast={podcast}
-									pending={pending}
-									run={run}
-								/>
-							</div>
-
-							{admin &&
-								['scan'].map((action) => (
-									<Button
-										key={action}
-										disabled={pending}
-										onClick={() => {
-											if (
-												window.confirm(
-													`${action === 'scan' ? 'Rescan' : 'Quick match'} ${selected.length} selected items?`,
-												)
-											)
-												void run(() =>
-													api(`/api/items/batch/${action}`, z.unknown(), {
-														method: 'POST',
-														body: JSON.stringify({
-															libraryItemIds: selected,
-														}),
-													}),
-												)
-										}}
-									>
-										{action === 'scan' ? 'Rescan' : 'Quick match'}
-									</Button>
-								))}
-							{admin && !podcast && (
-								<Button
-									disabled={pending}
-									onClick={() => {
-										if (
-											window.confirm(
-												'Embed metadata in selected audio files? This changes media files.',
-											)
-										)
-											void run(() =>
-												api('/api/tools/batch/embed-metadata', z.unknown(), {
-													method: 'POST',
-													body: JSON.stringify({ libraryItemIds: selected }),
-												}),
-											)
-									}}
-								>
-									Embed metadata
-								</Button>
-							)}
-							{allowed && !podcast && (
-								<form
-									className="flex gap-2"
-									onSubmit={(event) => {
-										event.preventDefault()
-										const id = new FormData(event.currentTarget).get(
-											'collection',
-										)
-										if (typeof id === 'string' && id)
-											void run(() =>
-												api(
-													`/api/collections/${encodeURIComponent(id)}/batch/add`,
-													z.unknown(),
-													{
-														method: 'POST',
-														body: JSON.stringify({ books: selected }),
-													},
-												),
-											)
-									}}
-								>
-									<label htmlFor="catalog-collection">
-										Collection
-										<NativeSelect
-											id="catalog-collection"
-											name="collection"
-											required
-											className="block"
-										>
-											<option value="">Choose collection</option>
-											{collections.map((entry) => (
-												<option key={entry.id} value={entry.id}>
-													{typeof entry.name === 'string'
-														? entry.name
-														: entry.id}
-												</option>
-											))}
-										</NativeSelect>
-									</label>
-									<Button type="submit" disabled={pending}>
-										Add selected to collection
-									</Button>
-								</form>
-							)}
-						</WorkflowSheet>
-					)}
-				</div>
-			)}
 			<div
 				className={search.view === 'grid' ? 'grid gap-4' : 'space-y-3'}
 				style={
 					search.view === 'grid'
 						? {
-								gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${coverSize.size * 1.7}px), 1fr))`,
+								gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${coverSize.size}px), 1fr))`,
 							}
 						: undefined
 				}
@@ -1582,13 +1638,14 @@ export function SearchPage({
 	)
 	return (
 		<section className="space-y-5">
-			<CatalogHeading title={`Search results for “${q}”`} />
+			<CatalogHeading title="Search" />
+			<p className="text-sm text-muted-foreground">Results for “{q}”</p>
 			{count === 0 && <p>No search results.</p>}
 
 			{(['book', 'podcast'] as const).map((type) => (
 				<section key={type}>
 					<h2 className="text-xl">{type === 'book' ? 'Books' : 'Podcasts'}</h2>
-					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+					<div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,140px),1fr))] gap-4 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]">
 						{data[type]?.map((match) => (
 							<EntryCard
 								key={match.libraryItem.id}
@@ -1604,9 +1661,16 @@ export function SearchPage({
 				<h2 className="text-xl">Episodes</h2>
 				{data.episodes?.map((match) => (
 					<div key={`${match.libraryItem.id}-${match.episode?.id ?? ''}`}>
-						<Link to="/item/$id" params={{ id: match.libraryItem.id }}>
-							{match.episode?.title || match.libraryItem.media.metadata.title}
-						</Link>
+						<EntryCard
+							library={library}
+							headingLevel={3}
+							view="list"
+							entry={{
+								...match.libraryItem,
+								_type: 'episode',
+								recentEpisode: match.episode,
+							}}
+						/>
 						{match.episode && (
 							<Button
 								onClick={() =>
@@ -1695,7 +1759,7 @@ export function NarratorsPage({
 	}
 	return (
 		<section className="space-y-5">
-			<h1 className="text-3xl">Narrators</h1>
+			<CatalogHeading title="Narrators" />
 			{error && <p role="alert">{error}</p>}
 			<table className="w-full">
 				<thead>
@@ -1787,7 +1851,7 @@ export function StatsPage({
 }) {
 	return (
 		<section className="space-y-6">
-			<h1 className="text-3xl">Library statistics</h1>
+			<CatalogHeading title="Library statistics" />
 			<dl className="grid grid-cols-2 gap-3">
 				{[
 					['Items', data.totalItems],
@@ -1929,7 +1993,7 @@ export function SeriesPage({
 	}
 	return (
 		<section className="space-y-5">
-			<h1 className="text-3xl">{data.name}</h1>
+			<CatalogHeading title={data.name || 'Series'} />
 			<p>{data.description}</p>
 			<p>
 				{data.progress?.libraryItemIdsFinished.length ?? 0} /{' '}
@@ -2010,7 +2074,7 @@ export function SeriesPage({
 					Mark series unfinished
 				</Button>
 			</div>
-			<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+			<div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,140px),1fr))] gap-4 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]">
 				{(data.books || data.libraryItems || []).map((item) => (
 					<EntryCard key={item.id} library={library} entry={item} />
 				))}

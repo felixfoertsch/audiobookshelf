@@ -109,8 +109,8 @@ it.each(['home', 'bookshelf', 'search', 'error'])(
 			screen.getAllByRole('searchbox', { name: 'Search library' }),
 		).toHaveLength(1)
 		if (view !== 'error')
-			expect(screen.getByRole('heading', { level: 1 }).textContent).toContain(
-				'Books · ',
+			expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(
+				view === 'home' ? 'Home' : view === 'search' ? 'Search' : 'Library',
 			)
 		expect(screen.getByText('Discover')).toBeTruthy()
 		expect(screen.getByText('Administration')).toBeTruthy()

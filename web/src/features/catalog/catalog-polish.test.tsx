@@ -15,7 +15,13 @@ import {
 import { afterEach, expect, it } from 'vitest'
 import { useAuth } from '../../api'
 import { SidebarProvider } from '../../shared/components/ui/sidebar'
-import { BrowsePage, EntryCard, HomePage, LibraryNav } from './browse'
+import {
+	BrowsePage,
+	EntryCard,
+	HomePage,
+	LibraryNameContext,
+	LibraryNav,
+} from './browse'
 import { browseSearch, entrySchema } from './browse-api'
 
 afterEach(cleanup)
@@ -75,6 +81,50 @@ it('preserves recent audioFile duration through serializer schema and prioritize
 	expect(screen.getByText('Show title')).toBeTruthy()
 	expect(screen.getByText('00:02:03')).toBeTruthy()
 	expect(screen.queryByText('00:00:00')).toBeNull()
+})
+it('separates library context from page title and links episode shelf to latest', async () => {
+	await show(
+		<LibraryNameContext value="Podcasts">
+			<HomePage
+				library="lib"
+				podcast
+				data={[
+					{
+						id: 'newest-episodes',
+						label: 'Newest Episodes',
+						type: 'episode',
+						entities: [],
+					},
+				]}
+			/>
+		</LibraryNameContext>,
+	)
+	expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Home')
+	expect(screen.getByText('Podcasts')).toBeTruthy()
+	expect(
+		screen.getByRole('link', { name: 'Newest Episodes' }).getAttribute('href'),
+	).toBe('/library/lib/podcast/latest')
+})
+it('keeps episode cards to show identity and one duration line', async () => {
+	await show(
+		<EntryCard
+			library="lib"
+			entry={{
+				...podcast(489),
+				_type: 'episode',
+				media: {
+					...podcast(489).media,
+					metadata: { title: 'Show title', author: 'Show author' },
+				},
+				recentEpisode: { id: 'ep', title: 'Episode title', duration: 123 },
+			}}
+		/>,
+	)
+	expect(screen.getByRole('heading', { name: 'Episode title' })).toBeTruthy()
+	expect(screen.getByText('Show title')).toBeTruthy()
+	expect(screen.getByText('00:02:03')).toBeTruthy()
+	expect(screen.queryByText('Show author')).toBeNull()
+	expect(screen.queryByText('489 episodes')).toBeNull()
 })
 it('omits unknown recent duration', async () => {
 	await show(
