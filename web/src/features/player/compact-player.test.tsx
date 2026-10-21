@@ -139,7 +139,9 @@ test('replacement restores native volume before metadata event delivery', () => 
 	if (!session) throw new Error('Missing test session')
 	act(() => usePlayer.getState().set(null))
 	act(() => usePlayer.getState().set({ ...session, id: 'replacement' }))
-	const replacement = screen.getByLabelText('Audio playback') as HTMLAudioElement
+	const replacement = screen.getByLabelText(
+		'Audio playback',
+	) as HTMLAudioElement
 	// readyState and defaultPlaybackRate can change before queued loadedmetadata.
 	expect(replacement.src).toContain('/audio.wav')
 	expect(replacement.volume).toBe(0.4)

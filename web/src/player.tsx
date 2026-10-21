@@ -723,8 +723,6 @@ export function Player() {
 		const ready = () => {
 			if (remote || !active || initialized) return
 			element.currentTime = pendingSeek
-			element.volume = localVolume.current.volume
-			element.muted = localVolume.current.muted
 			element.defaultPlaybackRate = readPlayerSettings().playbackRate || rate
 			element.playbackRate = element.defaultPlaybackRate
 			initialized = true
@@ -769,6 +767,9 @@ export function Player() {
 		setOptIn(true)
 		let engine: Hls | undefined
 		const loadSource = (nextUrl: URL) => {
+			// Restore before loading: readyState can advance before loadedmetadata fires.
+			element.volume = localVolume.current.volume
+			element.muted = localVolume.current.muted
 			sourceReady.current = false
 			element.defaultPlaybackRate = readPlayerSettings().playbackRate || rate
 			engine?.destroy()
