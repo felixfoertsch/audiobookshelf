@@ -929,9 +929,9 @@ export function Player() {
 	return (
 		<section
 			aria-label="Audio player"
-			className="fixed inset-x-0 bottom-0 z-20 border-t bg-card px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg"
+			className="fixed inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-3xl rounded-2xl border bg-card/80 px-3 py-2 shadow-xl backdrop-blur-xl sm:rounded-full md:left-[calc(var(--sidebar-width,0px)+0.5rem)]"
 		>
-			<div className="mx-auto max-w-6xl space-y-1">
+			<div className="space-y-1 break-words">
 				{streamMessage && <p role="status">{streamMessage}</p>}
 				{error && (
 					<p role="alert" className="text-destructive">

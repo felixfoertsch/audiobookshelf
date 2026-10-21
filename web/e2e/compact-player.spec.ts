@@ -54,11 +54,24 @@ for (const prefix of ['', '/abs']) {
 				const size = await player.evaluate((node) => ({
 					height: node.getBoundingClientRect().height,
 					width: node.getBoundingClientRect().width,
+					left: node.getBoundingClientRect().left,
+					right: node.getBoundingClientRect().right,
+					bottom: node.getBoundingClientRect().bottom,
+					radius: Number.parseFloat(getComputedStyle(node).borderRadius),
+					blur: getComputedStyle(node).backdropFilter,
 					scrollWidth: node.scrollWidth,
+					documentWidth: document.documentElement.scrollWidth,
 				}))
 				measurements.push({ theme, viewport: width, ...size })
 				expect(size.height).toBeLessThanOrEqual(width < 640 ? 100 : 80)
-				expect(size.scrollWidth).toBeLessThanOrEqual(width)
+				expect(size.width).toBeLessThanOrEqual(768)
+				expect(size.left).toBeGreaterThanOrEqual(8)
+				expect(size.right).toBeLessThanOrEqual(width - 8)
+				expect(size.bottom).toBeLessThanOrEqual(892)
+				expect(size.radius).toBeGreaterThanOrEqual(16)
+				expect(size.blur).not.toBe('none')
+				expect(size.scrollWidth).toBeLessThanOrEqual(size.width)
+				expect(size.documentWidth).toBeLessThanOrEqual(width)
 				await page.screenshot({
 					path: testInfo.outputPath(`${theme}-${width}.png`),
 				})
