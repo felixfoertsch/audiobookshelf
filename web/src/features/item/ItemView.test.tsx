@@ -201,7 +201,10 @@ it('aligns audiobook tool links with update and admin capabilities', async () =>
 	expect(screen.queryByRole('link', { name: 'Edit chapters' })).toBeNull()
 })
 
-it('shows episode status and discloses server reset before marking unfinished', async () => {
+// Real Sheet trees exceeded 5 s in Docker CI; keep this integration check bounded at 10 s.
+it('shows episode status and discloses server reset before marking unfinished', {
+	timeout: 10_000,
+}, async () => {
 	const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
 	mocks.updateProgress.mockResolvedValue({})
 	const view = render(<ItemView id="show" />)
