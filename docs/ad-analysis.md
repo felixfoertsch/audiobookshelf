@@ -32,6 +32,8 @@ This authorizes public podcast title/author searches at Apple and gpodder.net, u
 
 Successful new downloads enqueue automatically. Retry an existing episode with `POST /api/podcasts/:id/episode/:episodeId/ad-analysis`, JSON `{}`. Response 202 means queued; 409 means disabled, duplicate, or queue full. Queue holds at most 32 jobs, concurrency one. Jobs are not durable; interrupted `running` results require explicit retry.
 
+New durable attempts include ISO UTC `startedAt` and terminal `completedAt`; queued/running API overlays do not overwrite an older stored attempt. Failed results and catalog attempts include `diagnostic: { stage, reason }`: stages identify source/corpus/metadata/comparison, native version/decode/fingerprint, or catalog search/feed/audio; reasons use a fixed allowlist with `unexpected_error` fallback. Existing status/reason meanings and limits stay unchanged. Pre-save rejected jobs emit a sanitized lifecycle warning (item/episode IDs, `attempt` stage, `rejected` outcome, bounded reason); an invalidated initial load emits informational `not_started`, and cancellation is not logged as failure. Diagnostics retain no URLs, paths, public metadata, command arguments, native output, or arbitrary exception fields. Older results without timestamps remain readable; an overlay disappearing does not prove reexecution.
+
 ### Modern episode status
 
 Modern podcast detail and Latest episodes show one analysis icon when the show opts in; disabled shows show none. Classic Vue episode rows remain unchanged. Labels/tooltips use localization-ready English fallbacks and accessible names. Candidate tooltip lists original-timeline break ranges; green never means verified ad-free.

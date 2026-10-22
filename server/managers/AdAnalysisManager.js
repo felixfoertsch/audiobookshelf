@@ -12,6 +12,10 @@ const { parsePodcastRssFeedXml } = require('../utils/podcastUtils')
 const { normalize, matchesEpisode, PERIOD, DELAY } = require('../utils/daiAlignment')
 const { Worker } = require('worker_threads')
 const run = promisify(execFile)
+const Logger = require('../Logger')
+const diagnosticReasons = new Set(['cancelled', 'unsupported_runtime', 'duration_limit', 'audio_size_limit', 'duration_or_decode_mismatch', 'incomplete_fingerprint', 'invalid_fingerprint', 'http_error', 'response_too_large', 'request_timeout', 'redirect_limit', 'unsafe_url', 'request_failed_or_blocked', 'proxy_failed_or_blocked', 'invalid_analysis_proxy', 'malformed_catalog', 'corpus_unavailable', 'unsafe_public_metadata'])
+const diagnostic = (stage, error) => ({ stage, reason: diagnosticReasons.has(error?.message) ? error.message : 'unexpected_error' })
+const lifecycle = (job, outcome, error) => Logger[outcome === 'not_started' ? 'info' : 'warn']('[AdAnalysis] lifecycle', { itemId: job.itemId, episodeId: job.episodeId, outcome, ...diagnostic('attempt', error) })
 
 function alignAsync(original, variant, signal) {
   return new Promise((resolve, reject) => {
@@ -133,7 +137,8 @@ async function request(url, limit = 2 * 1024 * 1024, timeout = 10000, signal, ch
   } finally { clearTimeout(timer); signal?.removeEventListener('abort', cancel) }
 }
 
-async function fingerprint(path, dir, label, duration, signal) {
+async function fingerprint(path, dir, label, duration, signal, stage = () => {}) {
+  stage('native_version')
   const binary = executable()
   if (!binary) throw new Error('unsupported_runtime')
   if ((await fs.promises.stat(path)).size > MAX_AUDIO) throw new Error('audio_size_limit')
@@ -144,9 +149,11 @@ async function fingerprint(path, dir, label, duration, signal) {
   const pcm = Path.join(dir, `${label}.pcm`)
   try {
     // Only a local input may be decoded; demuxers cannot open nested network URLs.
+    stage('native_decode')
     await run(process.env.FFMPEG_PATH || 'ffmpeg', ['-nostdin', '-v', 'error', '-protocol_whitelist', 'file', '-format_whitelist', 'mp3,wav,mov,ogg,flac,aac,matroska,webm,aiff,asf', '-threads', '1', '-i', path, '-map', '0:a:0', '-vn', '-t', String(MAX_DURATION + 1), '-ac', '1', '-ar', '11025', '-f', 's16le', '-fs', String((MAX_DURATION + 1) * 22050), pcm], { signal, killSignal: 'SIGKILL', timeout: 180000, maxBuffer: 65536 })
     const size = (await fs.promises.stat(pcm)).size
     if (size < 50 * 22050 || size >= MAX_DURATION * 22050 || (duration != null && Math.abs(size / 22050 - duration) > 3)) throw new Error('duration_or_decode_mismatch')
+    stage('native_fingerprint')
     const { stdout } = await run(binary, ['-format', 's16le', '-rate', '11025', '-channels', '1', '-algorithm', '2', '-length', '0', '-raw', '-json', pcm], { signal, killSignal: 'SIGKILL', timeout: 180000, maxBuffer: 4 * 1024 * 1024 })
     const data = JSON.parse(stdout)
     if (!Array.isArray(data.fingerprint) || !data.fingerprint.every((n) => Number.isInteger(n) && n >= 0 && n <= 0xffffffff)) throw new Error('invalid_fingerprint')
@@ -212,7 +219,7 @@ class AdAnalysisManager {
     try {
       while (this.queue.length) {
         const job = this.queue.shift()
-        try { await this.analyze(job) } catch { /* Per-job failure must not stall subsequent work. */ }
+        try { await this.analyze(job) } catch (error) { if (error?.message !== 'cancelled') lifecycle(job, 'rejected', error) }
         finally { this.keys.delete(job.key) }
       }
     } finally { this.running = false }
@@ -227,7 +234,7 @@ class AdAnalysisManager {
       return { item, episode }
     }
     const initial = await load()
-    if (!initial) return
+    if (!initial) { lifecycle(job, 'not_started'); return }
     const controller = new AbortController()
     this.active.set(job.itemId, controller)
     this.activeJobs.set(job.key, job)
@@ -245,7 +252,9 @@ class AdAnalysisManager {
     let hash
     let dir
     const route = process.env.AD_ANALYSIS_PROXY_URL === undefined ? 'direct' : 'vpn_proxy'
-    const result = { version: 1, algorithm, route, status: 'running', reason: null, sourceSignature: job.sourceSignature, sourceSha256: null, segments: [], samples: [], catalogs: [] }
+    let stage = 'source'
+    const setStage = (value) => { stage = value }
+    const result = { startedAt: new Date().toISOString(), version: 1, algorithm, route, status: 'running', reason: null, sourceSignature: job.sourceSignature, sourceSha256: null, segments: [], samples: [], catalogs: [] }
     const save = async () => {
       const current = await load()
       if (!current) return false
@@ -262,8 +271,9 @@ class AdAnalysisManager {
       if (!executable()) throw new Error('unsupported_runtime')
       dir = await fs.promises.mkdtemp(Path.join(os.tmpdir(), 'abs-dai-'))
       await checkpoint()
-      const original = await fingerprint(job.path, dir, 'original', initial.episode.duration, controller.signal)
+      const original = await fingerprint(job.path, dir, 'original', initial.episode.duration, controller.signal, setStage)
       result.samples.push({ origin: 'subscribed', route: 'direct', fingerprintSha256: crypto.createHash('sha256').update(JSON.stringify(original)).digest('hex') })
+      setStage('corpus')
       const corpus = new ComparisonCorpus()
       let retained
       try { retained = await corpus.load(job.itemId, job.episodeId, checkpoint) } catch (error) {
@@ -275,6 +285,7 @@ class AdAnalysisManager {
       await refreshInventory()
       const fingerprints = new Set([result.samples[0].fingerprintSha256])
       const compare = async (variant, variantPath, sample) => {
+        setStage('comparison')
         await checkpoint()
         const sourceHash = await sha256(job.path)
         if (sourceHash !== hash) throw new Error('cancelled')
@@ -294,6 +305,7 @@ class AdAnalysisManager {
       for (const saved of retained.versions) {
         await compare(saved.fingerprint, saved.frames, { origin: saved.provider, route: saved.route, versionId: saved.versionId, sha256: saved.sha256, fingerprintSha256: saved.fingerprintSha256, retained: true })
       }
+      setStage('metadata')
       const title = initial.item.media.title
       const author = initial.item.media.author
       if (!result.corpus.collectionPaused && (!normalize(title) || title.length > 200 || (author && author.length > 200) || /https?:|[\r\n\u0000]/i.test(`${title} ${author || ''}`))) throw new Error('unsafe_public_metadata')
@@ -309,6 +321,7 @@ class AdAnalysisManager {
         result.catalogs.push(attempt)
         try {
           const endpoint = provider === 'apple' ? `https://itunes.apple.com/search?media=podcast&entity=podcast&limit=5&term=${query}` : `https://gpodder.net/search.json?q=${query}`
+          setStage('catalog_search')
           const response = await guardedRequest(endpoint)
           const candidates = catalogResults(provider, JSON.parse(response.data.toString()))
           attempt.status = candidates.length ? 'no_matching_episode' : 'empty'
@@ -320,6 +333,7 @@ class AdAnalysisManager {
               if (providerFeeds >= 2 || feeds.size >= 4) continue
               providerFeeds++
               feeds.set(candidate.url, null)
+              setStage('catalog_feed')
               const response = await guardedRequest(candidate.url)
               feed = (await parsePodcastRssFeedXml(response.data.toString()))?.podcast
               feeds.set(candidate.url, feed)
@@ -332,13 +346,14 @@ class AdAnalysisManager {
             const sample = { origin: provider, route, requestAttempt: extras, repeatedUrl: audioUrls.has(url), status: 'fetching' }
             result.samples.push(sample)
             audioUrls.add(url)
+            setStage('catalog_audio')
             const response = await guardedRequest(url, MAX_AUDIO, 120000)
             sample.repeatedFinalUrl = audioUrls.has(response.url) && response.url !== url
             audioUrls.add(response.url)
             const path = Path.join(dir, `sample${extras}`)
             await fs.promises.writeFile(path, response.data, { flag: 'wx' })
             await checkpoint()
-            const variant = await fingerprint(path, dir, `variant${extras}`, null, controller.signal)
+            const variant = await fingerprint(path, dir, `variant${extras}`, null, controller.signal, setStage)
             await checkpoint()
             sample.fingerprintSha256 = crypto.createHash('sha256').update(JSON.stringify(variant)).digest('hex')
             sample.sha256 = crypto.createHash('sha256').update(response.data).digest('hex')
@@ -368,6 +383,7 @@ class AdAnalysisManager {
           if (error.message === 'corpus_unavailable') throw error
           const pending = result.samples.find((sample) => sample.origin === provider && sample.status === 'fetching')
           if (pending) { pending.status = 'failed'; pending.reason = 'sample_failed' }
+          attempt.diagnostic = diagnostic(stage, error)
           attempt.status = 'failed'
           attempt.reason = ['http_error', 'response_too_large', 'request_timeout', 'redirect_limit', 'unsafe_url', 'request_failed_or_blocked', 'proxy_failed_or_blocked', 'invalid_analysis_proxy', 'unsupported_runtime', 'duration_limit', 'incomplete_fingerprint', 'duration_or_decode_mismatch', 'invalid_fingerprint', 'malformed_catalog'].includes(error.message) ? error.message : 'invalid_source'
         }
@@ -384,6 +400,7 @@ class AdAnalysisManager {
         result.reason = result.segments.length ? 'candidate_insertions_not_advertising_proof' : result.status === 'no_difference' ? 'no_inserted_audio' : fingerprints.size < 2 ? 'insufficient_diversity' : 'no_safe_candidates'
       }
     } catch (error) {
+      result.diagnostic = diagnostic(stage, error)
       result.status = error.message === 'cancelled' || controller.signal.aborted ? 'cancelled' : ['unsupported_runtime', 'duration_limit', 'audio_size_limit'].includes(error.message) ? 'unsupported' : 'failed'
       result.reason = ['corpus_unavailable', 'unsupported_runtime', 'duration_limit', 'audio_size_limit', 'duration_or_decode_mismatch', 'incomplete_fingerprint', 'unsafe_public_metadata'].includes(error.message) ? error.message : 'analysis_failed'
       result.segments = []
@@ -397,6 +414,7 @@ class AdAnalysisManager {
         result.reason = 'source_changed'
         result.segments = []
       }
+      result.completedAt = new Date().toISOString()
       if (!controller.signal.aborted && await save()) {
         const current = await load()
         if (current) this.emit(jobPayload(current.item, current.episode, result.status, publicResult(current.episode, current.item.id)))
