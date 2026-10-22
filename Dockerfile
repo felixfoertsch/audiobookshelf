@@ -30,7 +30,9 @@ RUN --mount=type=bind,source=web,target=/src \
 # Headless checks need only Chromium's shell, not the unused headed browser.
 # Browsers stay in this stage; runtime copies only /web/dist from build-web.
 FROM build-web AS check-web
-RUN --mount=type=bind,source=client/assets/ebooks,target=/client/assets/ebooks \
+# Real reconnect fixtures use the backend Socket.IO server, without native bindings.
+RUN --mount=type=bind,from=compile-server,source=/server/node_modules,target=/node_modules \
+	--mount=type=bind,source=client/assets/ebooks,target=/client/assets/ebooks \
 	--mount=type=bind,source=client/strings,target=/client/strings \
 	--mount=type=bind,source=package.json,target=/package.json \
 	node ./node_modules/@playwright/test/cli.js install --with-deps --only-shell chromium \

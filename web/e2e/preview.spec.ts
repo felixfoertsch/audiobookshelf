@@ -12,7 +12,7 @@ async function signIn(page: import('@playwright/test').Page, prefix = '') {
 	await page.goto(`${prefix}/new/`)
 	await expect(
 		page.getByRole('complementary', { name: 'Alpha frontend' }),
-	).toContainText('Incomplete Classic parity')
+	).toContainText('Modern UI · Classic available for legacy access.')
 	await expect(
 		page.getByRole('link', { name: 'Open Classic', exact: true }),
 	).toHaveAttribute('href', `${prefix}/?classic=1`)
