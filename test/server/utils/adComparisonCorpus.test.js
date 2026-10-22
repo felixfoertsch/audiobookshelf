@@ -41,6 +41,7 @@ describe('Persistent comparison corpus', () => {
     const first = await corpus.load('item', 'episode', async () => {})
     expect(first.versions[0].version).to.equal(2)
     expect(first.versions[0].sha256).to.equal(saved.sha256)
+    expect(first.totalBytes).to.equal((await corpus.inventory('item', 'episode')).totalBytes)
     expect(await fs.readdir(version)).to.have.members(['frames.bin', 'fingerprint.json', 'manifest.json'])
 
     const second = await corpus.retain(input(2))
@@ -50,6 +51,44 @@ describe('Persistent comparison corpus', () => {
     expect(await fs.readFile(Path.join(dir2, 'audio'))).to.deep.equal(input(2).data)
     await corpus.load('item', 'episode')
     expect(await fs.readdir(dir2)).to.have.members(['frames.bin', 'fingerprint.json', 'manifest.json'])
+  })
+  for (const failure of ['publication', 'reread', 'decode', 'consent']) it(`preserves legacy audio on ${failure} failure, inventory never migrates`, async () => {
+    const saved = await corpus.retain(input())
+    const version = Path.join(corpus.root, saved.versionId)
+    const manifestPath = Path.join(version, 'manifest.json')
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'))
+    manifest.version = 1
+    manifest.format = 'raw-uint32-json'
+    delete manifest.frameBytes
+    delete manifest.frameSha256
+    const legacy = JSON.stringify(manifest)
+    await fs.writeFile(manifestPath, legacy)
+    await fs.writeFile(Path.join(version, 'audio'), input().data, { mode: 0o600 })
+    await corpus.inventory('item', 'episode')
+    expect(await fs.readFile(manifestPath, 'utf8')).to.equal(legacy)
+    expect(await fs.readFile(Path.join(version, 'audio'))).to.deep.equal(input().data)
+    const rename = fs.rename.bind(fs)
+    const stub = sinon.stub(fs, 'rename').callsFake(async (...args) => {
+      if (failure === 'publication') throw new Error('publication failed')
+      await rename(...args)
+      if (failure === 'reread' || failure === 'decode') {
+        const encoded = await fs.readFile(Path.join(version, 'frames.bin'))
+        encoded.writeDoubleLE(NaN, encoded.length - 8)
+        await fs.writeFile(Path.join(version, 'frames.bin'), encoded)
+        if (failure === 'decode') {
+          const published = JSON.parse(await fs.readFile(manifestPath, 'utf8'))
+          published.frameSha256 = require('crypto').createHash('sha256').update(encoded).digest('hex')
+          await fs.writeFile(manifestPath, JSON.stringify(published))
+        }
+      }
+    })
+    try {
+      await expectFailure(() => corpus.load('item', 'episode', async () => {
+        if (failure === 'consent' && JSON.parse(await fs.readFile(manifestPath, 'utf8')).version === 2) throw new Error('cancelled')
+      }))
+    } finally { stub.restore() }
+    if (failure === 'decode') await expectFailure(() => corpus.load('item', 'episode'))
+    expect(await fs.readFile(Path.join(version, 'audio'))).to.deep.equal(input().data)
   })
   it('preserves audio when existing interrupted legacy frames do not match source', async () => {
     const saved = await corpus.retain(input())

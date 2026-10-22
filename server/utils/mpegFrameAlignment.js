@@ -109,8 +109,9 @@ const alignFiles = (originalPath, variantPath) => align(frames(fs.readFileSync(o
 // Persist exactly the aligner's 48-bit hashes and Float64 timeline, not playable audio.
 function encodeFrames(data) {
   const evidence = frames(data)
-  const bytes = Buffer.alloc(12 + evidence.hashes.length * 14)
-  if (bytes.length > 24 * 1024 * 1024) throw new Error('invalid_mpeg_evidence')
+  const length = 12 + evidence.hashes.length * 14
+  if (length > 24 * 1024 * 1024) throw new Error('invalid_mpeg_evidence')
+  const bytes = Buffer.alloc(length)
   bytes.write('MGF1')
   evidence.hashes.forEach((hash, i) => {
     bytes.writeUIntBE(hash, 4 + i * 14, 6)
@@ -121,7 +122,7 @@ function encodeFrames(data) {
 }
 
 function decodeFrames(bytes) {
-  if (!Buffer.isBuffer(bytes) || bytes.length < 12 || bytes.length > 24 * 1024 * 1024 || (bytes.length - 12) % 14 || bytes.toString('ascii', 0, 4) !== 'MGF1') throw new Error('invalid_mpeg_evidence')
+  if (!Buffer.isBuffer(bytes) || bytes.length < 12 || bytes.length > 24 * 1024 * 1024 || (bytes.length - 12) % 14 || !bytes.subarray(0, 4).equals(Buffer.from('MGF1'))) throw new Error('invalid_mpeg_evidence')
   const count = (bytes.length - 12) / 14
   const hashes = new Float64Array(count)
   const times = new Float64Array(count + 1)

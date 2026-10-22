@@ -116,7 +116,8 @@ class ComparisonCorpus {
       m.frames = decodeFrames(encoded)
       m.fingerprint = fingerprint
     }
-    return state
+    const current = await this.inventory(itemId, episodeId)
+    return { ...current, versions: state.versions }
   }
 
   async migrate(dir, m, checkpoint) {

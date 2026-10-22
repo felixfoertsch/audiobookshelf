@@ -38,6 +38,9 @@ describe('MPEG frame alignment', () => {
   })
   it('rejects malformed compact evidence', () => {
     for (const value of [Buffer.alloc(0), Buffer.alloc(12), Buffer.alloc(25), Buffer.alloc(24 * 1024 * 1024 + 1)]) expect(() => decodeFrames(value)).to.throw('invalid_mpeg_evidence')
+    const hostileHeader = encodeFrames(mp3(range(0, 10)))
+    hostileHeader[0] |= 0x80
+    expect(() => decodeFrames(hostileHeader)).to.throw('invalid_mpeg_evidence')
     const valid = encodeFrames(mp3(range(0, 10)))
     valid.writeDoubleLE(NaN, 10)
     expect(() => decodeFrames(valid)).to.throw('invalid_mpeg_evidence')
