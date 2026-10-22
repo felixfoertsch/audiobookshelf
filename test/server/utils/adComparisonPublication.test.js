@@ -66,7 +66,9 @@ describe('Manager comparison publication boundary', () => {
     expect(network.called).to.equal(true)
     expect(episode.extraData.adAnalysis.reason).to.not.equal('unsafe_public_metadata')
   })
-  it('reports oversized original as unsupported rather than an unexplained failure', async () => {
+  it('reports oversized original as unsupported rather than an unexplained failure', async function () {
+    // Hashing the 256 MiB fixture can exceed Mocha's default on the CI VFS filesystem.
+    this.timeout(15000)
     await fs.truncate(job.path, 256 * 1024 * 1024 + 1)
     await worker.analyze(job)
     expect(episode.extraData.adAnalysis).to.include({ status: 'unsupported', reason: 'audio_size_limit' })
