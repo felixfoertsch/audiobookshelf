@@ -81,6 +81,11 @@ jobs:
           })
           NODE
 
+      - name: Check native candidate boundaries on runtime
+        run: |
+          set -euo pipefail
+          docker buildx build --builder fork --platform linux/amd64 --target check-runtime .
+
       - name: Publish image
         if: github.ref == 'refs/heads/main'
         env:

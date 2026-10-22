@@ -45,6 +45,7 @@ RUN --mount=type=bind,source=package.json,target=/server/package.json \
 	--mount=type=bind,source=index.js,target=/server/index.js \
 	--mount=type=bind,source=tsconfig.server.json,target=/server/tsconfig.server.json \
 	--mount=type=bind,source=server,target=/server/server \
+	--mount=type=bind,source=test,target=/server/test \
 	npm ci --include=dev --ignore-scripts && npm run build:server
 
 ### STAGE 2: Install native server deps for the target arch ###
@@ -71,7 +72,7 @@ RUN apk add --no-cache --update curl make python3 g++ unzip && \
   npm ci --omit=dev
 
 ### STAGE 3: Create minimal runtime image ###
-FROM node:24-alpine
+FROM node:24-alpine AS runtime
 
 ARG NUSQLITE3_DIR
 ARG NUSQLITE3_PATH
@@ -105,3 +106,11 @@ ENV NUSQLITE3_PATH=${NUSQLITE3_PATH}
 
 ENTRYPOINT ["tini", "--"]
 CMD ["node", "dist-server/index.js"]
+
+# Test tools mount only for this RUN; published runtime never receives dev dependencies.
+FROM runtime AS check-runtime
+RUN --mount=type=bind,from=compile-server,source=/server/node_modules,target=/native-test-deps \
+	CI=true FPCALC_PATH=/usr/bin/fpcalc FFMPEG_PATH=/usr/bin/ffmpeg NODE_PATH=/native-test-deps \
+	node /native-test-deps/mocha/bin/mocha.js dist-server/test/server/utils/daiNativeSafety.test.js
+
+FROM runtime AS final
