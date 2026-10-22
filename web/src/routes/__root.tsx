@@ -32,6 +32,7 @@ import {
 } from '../features/catalog/browse'
 import { ServerActivityObserver } from '../features/catalog/server-activity'
 import { DebugMenu, RouteDebugOverlay } from '../features/debug'
+import { useT } from '../features/i18n'
 import { Player } from '../player'
 import { Button } from '../shared/components/ui/button'
 import {
@@ -74,12 +75,17 @@ function ShellSidebarTrigger() {
 }
 
 export function AlphaNotice() {
+	const t = useT()
 	return (
 		<aside
 			aria-label="Alpha frontend"
 			className="border-b bg-card px-5 py-3 text-sm"
 		>
-			Modern UI · Classic available for legacy access.{' '}
+			{t(
+				'Modern UI · Classic available for legacy access.',
+				[],
+				'Modern UI · Classic available for legacy access.',
+			)}{' '}
 			<a
 				href={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/?classic=1`}
 				className="underline"

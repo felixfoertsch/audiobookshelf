@@ -359,45 +359,47 @@ export function Providers() {
 			{!loading && providers.length === 0 && !error && (
 				<p>No custom metadata providers.</p>
 			)}
-			<table className="w-full text-left">
-				<thead>
-					<tr>
-						<th>Name</th>
-						<th>URL</th>
-						<th>Authorization Header Value</th>
-						<th />
-					</tr>
-				</thead>
-				<tbody>
-					{providers.map((provider) => (
-						<tr key={provider.id}>
-							<td>{provider.name}</td>
-							<td>{provider.url}</td>
-							<td>
-								<span
-									role="status"
-									aria-label={
-										provider.authHeaderValue
-											? 'Authorization value configured'
-											: 'No authorization value'
-									}
-								>
-									{provider.authHeaderValue ? 'Configured' : '—'}
-								</span>
-							</td>
-							<td>
-								<Button
-									variant="destructive"
-									disabled={loading}
-									onClick={() => void remove(provider.id)}
-								>
-									Delete
-								</Button>
-							</td>
+			<div className="overflow-x-auto">
+				<table className="w-full text-left">
+					<thead>
+						<tr>
+							<th>Name</th>
+							<th>URL</th>
+							<th>Authorization Header Value</th>
+							<th />
 						</tr>
-					))}
-				</tbody>
-			</table>
+					</thead>
+					<tbody>
+						{providers.map((provider) => (
+							<tr key={provider.id}>
+								<td>{provider.name}</td>
+								<td>{provider.url}</td>
+								<td>
+									<span
+										role="status"
+										aria-label={
+											provider.authHeaderValue
+												? 'Authorization value configured'
+												: 'No authorization value'
+										}
+									>
+										{provider.authHeaderValue ? 'Configured' : '—'}
+									</span>
+								</td>
+								<td>
+									<Button
+										variant="destructive"
+										disabled={loading}
+										onClick={() => void remove(provider.id)}
+									>
+										Delete
+									</Button>
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
 		</section>
 	)
 }

@@ -4,6 +4,7 @@ import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
 import { Input } from '../../shared/components/ui/input'
 import { NativeSelect } from '../../shared/components/ui/native-select'
+import { useT } from '../i18n'
 import {
 	feedAddress as feedTransportAddress,
 	itemActions,
@@ -25,6 +26,7 @@ export function ItemActions({
 	item: Item
 	onChanged: () => void
 }) {
+	const t = useT()
 	const user = useAuth((state) => state.user) as
 		| (typeof useAuth extends never
 				? never
@@ -245,7 +247,11 @@ export function ItemActions({
 											)
 											.catch(() =>
 												setError(
-													'Could not copy feed URL. Select the URL above and copy it manually.',
+													t(
+														'Could not copy feed URL. Select the URL above and copy it manually.',
+														[],
+														'Could not copy feed URL. Select the URL above and copy it manually.',
+													),
 												),
 											)
 									}

@@ -505,11 +505,11 @@ export function EntryCard({
 					<Link
 						to="/item/$id"
 						params={{ id: item.id }}
-						className="block space-y-2 rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+						className={`${view === 'grid' ? 'block space-y-2' : 'flex items-center gap-3'} rounded-md focus-visible:outline-2 focus-visible:outline-ring`}
 					>
-						{view !== 'list' && item.media.coverPath && (
+						{item.media.coverPath && (
 							<img
-								className="aspect-square w-full rounded-lg bg-muted object-cover"
+								className={`${view === 'grid' ? 'aspect-square w-full' : 'size-16 shrink-0'} rounded-lg bg-muted object-cover`}
 								loading="lazy"
 								alt=""
 								src={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(item.id)}/cover?token=${encodeURIComponent(localStorage.getItem('token') || '')}`}
@@ -917,6 +917,7 @@ export function BrowsePage({
 	const sorts = applicableSorts(section, podcast)
 	const itemView = !section
 	const seriesView = section === 'series'
+	const view = itemView ? search.view : 'grid'
 	useShelfPosition(`${library}/${section}/${JSON.stringify(search)}`)
 	useEffect(() => {
 		persistSearch(search, section)
@@ -1263,20 +1264,22 @@ export function BrowsePage({
 								{itemView && (
 									<>
 										{' '}
-										<label>
-											Cover size
-											<input
-												className="block"
-												type="range"
-												min={60}
-												max={220}
-												step={20}
-												value={coverSize.size}
-												onChange={(event) =>
-													coverSize.setSize(Number(event.target.value))
-												}
-											/>
-										</label>
+										{view === 'grid' && (
+											<label>
+												Cover size
+												<input
+													className="block"
+													type="range"
+													min={60}
+													max={220}
+													step={20}
+													value={coverSize.size}
+													onChange={(event) =>
+														coverSize.setSize(Number(event.target.value))
+													}
+												/>
+											</label>
+										)}
 										<label htmlFor="catalog-view">
 											View
 											<NativeSelect
@@ -1579,9 +1582,9 @@ export function BrowsePage({
 			)}
 
 			<div
-				className={search.view === 'grid' ? 'grid gap-4' : 'space-y-3'}
+				className={view === 'grid' ? 'grid gap-4' : 'space-y-3'}
 				style={
-					search.view === 'grid'
+					view === 'grid'
 						? {
 								gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${coverSize.size}px), 1fr))`,
 							}
@@ -1593,7 +1596,7 @@ export function BrowsePage({
 						key={entry.id}
 						library={library}
 						entry={{ ...entry, _type: section }}
-						view={search.view}
+						view={view}
 						select={
 							selectMode && !section && 'media' in entry
 								? {
