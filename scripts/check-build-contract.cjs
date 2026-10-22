@@ -22,6 +22,7 @@ function check(source) {
 		assert.ok(stage(name).body.split('\n').filter((line) => /^RUN /.test(line)).length === 1, `${name}: one RUN`)
 	assert.equal(stage('build-web').from, '--platform=$BUILDPLATFORM node:24-trixie-slim')
 	assert.equal(stage('check-web').from, 'build-web')
+	assert.ok(source.indexOf(' AS compile-server\n') < source.indexOf(' AS check-web\n'), 'mount source stage must precede consumer')
 	assert.match(stage('check-web').body, /from=compile-server,source=\/server\/node_modules,target=\/node_modules/)
 	assert.doesNotMatch(stage('build-web').body, /playwright/)
 	assert.match(stage('check-web').body, /node \.\/node_modules\/@playwright\/test\/cli.js install --with-deps --only-shell chromium/)

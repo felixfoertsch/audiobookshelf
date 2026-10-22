@@ -26,6 +26,17 @@ RUN --mount=type=bind,source=web,target=/src \
 	&& bun install --frozen-lockfile \
 	&& bun run build
 
+### STAGE 1: Compile server on the builder CPU (avoid QEMU SIGILL from tsc on arm64) ###
+FROM --platform=$BUILDPLATFORM node:24-alpine AS compile-server
+WORKDIR /server
+RUN --mount=type=bind,source=package.json,target=/server/package.json \
+	--mount=type=bind,source=package-lock.json,target=/server/package-lock.json \
+	--mount=type=bind,source=index.js,target=/server/index.js \
+	--mount=type=bind,source=tsconfig.server.json,target=/server/tsconfig.server.json \
+	--mount=type=bind,source=server,target=/server/server \
+	--mount=type=bind,source=test,target=/server/test \
+	npm ci --include=dev --ignore-scripts && npm run build:server
+
 # CI checks the exact modern artifact copied into the runtime image.
 # Headless checks need only Chromium's shell, not the unused headed browser.
 # Browsers stay in this stage; runtime copies only /web/dist from build-web.
@@ -38,17 +49,6 @@ RUN --mount=type=bind,from=compile-server,source=/server/node_modules,target=/no
 	node ./node_modules/@playwright/test/cli.js install --with-deps --only-shell chromium \
 	&& bun run typecheck && bun run lint && bun run test \
 	&& node ./node_modules/@playwright/test/cli.js test
-
-### STAGE 1: Compile server on the builder CPU (avoid QEMU SIGILL from tsc on arm64) ###
-FROM --platform=$BUILDPLATFORM node:24-alpine AS compile-server
-WORKDIR /server
-RUN --mount=type=bind,source=package.json,target=/server/package.json \
-	--mount=type=bind,source=package-lock.json,target=/server/package-lock.json \
-	--mount=type=bind,source=index.js,target=/server/index.js \
-	--mount=type=bind,source=tsconfig.server.json,target=/server/tsconfig.server.json \
-	--mount=type=bind,source=server,target=/server/server \
-	--mount=type=bind,source=test,target=/server/test \
-	npm ci --include=dev --ignore-scripts && npm run build:server
 
 ### STAGE 2: Install native server deps for the target arch ###
 FROM node:24-alpine AS build-server
