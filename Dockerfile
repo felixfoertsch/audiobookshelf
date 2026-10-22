@@ -113,4 +113,13 @@ RUN --mount=type=bind,from=compile-server,source=/server/node_modules,target=/na
 	DAI_NATIVE_REQUIRED=1 FPCALC_PATH=/usr/bin/fpcalc FFMPEG_PATH=/usr/bin/ffmpeg NODE_PATH=/native-test-deps \
 	node /native-test-deps/mocha/bin/mocha.js dist-server/test/server/utils/daiNativeSafety.test.js
 
+# Full backend gate includes modern-serving HTTP tests and serializer drift check.
+# Keep dev dependencies and fixture out of published runtime.
+FROM runtime AS check-backend
+RUN --mount=type=bind,from=compile-server,source=/server/node_modules,target=/backend-test-deps \
+	--mount=type=bind,from=build-server,source=/server/node_modules/sqlite3,target=/backend-test-deps/sqlite3 \
+	--mount=type=bind,source=web/src/test/serializer-fixtures.json,target=/app/web/src/test/serializer-fixtures.json \
+	apk add --no-cache openssl \
+	&& NODE_PATH=/backend-test-deps node /backend-test-deps/mocha/bin/mocha.js dist-server/test
+
 FROM runtime AS final

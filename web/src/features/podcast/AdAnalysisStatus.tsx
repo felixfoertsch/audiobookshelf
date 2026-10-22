@@ -42,7 +42,7 @@ const resultSchema = z.object({
 		)
 		.optional(),
 })
-const eventSchema = z.object({
+export const eventSchema = z.object({
 	libraryItemId: z.string(),
 	episodeId: z.string(),
 	adAnalysis: resultSchema.nullish(),

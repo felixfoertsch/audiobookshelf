@@ -9,12 +9,6 @@ npm-debug.log
 /media/
 /metadata
 dev.js
-test/*
-!test/server/
-test/server/*
-!test/server/utils/
-test/server/utils/*
-!test/server/utils/daiNativeSafety.test.js
 /client/.nuxt/
 /client/dist/
 /dist/

@@ -17,7 +17,7 @@ export const itemSchema = z
 		id: z.string().min(1),
 		libraryId: z.string().optional(),
 		mediaType: z.enum(['podcast', 'book']),
-		size: z.number().nonnegative().optional(),
+		size: z.number().nonnegative().nullish(),
 		isMissing: z.boolean().optional(),
 		isInvalid: z.boolean().optional(),
 		numEpisodesIncomplete: z.number().nonnegative().optional(),
@@ -33,7 +33,7 @@ export const itemSchema = z
 			.object({
 				id: z.string().optional(),
 				tags: z.array(z.string()).optional(),
-				size: z.number().nonnegative().optional(),
+				size: z.number().nonnegative().nullish(),
 				ebookFormat: text,
 				metadata: z
 					.object({
@@ -48,8 +48,8 @@ export const itemSchema = z
 						language: text,
 						isbn: text,
 						asin: text,
-						explicit: z.boolean().optional(),
-						abridged: z.boolean().optional(),
+						explicit: z.boolean().nullish(),
+						abridged: z.boolean().nullish(),
 						authors: z
 							.array(z.object({ id: z.string(), name: z.string() }))
 							.optional(),
@@ -72,7 +72,7 @@ export const itemSchema = z
 					})
 					.passthrough(),
 				coverPath: text,
-				duration: z.number().nonnegative().optional(),
+				duration: z.number().nonnegative().nullish(),
 				numAudioFiles: z.number().nonnegative().optional(),
 				chapters: z
 					.array(

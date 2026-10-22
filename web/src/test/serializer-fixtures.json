@@ -1,0 +1,793 @@
+{
+	"podcast": {
+		"id": "podcast-item",
+		"ino": null,
+		"oldLibraryItemId": null,
+		"libraryId": "library",
+		"folderId": "folder",
+		"path": null,
+		"relPath": null,
+		"isFile": null,
+		"addedAt": 1700000000000,
+		"updatedAt": 1700000000000,
+		"isMissing": false,
+		"isInvalid": false,
+		"mediaType": "podcast",
+		"media": {
+			"id": "podcast",
+			"metadata": {
+				"title": "Fixture podcast",
+				"author": "Fixture author",
+				"description": null,
+				"releaseDate": null,
+				"genres": [],
+				"feedUrl": null,
+				"imageUrl": null,
+				"itunesPageUrl": null,
+				"itunesId": null,
+				"itunesArtistId": null,
+				"explicit": null,
+				"language": null,
+				"type": null,
+				"titleIgnorePrefix": "Fixture podcast"
+			},
+			"coverPath": null,
+			"tags": [],
+			"numEpisodes": 5,
+			"autoDownloadEpisodes": null,
+			"autoDownloadSchedule": null,
+			"lastEpisodeCheck": null,
+			"maxEpisodesToKeep": null,
+			"maxNewEpisodesToDownload": null,
+			"size": 210,
+			"libraryItemId": "podcast-item",
+			"episodes": [
+				{
+					"libraryItemId": "podcast-item",
+					"podcastId": "podcast",
+					"id": "episode-absent",
+					"oldEpisodeId": null,
+					"index": 1,
+					"season": null,
+					"episode": null,
+					"episodeType": null,
+					"title": "Episode absent",
+					"subtitle": null,
+					"description": null,
+					"enclosure": null,
+					"guid": null,
+					"adAnalysis": null,
+					"adAnalysisEnabled": true,
+					"pubDate": null,
+					"chapters": null,
+					"audioFile": {
+						"ino": "1",
+						"duration": 120,
+						"metadata": {
+							"filename": "episode.mp3",
+							"ext": ".mp3",
+							"path": "/fixtures/episode.mp3",
+							"relPath": "episode.mp3",
+							"size": 42
+						}
+					},
+					"publishedAt": null,
+					"addedAt": 1700000000000,
+					"updatedAt": 1700000000000,
+					"audioTrack": {
+						"ino": "1",
+						"duration": 120,
+						"metadata": {
+							"filename": "episode.mp3",
+							"ext": ".mp3",
+							"path": "/fixtures/episode.mp3",
+							"relPath": "episode.mp3",
+							"size": 42
+						},
+						"startOffset": 0,
+						"title": "episode.mp3",
+						"index": 1,
+						"contentUrl": "/api/items/podcast-item/file/1"
+					},
+					"size": 42,
+					"duration": 120
+				},
+				{
+					"libraryItemId": "podcast-item",
+					"podcastId": "podcast",
+					"id": "episode-candidates",
+					"oldEpisodeId": null,
+					"index": 2,
+					"season": null,
+					"episode": null,
+					"episodeType": null,
+					"title": "Episode candidates",
+					"subtitle": null,
+					"description": null,
+					"enclosure": null,
+					"guid": null,
+					"adAnalysis": {
+						"version": 1,
+						"status": "candidates",
+						"reason": null,
+						"segments": [
+							{
+								"start": 10,
+								"end": 20
+							}
+						]
+					},
+					"adAnalysisEnabled": true,
+					"pubDate": null,
+					"chapters": null,
+					"audioFile": {
+						"ino": "1",
+						"duration": 120,
+						"metadata": {
+							"filename": "episode.mp3",
+							"ext": ".mp3",
+							"path": "/fixtures/episode.mp3",
+							"relPath": "episode.mp3",
+							"size": 42
+						}
+					},
+					"publishedAt": null,
+					"addedAt": 1700000000000,
+					"updatedAt": 1700000000000,
+					"audioTrack": {
+						"ino": "1",
+						"duration": 120,
+						"metadata": {
+							"filename": "episode.mp3",
+							"ext": ".mp3",
+							"path": "/fixtures/episode.mp3",
+							"relPath": "episode.mp3",
+							"size": 42
+						},
+						"startOffset": 0,
+						"title": "episode.mp3",
+						"index": 1,
+						"contentUrl": "/api/items/podcast-item/file/1"
+					},
+					"size": 42,
+					"duration": 120
+				},
+				{
+					"libraryItemId": "podcast-item",
+					"podcastId": "podcast",
+					"id": "episode-stale",
+					"oldEpisodeId": null,
+					"index": 3,
+					"season": null,
+					"episode": null,
+					"episodeType": null,
+					"title": "Episode stale",
+					"subtitle": null,
+					"description": null,
+					"enclosure": null,
+					"guid": null,
+					"adAnalysis": {
+						"version": 1,
+						"status": "stale",
+						"reason": "source_changed",
+						"segments": []
+					},
+					"adAnalysisEnabled": true,
+					"pubDate": null,
+					"chapters": null,
+					"audioFile": {
+						"ino": "1",
+						"duration": 120,
+						"metadata": {
+							"filename": "episode.mp3",
+							"ext": ".mp3",
+							"path": "/fixtures/episode.mp3",
+							"relPath": "episode.mp3",
+							"size": 42
+						}
+					},
+					"publishedAt": null,
+					"addedAt": 1700000000000,
+					"updatedAt": 1700000000000,
+					"audioTrack": {
+						"ino": "1",
+						"duration": 120,
+						"metadata": {
+							"filename": "episode.mp3",
+							"ext": ".mp3",
+							"path": "/fixtures/episode.mp3",
+							"relPath": "episode.mp3",
+							"size": 42
+						},
+						"startOffset": 0,
+						"title": "episode.mp3",
+						"index": 1,
+						"contentUrl": "/api/items/podcast-item/file/1"
+					},
+					"size": 42,
+					"duration": 120
+				},
+				{
+					"libraryItemId": "podcast-item",
+					"podcastId": "podcast",
+					"id": "episode-queued",
+					"oldEpisodeId": null,
+					"index": 4,
+					"season": null,
+					"episode": null,
+					"episodeType": null,
+					"title": "Episode queued",
+					"subtitle": null,
+					"description": null,
+					"enclosure": null,
+					"guid": null,
+					"adAnalysis": {
+						"version": 1,
+						"status": "queued",
+						"reason": null,
+						"segments": []
+					},
+					"adAnalysisEnabled": true,
+					"pubDate": null,
+					"chapters": null,
+					"audioFile": {
+						"ino": "1",
+						"duration": 120,
+						"metadata": {
+							"filename": "episode.mp3",
+							"ext": ".mp3",
+							"path": "/fixtures/episode.mp3",
+							"relPath": "episode.mp3",
+							"size": 42
+						}
+					},
+					"publishedAt": null,
+					"addedAt": 1700000000000,
+					"updatedAt": 1700000000000,
+					"audioTrack": {
+						"ino": "1",
+						"duration": 120,
+						"metadata": {
+							"filename": "episode.mp3",
+							"ext": ".mp3",
+							"path": "/fixtures/episode.mp3",
+							"relPath": "episode.mp3",
+							"size": 42
+						},
+						"startOffset": 0,
+						"title": "episode.mp3",
+						"index": 1,
+						"contentUrl": "/api/items/podcast-item/file/1"
+					},
+					"size": 42,
+					"duration": 120
+				},
+				{
+					"libraryItemId": "podcast-item",
+					"podcastId": "podcast",
+					"id": "episode-running",
+					"oldEpisodeId": null,
+					"index": 5,
+					"season": null,
+					"episode": null,
+					"episodeType": null,
+					"title": "Episode running",
+					"subtitle": null,
+					"description": null,
+					"enclosure": null,
+					"guid": null,
+					"adAnalysis": {
+						"version": 1,
+						"status": "running",
+						"reason": null,
+						"segments": []
+					},
+					"adAnalysisEnabled": true,
+					"pubDate": null,
+					"chapters": null,
+					"audioFile": {
+						"ino": "1",
+						"duration": 120,
+						"metadata": {
+							"filename": "episode.mp3",
+							"ext": ".mp3",
+							"path": "/fixtures/episode.mp3",
+							"relPath": "episode.mp3",
+							"size": 42
+						}
+					},
+					"publishedAt": null,
+					"addedAt": 1700000000000,
+					"updatedAt": 1700000000000,
+					"audioTrack": {
+						"ino": "1",
+						"duration": 120,
+						"metadata": {
+							"filename": "episode.mp3",
+							"ext": ".mp3",
+							"path": "/fixtures/episode.mp3",
+							"relPath": "episode.mp3",
+							"size": 42
+						},
+						"startOffset": 0,
+						"title": "episode.mp3",
+						"index": 1,
+						"contentUrl": "/api/items/podcast-item/file/1"
+					},
+					"size": 42,
+					"duration": 120
+				}
+			]
+		},
+		"numFiles": 0,
+		"size": null,
+		"adAnalysisEnabled": true,
+		"scanVersion": null,
+		"libraryFiles": []
+	},
+	"book": {
+		"id": "book-item",
+		"ino": null,
+		"oldLibraryItemId": null,
+		"libraryId": "library",
+		"folderId": "folder",
+		"path": null,
+		"relPath": null,
+		"isFile": null,
+		"addedAt": 1700000000000,
+		"updatedAt": 1700000000000,
+		"isMissing": false,
+		"isInvalid": false,
+		"mediaType": "book",
+		"media": {
+			"id": "book",
+			"metadata": {
+				"title": "Fixture book",
+				"subtitle": null,
+				"authors": [],
+				"narrators": [],
+				"series": [],
+				"genres": [],
+				"publishedYear": null,
+				"publishedDate": null,
+				"publisher": null,
+				"description": null,
+				"isbn": null,
+				"asin": null,
+				"language": null,
+				"explicit": null,
+				"abridged": null,
+				"titleIgnorePrefix": "Fixture book",
+				"authorName": "",
+				"authorNameLF": "",
+				"narratorName": "",
+				"seriesName": "",
+				"descriptionPlain": null
+			},
+			"coverPath": null,
+			"tags": [],
+			"numTracks": 1,
+			"numAudioFiles": 1,
+			"numChapters": 1,
+			"duration": null,
+			"size": 42,
+			"libraryItemId": "book-item",
+			"audioFiles": [
+				{
+					"ino": "1",
+					"duration": 120,
+					"metadata": {
+						"filename": "episode.mp3",
+						"ext": ".mp3",
+						"path": "/fixtures/episode.mp3",
+						"relPath": "episode.mp3",
+						"size": 42
+					},
+					"index": 1
+				}
+			],
+			"chapters": [
+				{
+					"id": 0,
+					"title": "Chapter one",
+					"start": 0,
+					"end": 120
+				}
+			],
+			"ebookFile": null,
+			"tracks": [
+				{
+					"ino": "1",
+					"duration": 120,
+					"metadata": {
+						"filename": "episode.mp3",
+						"ext": ".mp3",
+						"path": "/fixtures/episode.mp3",
+						"relPath": "episode.mp3",
+						"size": 42
+					},
+					"index": 1,
+					"title": "episode.mp3",
+					"startOffset": 0,
+					"contentUrl": "/api/items/book-item/file/1"
+				}
+			]
+		},
+		"numFiles": 0,
+		"size": null,
+		"scanVersion": null,
+		"libraryFiles": []
+	},
+	"session": {
+		"id": "session",
+		"userId": "user",
+		"libraryId": "library",
+		"libraryItemId": "podcast-item",
+		"bookId": null,
+		"episodeId": "episode-candidates",
+		"mediaType": "podcast",
+		"mediaMetadata": null,
+		"chapters": [],
+		"displayTitle": null,
+		"displayAuthor": null,
+		"coverPath": null,
+		"duration": 120,
+		"playMethod": 0,
+		"mediaPlayer": null,
+		"deviceInfo": null,
+		"serverVersion": null,
+		"date": null,
+		"dayOfWeek": null,
+		"timeListening": null,
+		"startTime": null,
+		"currentTime": 5,
+		"startedAt": null,
+		"updatedAt": null,
+		"audioTracks": [
+			{
+				"index": 0,
+				"contentUrl": "/api/items/podcast-item/file/1",
+				"mimeType": "audio/mpeg",
+				"duration": 120,
+				"startOffset": 0
+			}
+		],
+		"libraryItem": {
+			"id": "podcast-item",
+			"ino": null,
+			"oldLibraryItemId": null,
+			"libraryId": "library",
+			"folderId": "folder",
+			"path": null,
+			"relPath": null,
+			"isFile": null,
+			"addedAt": 1700000000000,
+			"updatedAt": 1700000000000,
+			"isMissing": false,
+			"isInvalid": false,
+			"mediaType": "podcast",
+			"media": {
+				"id": "podcast",
+				"metadata": {
+					"title": "Fixture podcast",
+					"author": "Fixture author",
+					"description": null,
+					"releaseDate": null,
+					"genres": [],
+					"feedUrl": null,
+					"imageUrl": null,
+					"itunesPageUrl": null,
+					"itunesId": null,
+					"itunesArtistId": null,
+					"explicit": null,
+					"language": null,
+					"type": null,
+					"titleIgnorePrefix": "Fixture podcast"
+				},
+				"coverPath": null,
+				"tags": [],
+				"numEpisodes": 5,
+				"autoDownloadEpisodes": null,
+				"autoDownloadSchedule": null,
+				"lastEpisodeCheck": null,
+				"maxEpisodesToKeep": null,
+				"maxNewEpisodesToDownload": null,
+				"size": 210,
+				"libraryItemId": "podcast-item",
+				"episodes": [
+					{
+						"libraryItemId": "podcast-item",
+						"podcastId": "podcast",
+						"id": "episode-absent",
+						"oldEpisodeId": null,
+						"index": 1,
+						"season": null,
+						"episode": null,
+						"episodeType": null,
+						"title": "Episode absent",
+						"subtitle": null,
+						"description": null,
+						"enclosure": null,
+						"guid": null,
+						"adAnalysis": null,
+						"adAnalysisEnabled": true,
+						"pubDate": null,
+						"chapters": null,
+						"audioFile": {
+							"ino": "1",
+							"duration": 120,
+							"metadata": {
+								"filename": "episode.mp3",
+								"ext": ".mp3",
+								"path": "/fixtures/episode.mp3",
+								"relPath": "episode.mp3",
+								"size": 42
+							}
+						},
+						"publishedAt": null,
+						"addedAt": 1700000000000,
+						"updatedAt": 1700000000000,
+						"audioTrack": {
+							"ino": "1",
+							"duration": 120,
+							"metadata": {
+								"filename": "episode.mp3",
+								"ext": ".mp3",
+								"path": "/fixtures/episode.mp3",
+								"relPath": "episode.mp3",
+								"size": 42
+							},
+							"startOffset": 0,
+							"title": "episode.mp3",
+							"index": 1,
+							"contentUrl": "/api/items/podcast-item/file/1"
+						},
+						"size": 42,
+						"duration": 120
+					},
+					{
+						"libraryItemId": "podcast-item",
+						"podcastId": "podcast",
+						"id": "episode-candidates",
+						"oldEpisodeId": null,
+						"index": 2,
+						"season": null,
+						"episode": null,
+						"episodeType": null,
+						"title": "Episode candidates",
+						"subtitle": null,
+						"description": null,
+						"enclosure": null,
+						"guid": null,
+						"adAnalysis": {
+							"version": 1,
+							"status": "candidates",
+							"reason": null,
+							"segments": [
+								{
+									"start": 10,
+									"end": 20
+								}
+							]
+						},
+						"adAnalysisEnabled": true,
+						"pubDate": null,
+						"chapters": null,
+						"audioFile": {
+							"ino": "1",
+							"duration": 120,
+							"metadata": {
+								"filename": "episode.mp3",
+								"ext": ".mp3",
+								"path": "/fixtures/episode.mp3",
+								"relPath": "episode.mp3",
+								"size": 42
+							}
+						},
+						"publishedAt": null,
+						"addedAt": 1700000000000,
+						"updatedAt": 1700000000000,
+						"audioTrack": {
+							"ino": "1",
+							"duration": 120,
+							"metadata": {
+								"filename": "episode.mp3",
+								"ext": ".mp3",
+								"path": "/fixtures/episode.mp3",
+								"relPath": "episode.mp3",
+								"size": 42
+							},
+							"startOffset": 0,
+							"title": "episode.mp3",
+							"index": 1,
+							"contentUrl": "/api/items/podcast-item/file/1"
+						},
+						"size": 42,
+						"duration": 120
+					},
+					{
+						"libraryItemId": "podcast-item",
+						"podcastId": "podcast",
+						"id": "episode-stale",
+						"oldEpisodeId": null,
+						"index": 3,
+						"season": null,
+						"episode": null,
+						"episodeType": null,
+						"title": "Episode stale",
+						"subtitle": null,
+						"description": null,
+						"enclosure": null,
+						"guid": null,
+						"adAnalysis": {
+							"version": 1,
+							"status": "stale",
+							"reason": "source_changed",
+							"segments": []
+						},
+						"adAnalysisEnabled": true,
+						"pubDate": null,
+						"chapters": null,
+						"audioFile": {
+							"ino": "1",
+							"duration": 120,
+							"metadata": {
+								"filename": "episode.mp3",
+								"ext": ".mp3",
+								"path": "/fixtures/episode.mp3",
+								"relPath": "episode.mp3",
+								"size": 42
+							}
+						},
+						"publishedAt": null,
+						"addedAt": 1700000000000,
+						"updatedAt": 1700000000000,
+						"audioTrack": {
+							"ino": "1",
+							"duration": 120,
+							"metadata": {
+								"filename": "episode.mp3",
+								"ext": ".mp3",
+								"path": "/fixtures/episode.mp3",
+								"relPath": "episode.mp3",
+								"size": 42
+							},
+							"startOffset": 0,
+							"title": "episode.mp3",
+							"index": 1,
+							"contentUrl": "/api/items/podcast-item/file/1"
+						},
+						"size": 42,
+						"duration": 120
+					},
+					{
+						"libraryItemId": "podcast-item",
+						"podcastId": "podcast",
+						"id": "episode-queued",
+						"oldEpisodeId": null,
+						"index": 4,
+						"season": null,
+						"episode": null,
+						"episodeType": null,
+						"title": "Episode queued",
+						"subtitle": null,
+						"description": null,
+						"enclosure": null,
+						"guid": null,
+						"adAnalysis": {
+							"version": 1,
+							"status": "queued",
+							"reason": null,
+							"segments": []
+						},
+						"adAnalysisEnabled": true,
+						"pubDate": null,
+						"chapters": null,
+						"audioFile": {
+							"ino": "1",
+							"duration": 120,
+							"metadata": {
+								"filename": "episode.mp3",
+								"ext": ".mp3",
+								"path": "/fixtures/episode.mp3",
+								"relPath": "episode.mp3",
+								"size": 42
+							}
+						},
+						"publishedAt": null,
+						"addedAt": 1700000000000,
+						"updatedAt": 1700000000000,
+						"audioTrack": {
+							"ino": "1",
+							"duration": 120,
+							"metadata": {
+								"filename": "episode.mp3",
+								"ext": ".mp3",
+								"path": "/fixtures/episode.mp3",
+								"relPath": "episode.mp3",
+								"size": 42
+							},
+							"startOffset": 0,
+							"title": "episode.mp3",
+							"index": 1,
+							"contentUrl": "/api/items/podcast-item/file/1"
+						},
+						"size": 42,
+						"duration": 120
+					},
+					{
+						"libraryItemId": "podcast-item",
+						"podcastId": "podcast",
+						"id": "episode-running",
+						"oldEpisodeId": null,
+						"index": 5,
+						"season": null,
+						"episode": null,
+						"episodeType": null,
+						"title": "Episode running",
+						"subtitle": null,
+						"description": null,
+						"enclosure": null,
+						"guid": null,
+						"adAnalysis": {
+							"version": 1,
+							"status": "running",
+							"reason": null,
+							"segments": []
+						},
+						"adAnalysisEnabled": true,
+						"pubDate": null,
+						"chapters": null,
+						"audioFile": {
+							"ino": "1",
+							"duration": 120,
+							"metadata": {
+								"filename": "episode.mp3",
+								"ext": ".mp3",
+								"path": "/fixtures/episode.mp3",
+								"relPath": "episode.mp3",
+								"size": 42
+							}
+						},
+						"publishedAt": null,
+						"addedAt": 1700000000000,
+						"updatedAt": 1700000000000,
+						"audioTrack": {
+							"ino": "1",
+							"duration": 120,
+							"metadata": {
+								"filename": "episode.mp3",
+								"ext": ".mp3",
+								"path": "/fixtures/episode.mp3",
+								"relPath": "episode.mp3",
+								"size": 42
+							},
+							"startOffset": 0,
+							"title": "episode.mp3",
+							"index": 1,
+							"contentUrl": "/api/items/podcast-item/file/1"
+						},
+						"size": 42,
+						"duration": 120
+					}
+				]
+			},
+			"numFiles": 0,
+			"size": null,
+			"adAnalysisEnabled": true,
+			"scanVersion": null,
+			"libraryFiles": []
+		}
+	},
+	"socket": {
+		"libraryItemId": "podcast-item",
+		"episodeId": "episode-queued",
+		"adAnalysis": {
+			"version": 1,
+			"status": "cancelled",
+			"reason": null,
+			"segments": []
+		},
+		"adAnalysisEnabled": false
+	}
+}
