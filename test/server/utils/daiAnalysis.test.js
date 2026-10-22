@@ -32,6 +32,21 @@ describe('DAI candidate analysis', () => {
     expect(result.segments[0].start).to.be.greaterThan(600 * PERIOD)
     expect(result.segments[0].end).to.be.lessThan(800 * PERIOD)
   })
+  it('keeps Lateral 10-shaped internal gaps despite an unmatched 29-second prefix', () => {
+    let seed = 10
+    const original = Array.from({ length: Math.round(2464 / PERIOD) }, () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed })
+    const variant = original.slice(Math.round(29 / PERIOD), Math.round(982 / PERIOD)).concat(original.slice(Math.round(1042 / PERIOD)))
+    const result = align(original, variant)
+    expect(result.segments).to.have.length(1)
+    expect(result.segments[0].start).to.be.greaterThan(982)
+    expect(result.segments[0].end).to.be.lessThan(1042)
+    expect(result.segments[0].end - result.segments[0].start).to.be.within(45, 60)
+  })
+  it('keeps Lateral 1-shaped unmatched 18-second tail untagged', () => {
+    let seed = 1
+    const original = Array.from({ length: Math.round(2572 / PERIOD) }, () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed })
+    expect(align(original, original.slice(0, -Math.round(18 / PERIOD))).segments).to.deep.equal([])
+  })
   it('normalizes provider contracts without treating catalog URLs as audio diversity', () => {
     const apple = manager.catalogResults('apple', { results: [{ feedUrl: 'https://example.org/feed', collectionName: 'Show', artistName: 'Author' }] })
     const gpodder = manager.catalogResults('gpodder', [{ url: 'https://example.org/feed', title: 'Show', author: 'Author' }])

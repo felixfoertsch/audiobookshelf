@@ -77,8 +77,7 @@ function align(original, variant) {
   }
   const matchedSeconds = strong.reduce((sum, r) => sum + (r.end - r.start) * PERIOD, 0)
   if (strong.length < 1 || matchedSeconds < Math.min(original.length, variant.length) * PERIOD * 0.65) return empty('insufficient_shared_audio')
-  // Both ends must have shared content: prefix/tail differences remain untagged.
-  if (strong[0].start * PERIOD > 15 || (original.length - strong[strong.length - 1].end) * PERIOD > 15) return empty('truncated_or_unanchored')
+  // Only gaps between shared runs are eligible; unmatched ends must not veto safe interiors.
   const segments = []
   for (let i = 1; i < strong.length; i++) {
     const before = strong[i - 1]
