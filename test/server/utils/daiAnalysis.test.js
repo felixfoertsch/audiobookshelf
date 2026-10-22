@@ -32,7 +32,7 @@ describe('DAI candidate analysis', () => {
     expect(result.segments[0].start).to.be.greaterThan(600 * PERIOD)
     expect(result.segments[0].end).to.be.lessThan(800 * PERIOD)
   })
-  it('keeps Lateral 10-shaped internal gaps despite an unmatched 29-second prefix', () => {
+  it('keeps internal insertions despite an unmatched prefix', () => {
     let seed = 10
     const original = Array.from({ length: Math.round(2464 / PERIOD) }, () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed })
     const variant = original.slice(Math.round(29 / PERIOD), Math.round(982 / PERIOD)).concat(original.slice(Math.round(1042 / PERIOD)))
@@ -42,10 +42,24 @@ describe('DAI candidate analysis', () => {
     expect(result.segments[0].end).to.be.lessThan(1042)
     expect(result.segments[0].end - result.segments[0].start).to.be.within(45, 60)
   })
-  it('keeps Lateral 1-shaped unmatched 18-second tail untagged', () => {
+  it('keeps unmatched tails untagged', () => {
     let seed = 1
     const original = Array.from({ length: Math.round(2572 / PERIOD) }, () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed })
     expect(align(original, original.slice(0, -Math.round(18 / PERIOD))).segments).to.deep.equal([])
+  })
+  it('refuses replacement ambiguity only when ends are unanchored', () => {
+    let seed = 194
+    const random = (length) => Array.from({ length }, () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed })
+    const original = random(Math.round(2600 / PERIOD))
+    const start = Math.round(1000 / PERIOD)
+    for (const [localSeconds, catalogSeconds] of [[20.8, 20.8], [30, 60], [60, 30]]) {
+      const end = start + Math.round(localSeconds / PERIOD)
+      const variant = original.slice(0, start).concat(random(Math.round(catalogSeconds / PERIOD)), original.slice(end))
+      // End-anchored creative replacement is an existing contract, not insertion proof.
+      expect(align(original, variant).segments).to.have.length(1)
+      const prefixTrimmed = variant.slice(Math.round(29 / PERIOD))
+      expect(align(original, prefixTrimmed).segments).to.deep.equal([])
+    }
   })
   it('normalizes provider contracts without treating catalog URLs as audio diversity', () => {
     const apple = manager.catalogResults('apple', { results: [{ feedUrl: 'https://example.org/feed', collectionName: 'Show', artistName: 'Author' }] })

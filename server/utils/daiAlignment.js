@@ -36,7 +36,8 @@ function align(original, variant) {
   }
   const anchors = []
   let comparisons = 0
-  for (let i = 0; i <= original.length - width; i += Math.max(4, Math.ceil(original.length / 4000))) {
+  const stride = Math.max(4, Math.ceil(original.length / 4000))
+  for (let i = 0; i <= original.length - width; i += stride) {
     const candidates = new Set()
     for (let band = 0; band < 4; band++) {
       const bucket = index.get(`${band}:${(original[i] >>> (band * 8)) & 255}:${(original[i + 3] >>> (band * 8)) & 255}`) || []
@@ -77,7 +78,10 @@ function align(original, variant) {
   }
   const matchedSeconds = strong.reduce((sum, r) => sum + (r.end - r.start) * PERIOD, 0)
   if (strong.length < 1 || matchedSeconds < Math.min(original.length, variant.length) * PERIOD * 0.65) return empty('insufficient_shared_audio')
-  // Only gaps between shared runs are eligible; unmatched ends must not veto safe interiors.
+  const unanchored = strong[0].start * PERIOD > 15 || (original.length - strong[strong.length - 1].end) * PERIOD > 15
+  // At a splice, one hash window plus one anchor stride per edge and ±2 offset
+  // tolerance per run can be unmatched without any catalog-only material.
+  const spliceUncertainty = (width + 2 * stride + 4) * PERIOD + DELAY
   const segments = []
   for (let i = 1; i < strong.length; i++) {
     const before = strong[i - 1]
@@ -86,6 +90,8 @@ function align(original, variant) {
     const gap = (after.start - before.end) * PERIOD
     const variantGap = gap - removed
     if (gap < 12 || gap > 200 || variantGap < -1 || variantGap > 200) continue
+    // Unanchored ends cannot support the existing replacement interpretation.
+    if (unanchored && (removed <= spliceUncertainty || variantGap > spliceUncertainty)) continue
     const start = (before.end + width) * PERIOD + DELAY + 1
     // ponytail: synthetic calibration only; retain 5 s inward margin until speech calibration.
     const end = after.start * PERIOD - DELAY - 5
