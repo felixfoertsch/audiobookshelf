@@ -6,6 +6,7 @@ import {
 	waitFor,
 } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import * as i18n from '../i18n'
 import { PodcastDownloadQueue, PodcastLatest } from './index'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -33,6 +34,34 @@ it('queue distinguishes pending, failure, retry and successful empty', async () 
 	fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
 	await screen.findByText('No queued downloads.')
 	expect(screen.queryByRole('alert')).toBeNull()
+})
+it('queue translates failed downloads with an interpolated English fallback', async () => {
+	const translate = vi.fn(i18n.translate)
+	vi.spyOn(i18n, 'useT').mockReturnValue(translate)
+	vi.spyOn(globalThis, 'fetch').mockImplementation(
+		async () => new Response(JSON.stringify({ queue: [] })),
+	)
+	render(<PodcastDownloadQueue libraryId="lib" />)
+	await screen.findByText('No queued downloads.')
+	for (const title of ['Episode identity', null]) {
+		fireEvent(
+			window,
+			new CustomEvent('abs:socket', {
+				detail: {
+					event: 'episode_download_finished',
+					payload: { failed: true, episodeDisplayTitle: title },
+				},
+			}),
+		)
+		expect((await screen.findByRole('alert')).textContent).toBe(
+			`Download failed: ${title || 'Podcast episode'}`,
+		)
+		expect(translate).toHaveBeenCalledWith(
+			'Podcast.downloadFailed',
+			[title || 'Podcast episode'],
+			'Download failed: {0}',
+		)
+	}
 })
 it('latest previews safe descriptions, expands on explicit disclosure', async () => {
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(

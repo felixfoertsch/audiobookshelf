@@ -13,6 +13,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '../../shared/components/ui/dropdown-menu'
+import { useT } from '../i18n'
 import { episodeProgress, refreshProgress } from '../item/progress'
 import { updateProgress } from '../item/service'
 import { AdAnalysisStatus } from './AdAnalysisStatus'
@@ -741,6 +742,7 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 }
 
 export function PodcastDownloadQueue({ libraryId }: { libraryId: string }) {
+	const t = useT()
 	const admin = useAuth((s) => isAdmin(s.user))
 	const [queue, setQueue] = useState<z.infer<typeof queueSchema>['queue']>([])
 	const [error, setError] = useState('')
@@ -796,7 +798,11 @@ export function PodcastDownloadQueue({ libraryId }: { libraryId: string }) {
 						failure.success
 					)
 						setError(
-							`Download failed: ${failure.data.episodeDisplayTitle || 'Podcast episode'}`,
+							t(
+								'Podcast.downloadFailed',
+								[failure.data.episodeDisplayTitle || 'Podcast episode'],
+								'Download failed: {0}',
+							),
 						)
 				})
 		}
@@ -805,7 +811,7 @@ export function PodcastDownloadQueue({ libraryId }: { libraryId: string }) {
 			active = false
 			window.removeEventListener('abs:socket', receive)
 		}
-	}, [load])
+	}, [load, t])
 	async function clear(itemId: string) {
 		if (!window.confirm('Clear all queued downloads for this podcast?')) return
 		setBusy(true)
