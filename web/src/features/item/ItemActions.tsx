@@ -228,16 +228,26 @@ export function ItemActions({
 						<h3 className="font-medium">RSS feed</h3>
 						{feed?.id ? (
 							<>
-								<p>{feed.feedUrl || feed.slug}</p>
+								<p>
+									{feedTransportAddress(feed.feedUrl || `/feed/${feed.slug}`)}
+								</p>
 								<Button
 									disabled={busy}
 									variant="outline"
 									onClick={() =>
-										void navigator.clipboard.writeText(
-											feedTransportAddress(
-												feed.feedUrl || `/feed/${feed.slug}`,
-											),
-										)
+										void Promise.resolve()
+											.then(() =>
+												navigator.clipboard.writeText(
+													feedTransportAddress(
+														feed.feedUrl || `/feed/${feed.slug}`,
+													),
+												),
+											)
+											.catch(() =>
+												setError(
+													'Could not copy feed URL. Select the URL above and copy it manually.',
+												),
+											)
 									}
 								>
 									Copy feed URL

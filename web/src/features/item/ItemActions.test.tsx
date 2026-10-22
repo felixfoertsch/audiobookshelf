@@ -16,7 +16,11 @@ vi.mock('../../api', () => ({
 	useAuth: (select: (state: typeof mocks) => unknown) => select(mocks),
 	api: vi.fn(),
 }))
-afterEach(cleanup)
+afterEach(() => {
+	cleanup()
+	mocks.user.type = 'user'
+	vi.unstubAllGlobals()
+})
 const item = {
 	id: 'show',
 	mediaType: 'podcast',
@@ -74,4 +78,25 @@ it('sharing draft survives Escape and return, with native validation intact', as
 		screen.getByRole('button', { name: 'Create and copy share' }),
 	).toHaveProperty('disabled', true)
 	mocks.user.type = 'user'
+})
+it('RSS copy failure explains manual fallback without changing feed', async () => {
+	mocks.user.type = 'admin'
+	vi.stubGlobal('navigator', {
+		clipboard: {
+			writeText: vi.fn().mockRejectedValue(new Error('Clipboard blocked')),
+		},
+	})
+	render(
+		<ItemActions
+			item={{ ...item, rssFeed: { id: 'feed', feedUrl: '/feed/show' } } as Item}
+			onChanged={() => {}}
+		/>,
+	)
+	fireEvent.click(screen.getByRole('button', { name: /^RSS feed$/ }))
+	fireEvent.click(screen.getByRole('button', { name: 'Copy feed URL' }))
+	await waitFor(() =>
+		expect(screen.getByRole('dialog').textContent).toContain(
+			'Could not copy feed URL. Select the URL above and copy it manually.',
+		),
+	)
 })
