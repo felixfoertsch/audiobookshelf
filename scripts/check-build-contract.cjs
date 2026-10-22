@@ -40,7 +40,7 @@ function check(source) {
 	assert.match(stage('compile-server').body, /source=test,target=\/server\/test/)
 	assert.equal(stage('check-runtime').from, 'runtime')
 	assert.match(stage('check-runtime').body, /from=compile-server,source=\/server\/node_modules,target=\/native-test-deps/)
-	assert.match(stage('check-runtime').body, /CI=true FPCALC_PATH=\/usr\/bin\/fpcalc FFMPEG_PATH=\/usr\/bin\/ffmpeg/)
+	assert.match(stage('check-runtime').body, /DAI_NATIVE_REQUIRED=1 FPCALC_PATH=\/usr\/bin\/fpcalc FFMPEG_PATH=\/usr\/bin\/ffmpeg/)
 	assert.match(stage('check-runtime').body, /mocha\.js dist-server\/test\/server\/utils\/daiNativeSafety\.test\.js/)
 	assert.equal(stage('final').from, 'runtime')
 	assert.doesNotMatch(stage('runtime').body, /native-test-deps|--from=compile-server \/server\/node_modules/)
@@ -49,6 +49,11 @@ function check(source) {
 	assert.ok(workflow.indexOf('--target check-runtime') < workflow.indexOf('- name: Publish image'))
 	assert.equal(JSON.parse(read('web/package.json')).scripts.e2e, 'bun run build && playwright test')
 }
+// Explicit traversal keeps native fixture in context without opening other tests/media.
+const ignoreRules = read('.dockerignore').trim().split('\n')
+assert.ok(ignoreRules.join('\n').includes('test/*\n!test/server/\ntest/server/*\n!test/server/utils/\ntest/server/utils/*\n!test/server/utils/daiNativeSafety.test.js'))
+assert.ok(!ignoreRules.includes('test/'))
+for (const rule of ['**/node_modules', '.git', '/media/', '/metadata', '/web/e2e/media/local/', '/web/e2e/media/real/']) assert.ok(ignoreRules.includes(rule), `preserve context exclusion: ${rule}`)
 assert.match(read('web/playwright.config.ts'), /headless: true/)
 assert.doesNotMatch(read('web/playwright.config.ts'), /\bchannel:/)
 check(dockerfile)
@@ -57,6 +62,6 @@ assert.throws(() => check(dockerfile.replace('FROM build-web AS check-web', 'FRO
 assert.throws(() => check(dockerfile.replace('npm ci --omit=dev', 'npm ci --omit=dev --ignore-scripts')))
 assert.throws(() => check(dockerfile.replace('\tnpm ci --include=dev', '\tRUN true\nRUN npm ci --include=dev')))
 assert.throws(() => check(dockerfile.replace('source=test,target=/server/test', 'source=server,target=/server/test')))
-assert.throws(() => check(dockerfile.replace('CI=true FPCALC_PATH=', 'FPCALC_PATH=')))
+assert.throws(() => check(dockerfile.replace('DAI_NATIVE_REQUIRED=1 FPCALC_PATH=', 'FPCALC_PATH=')))
 assert.throws(() => check(dockerfile.replace('FROM runtime AS final', 'FROM check-runtime AS final')))
 console.log('Build contract passed; browser, native safety, native-script and layer-count regressions rejected')

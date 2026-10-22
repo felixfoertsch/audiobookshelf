@@ -11,7 +11,7 @@ describe('Native unanchored span safety', () => {
   it('keeps every emitted interior inside known changed audio across independent encodings', async function () {
     this.timeout(600000)
     if (!process.env.FPCALC_PATH || !process.env.FFMPEG_PATH) {
-      if (process.env.CI) throw new Error('Native safety requires FPCALC_PATH and FFMPEG_PATH')
+      if (process.env.DAI_NATIVE_REQUIRED === '1') throw new Error('Native safety requires FPCALC_PATH and FFMPEG_PATH')
       this.skip()
     }
     for (const binary of [process.env.FPCALC_PATH, process.env.FFMPEG_PATH]) fs.accessSync(binary, fs.constants.X_OK)

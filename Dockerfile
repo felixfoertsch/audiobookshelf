@@ -110,7 +110,7 @@ CMD ["node", "dist-server/index.js"]
 # Test tools mount only for this RUN; published runtime never receives dev dependencies.
 FROM runtime AS check-runtime
 RUN --mount=type=bind,from=compile-server,source=/server/node_modules,target=/native-test-deps \
-	CI=true FPCALC_PATH=/usr/bin/fpcalc FFMPEG_PATH=/usr/bin/ffmpeg NODE_PATH=/native-test-deps \
+	DAI_NATIVE_REQUIRED=1 FPCALC_PATH=/usr/bin/fpcalc FFMPEG_PATH=/usr/bin/ffmpeg NODE_PATH=/native-test-deps \
 	node /native-test-deps/mocha/bin/mocha.js dist-server/test/server/utils/daiNativeSafety.test.js
 
 FROM runtime AS final
