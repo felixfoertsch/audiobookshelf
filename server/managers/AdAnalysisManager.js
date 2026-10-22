@@ -266,7 +266,8 @@ class AdAnalysisManager {
       result.samples.push({ origin: 'subscribed', route: 'direct', fingerprintSha256: crypto.createHash('sha256').update(JSON.stringify(original)).digest('hex') })
       const corpus = new ComparisonCorpus()
       let retained
-      try { retained = await corpus.load(job.itemId, job.episodeId) } catch {
+      try { retained = await corpus.load(job.itemId, job.episodeId, checkpoint) } catch (error) {
+        if (error.message === 'cancelled' || controller.signal.aborted) throw error
         result.corpus = { collectionPaused: true, reason: 'corpus_unavailable' }
         throw new Error('corpus_unavailable')
       }
@@ -291,7 +292,7 @@ class AdAnalysisManager {
         result.segments.push(...comparison.segments.map((segment) => ({ ...segment, sampleIndex: result.samples.length - 1 })))
       }
       for (const saved of retained.versions) {
-        await compare(saved.fingerprint, Path.join(corpus.root, saved.versionId, 'audio'), { origin: saved.provider, route: saved.route, versionId: saved.versionId, sha256: saved.sha256, fingerprintSha256: saved.fingerprintSha256, retained: true })
+        await compare(saved.fingerprint, saved.frames, { origin: saved.provider, route: saved.route, versionId: saved.versionId, sha256: saved.sha256, fingerprintSha256: saved.fingerprintSha256, retained: true })
       }
       const title = initial.item.media.title
       const author = initial.item.media.author

@@ -4,21 +4,66 @@ const os = require('os')
 const Path = require('path')
 const sinon = require('sinon')
 const { ComparisonCorpus } = require('../../../server/utils/adComparisonCorpus')
+const { frames, decodeFrames } = require('../../../server/utils/mpegFrameAlignment')
 
 describe('Persistent comparison corpus', () => {
   let dir, corpus
   beforeEach(async () => { dir = await fs.mkdtemp(Path.join(os.tmpdir(), 'abs-corpus-test-')); corpus = new ComparisonCorpus(Path.join(dir, 'corpus')) })
   afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
   const input = (n = 1) => ({ itemId: 'item', episodeId: 'episode', data: Buffer.from(`audio${n}`), fingerprint: [n, 2, 3], duration: 60, provider: 'apple', route: 'direct' })
-  it('retains audio and raw fingerprints across instances, deduplicates bytes or fingerprints', async () => {
+  it('retains compact frames and raw fingerprints, preserves provenance and deduplicates', async () => {
     const saved = await corpus.retain(input())
     corpus = new ComparisonCorpus(Path.join(dir, 'corpus'))
     const loaded = await corpus.load('item', 'episode')
     expect(loaded.versions[0].fingerprint).to.deep.equal([1, 2, 3])
-    expect(await fs.readFile(Path.join(dir, 'corpus', saved.versionId, 'audio'))).to.deep.equal(input().data)
+    expect(loaded.versions[0].sha256).to.equal(saved.sha256)
+    expect(loaded.versions[0].audioBytes).to.equal(input().data.length)
+    expect(decodeFrames(await fs.readFile(Path.join(dir, 'corpus', saved.versionId, 'frames.bin')))).to.deep.equal(frames(input().data))
+    expect(await fs.readdir(Path.join(dir, 'corpus', saved.versionId))).to.have.members(['frames.bin', 'fingerprint.json', 'manifest.json'])
     expect((await corpus.retain(input())).status).to.equal('duplicate')
     expect((await corpus.retain({ ...input(), data: Buffer.from('different') })).status).to.equal('duplicate')
     expect((await corpus.inventory('item', 'episode')).count).to.equal(1)
+  })
+  it('migrates v1 after verifying provenance, and completes interruption states on explicit load', async () => {
+    const saved = await corpus.retain(input())
+    const version = Path.join(corpus.root, saved.versionId)
+    const manifestPath = Path.join(version, 'manifest.json')
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'))
+    manifest.version = 1
+    manifest.format = 'raw-uint32-json'
+    delete manifest.frameBytes
+    delete manifest.frameSha256
+    const audio = input().data
+    const legacy = { ...manifest, version: 1, format: 'raw-uint32-json' }
+    await fs.writeFile(Path.join(version, 'audio'), audio, { mode: 0o600 })
+    await fs.writeFile(manifestPath, JSON.stringify(legacy), { mode: 0o600 })
+    expect((await corpus.inventory('item', 'episode')).count).to.equal(1)
+    const first = await corpus.load('item', 'episode', async () => {})
+    expect(first.versions[0].version).to.equal(2)
+    expect(first.versions[0].sha256).to.equal(saved.sha256)
+    expect(await fs.readdir(version)).to.have.members(['frames.bin', 'fingerprint.json', 'manifest.json'])
+
+    const second = await corpus.retain(input(2))
+    const dir2 = Path.join(corpus.root, second.versionId)
+    await fs.writeFile(Path.join(dir2, 'audio'), input(2).data, { mode: 0o600 })
+    await expectFailure(() => corpus.load('item', 'episode', async () => { throw new Error('cancelled') }))
+    expect(await fs.readFile(Path.join(dir2, 'audio'))).to.deep.equal(input(2).data)
+    await corpus.load('item', 'episode')
+    expect(await fs.readdir(dir2)).to.have.members(['frames.bin', 'fingerprint.json', 'manifest.json'])
+  })
+  it('preserves audio when existing interrupted legacy frames do not match source', async () => {
+    const saved = await corpus.retain(input())
+    const version = Path.join(corpus.root, saved.versionId)
+    const manifest = JSON.parse(await fs.readFile(Path.join(version, 'manifest.json'), 'utf8'))
+    manifest.version = 1
+    manifest.format = 'raw-uint32-json'
+    delete manifest.frameBytes
+    delete manifest.frameSha256
+    await fs.writeFile(Path.join(version, 'audio'), input().data, { mode: 0o600 })
+    await fs.writeFile(Path.join(version, 'manifest.json'), JSON.stringify(manifest), { mode: 0o600 })
+    await fs.writeFile(Path.join(version, 'frames.bin'), Buffer.from('corrupt'), { mode: 0o600 })
+    await expectFailure(() => corpus.load('item', 'episode'))
+    expect(await fs.readFile(Path.join(version, 'audio'))).to.deep.equal(input().data)
   })
   it('pauses at five, never evicts, and allows offline reads at capacity', async () => {
     for (let n = 1; n <= 5; n++) await corpus.retain(input(n))
@@ -26,7 +71,7 @@ describe('Persistent comparison corpus', () => {
     expect((await corpus.load('item', 'episode')).versions).to.have.length(5)
     expect((await fs.readdir(Path.join(dir, 'corpus'))).length).to.equal(5)
   })
-  it('counts audio, fingerprint and manifest bytes and rejects excess without replacing old evidence', async () => {
+  it('counts compact frames, fingerprint and manifest bytes and rejects excess without replacing evidence', async () => {
     await corpus.retain(input())
     const before = await corpus.inventory('item', 'episode')
     corpus = new ComparisonCorpus(Path.join(dir, 'corpus'), before.totalBytes + 1)

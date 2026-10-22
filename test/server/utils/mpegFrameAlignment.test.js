@@ -1,5 +1,5 @@
 const { expect } = require('chai')
-const { frames, align } = require('../../../server/utils/mpegFrameAlignment')
+const { frames, align, encodeFrames, decodeFrames } = require('../../../server/utils/mpegFrameAlignment')
 
 // MPEG-1 Layer III, 128 kbps, 44.1 kHz, no padding: 417-byte frames of 1152 samples.
 const FRAME = 1152 / 44100
@@ -12,6 +12,36 @@ const mp3 = (ids) => Buffer.concat(ids.map((id) => {
 const range = (from, to) => Array.from({ length: to - from }, (_, i) => from + i)
 
 describe('MPEG frame alignment', () => {
+  it('reproduces full-audio comparisons from compact evidence, including changed originals', () => {
+    const show = range(0, 3000)
+    const catalog = mp3(show)
+    const compact = decodeFrames(encodeFrames(catalog))
+    for (const ids of [show, [...range(100000, 100766), ...show], [...show.slice(0, 1148), ...range(100000, 100766), ...show.slice(1148)]]) {
+      const original = frames(mp3(ids))
+      expect(align(original, compact)).to.deep.equal(align(original, frames(catalog)))
+    }
+    expect(Buffer.from(compact.hashes.buffer)).to.deep.equal(Buffer.from(frames(catalog).hashes.buffer))
+    expect(Buffer.from(compact.times.buffer)).to.deep.equal(Buffer.from(frames(catalog).times.buffer))
+  })
+  it('passes compact typed arrays through the actual alignment worker', async () => {
+    const fs = require('fs')
+    const path = require('path')
+    const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'mpeg-worker-'))
+    const audio = mp3([...range(100000, 100766), ...range(0, 3000)])
+    const catalog = mp3(range(0, 3000))
+    const file = path.join(dir, 'audio')
+    fs.writeFileSync(file, audio)
+    try {
+      const result = await require('../../../server/managers/AdAnalysisManager').alignAsync(file, decodeFrames(encodeFrames(catalog)))
+      expect(result).to.deep.equal(align(frames(audio), frames(catalog)))
+    } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+  })
+  it('rejects malformed compact evidence', () => {
+    for (const value of [Buffer.alloc(0), Buffer.alloc(12), Buffer.alloc(25), Buffer.alloc(24 * 1024 * 1024 + 1)]) expect(() => decodeFrames(value)).to.throw('invalid_mpeg_evidence')
+    const valid = encodeFrames(mp3(range(0, 10)))
+    valid.writeDoubleLE(NaN, 10)
+    expect(() => decodeFrames(valid)).to.throw('invalid_mpeg_evidence')
+  })
   it('finds a stitched ad exact to one frame and nothing in the clean copy', () => {
     const show = range(0, 3000)
     const ad = range(100000, 100766)
