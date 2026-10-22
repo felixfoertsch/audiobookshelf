@@ -121,7 +121,9 @@ export function sessionSegments(session: Session) {
 		(e) => e.id === session.episodeId,
 	)?.adAnalysis
 	return result?.status === 'candidates'
-		? (result.segments ?? []).filter((s) => s.end <= session.duration)
+		? (result.segments ?? [])
+				.filter((s) => s.start < session.duration)
+				.map((s) => ({ ...s, end: Math.min(s.end, session.duration) }))
 		: []
 }
 export const usePlayer = create<{

@@ -73,11 +73,31 @@ describe('fresh session candidate applicability', () => {
 		mismatch.episodeId = 'other'
 		expect(sessionSegments(mismatch)).toEqual([])
 	})
+	it('intersects terminal candidates with playback duration without changing evidence', () => {
+		for (const excess of [1152 / 44100, 1728 / 44100]) {
+			const session = sessionSchema.parse(
+				payload('candidates', [
+					{ start: 10, end: 20 },
+					{ start: 50, end: 60 + excess },
+					{ start: 60, end: 70 },
+					{ start: 61, end: 70 },
+				]),
+			)
+			const evidence = structuredClone(session)
+			expect(sessionSegments(session)).toEqual([
+				{ start: 10, end: 20 },
+				{ start: 50, end: 60 },
+			])
+			expect(session).toEqual(evidence)
+		}
+	})
 	it('rejects malformed sessions and invalid segments', () => {
 		for (const data of [
 			null,
 			{},
 			payload('candidates', [{ start: 20, end: 10 }]),
+			payload('candidates', [{ start: 10, end: Infinity }]),
+			payload('candidates', [{ start: Number.NaN, end: 20 }]),
 		])
 			expect(sessionSchema.safeParse(data).success).toBe(false)
 	})
