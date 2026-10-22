@@ -12,6 +12,8 @@ Fixture adds persisted offline subscription snapshots at startup (not production
 
 ## Portable synthetic breadth
 
+`tones/field-notes-episode-01.mpegts` derives from checked-in tone WAV for Chromium HLS decoding contracts. Regenerate with FFmpeg: `ffmpeg -nostdin -v error -i web/e2e/media/tones/field-notes-episode-01.wav -c:a aac -b:a 32k -f mpegts web/e2e/media/tones/field-notes-episode-01.mpegts`.
+
 Visible text, transcripts, SVG covers, and generated tones are original fixture material. Native speech output remains local-only; no redistribution rights asserted. No real library data, remote assets, or cloud TTS.
 
 `tones/*.wav` are deterministic synthetic PCM tone fallbacks (not voice narration). `field-notes-episode-01.wav` and `glass-orchard-chapter-01.wav` match narration WAV durations exactly. `local/*.aiff` and `local/*.wav` are generated locally with macOS `say` and `afconvert`; they remain ignored because System Voices redistribution terms are not established. Only first Field Notes episode and first book have playable map entries; other records are intentionally unavailable (duration zero), and requests should return 404. Local preview uses ignored native narration when present, otherwise its checked-in tone fallback. Transcripts are original: `transcripts/field-notes-episode-01.txt` and `transcripts/glass-orchard-chapter-01.txt`.
