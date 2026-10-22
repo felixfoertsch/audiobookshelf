@@ -79,7 +79,7 @@ export function AlphaNotice() {
 			aria-label="Alpha frontend"
 			className="border-b bg-card px-5 py-3 text-sm"
 		>
-			Alpha 1 · Incomplete Classic parity.{' '}
+			Modern UI · Classic available for legacy access.{' '}
 			<a
 				href={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/?classic=1`}
 				className="underline"
@@ -365,7 +365,11 @@ export function Layout({
 								</DropdownMenuItem>
 								<DropdownMenuSeparator />
 								<DropdownMenuLabel>Theme</DropdownMenuLabel>
-								<DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+								<DropdownMenuRadioGroup
+									aria-label="Theme"
+									value={theme}
+									onValueChange={setTheme}
+								>
 									<DropdownMenuRadioItem value="system">
 										System
 									</DropdownMenuRadioItem>
