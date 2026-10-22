@@ -268,6 +268,7 @@ class AdAnalysisManager {
       hash = await sha256(job.path)
       result.sourceSha256 = hash
       if (!(await save())) return
+      setStage('native_version')
       if (!executable()) throw new Error('unsupported_runtime')
       dir = await fs.promises.mkdtemp(Path.join(os.tmpdir(), 'abs-dai-'))
       await checkpoint()
@@ -281,7 +282,7 @@ class AdAnalysisManager {
         result.corpus = { collectionPaused: true, reason: 'corpus_unavailable' }
         throw new Error('corpus_unavailable')
       }
-      const refreshInventory = async () => { result.corpus = await corpus.inventory(job.itemId, job.episodeId) }
+      const refreshInventory = async () => { setStage('corpus'); result.corpus = await corpus.inventory(job.itemId, job.episodeId) }
       await refreshInventory()
       const fingerprints = new Set([result.samples[0].fingerprintSha256])
       const compare = async (variant, variantPath, sample) => {
@@ -358,6 +359,7 @@ class AdAnalysisManager {
             sample.fingerprintSha256 = crypto.createHash('sha256').update(JSON.stringify(variant)).digest('hex')
             sample.sha256 = crypto.createHash('sha256').update(response.data).digest('hex')
             let publication
+            setStage('corpus')
             try { publication = await corpus.retain({ itemId: job.itemId, episodeId: job.episodeId, data: response.data, fingerprint: variant, duration: variant.duration, provider, route }, async () => {
               await checkpoint()
               if (await sha256(job.path) !== hash) throw new Error('cancelled')

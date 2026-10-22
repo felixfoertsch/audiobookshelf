@@ -37,11 +37,18 @@ describe('sanitized ad-analysis diagnostics', () => {
     const episode = { id: 'ep', title: 'Episode', publishedAt: new Date('2026-01-01'), audioFile, duration: 60, extraData: {}, save: async () => {} }
     const item = { id: 'item', extraData: { adAnalysisEnabled: true }, media: { title: 'Show & punctuation!', author: 'Public Author', podcastEpisodes: [episode] } }
     let failAt = 'catalog_search'
+    let corpusFailure = ''
+    let inventoryCalls = 0
+    let loadOutcome = ''
+    let saves = 0
+    const save = episode.save
+    episode.save = async () => { saves++; await save() }
     const fixtureRequire = (name) => {
-      if (name === '../Database') return { libraryItemModel: { getExpandedById: async () => item } }
+      if (name === '../Database') return { libraryItemModel: { getExpandedById: async () => { if (loadOutcome === 'throw') throw Object.assign(new Error(secret), { stderr: secret }); return loadOutcome === 'invalid' ? null : item } } }
       if (name === '../utils/adComparisonCorpus') return { validId: () => true, ComparisonCorpus: class {
         async load() { return { versions: [] } }
-        async inventory() { return { collectionPaused: false } }
+        async inventory() { inventoryCalls++; if (corpusFailure === 'inventory' || (corpusFailure === 'provider_inventory' && inventoryCalls === 2) || (corpusFailure === 'post_retain_inventory' && inventoryCalls === 3)) throw new Error('corpus_unavailable'); return { collectionPaused: false } }
+        async retain() { if (corpusFailure === 'retain') throw new Error(secret); return { status: 'duplicate' } }
       } }
       if (name === 'child_process') return { execFile: (binary, args, options, callback) => {
         const stage = args[0] === '-version' ? 'native_version' : args.includes('-nostdin') ? 'native_decode' : 'native_fingerprint'
@@ -86,6 +93,14 @@ describe('sanitized ad-analysis diagnostics', () => {
         expect(episode.extraData.adAnalysis.catalogs[0].diagnostic).to.deep.equal({ stage: failAt, reason: 'response_too_large' })
         expect(JSON.stringify(episode.extraData.adAnalysis)).not.to.include('SECRET')
       }
+      failAt = ''
+      for (corpusFailure of ['retain', 'inventory', 'provider_inventory', 'post_retain_inventory']) {
+        inventoryCalls = 0
+        await worker.analyze(job)
+        expect(episode.extraData.adAnalysis.diagnostic).to.deep.equal({ stage: 'corpus', reason: 'corpus_unavailable' })
+        expect(JSON.stringify(episode.extraData.adAnalysis)).not.to.include(secret)
+      }
+      corpusFailure = ''
       for (const title of ['https://unsafe.example', 'bad\ncontrol']) {
         item.media.title = title
         await worker.analyze(job)
@@ -94,12 +109,30 @@ describe('sanitized ad-analysis diagnostics', () => {
       }
       const old = episode.extraData.adAnalysis
       const time = old.startedAt
+      const completed = old.completedAt
       isolated.queue.push(job)
       expect(isolated.publicResult(episode, 'item').status).to.equal('queued')
       expect(isolated.publicResult(episode, 'item').startedAt).to.equal(undefined)
       isolated.queue.length = 0
       expect(isolated.publicResult(episode, 'item').startedAt).to.equal(time)
       expect(episode.extraData.adAnalysis).to.equal(old)
+      const savedCount = saves
+      const warnings = sinon.stub(Logger, 'warn')
+      const info = sinon.stub(Logger, 'info')
+      loadOutcome = 'throw'
+      worker.queue = [job, { ...job, key: 'next', episodeId: 'next' }]
+      // First actual analyze rejects before save; second actual analyze gets invalidated load.
+      warnings.callsFake(() => { loadOutcome = 'invalid' })
+      await worker.drain()
+      expect(warnings.calledOnce).to.equal(true)
+      expect(info.calledOnce).to.equal(true)
+      expect(JSON.stringify(warnings.args)).to.include('unexpected_error').and.not.to.include(secret)
+      expect(JSON.stringify(info.args)).to.include('not_started').and.to.include('next')
+      expect(episode.extraData.adAnalysis).to.equal(old)
+      expect(episode.extraData.adAnalysis.startedAt).to.equal(time)
+      expect(episode.extraData.adAnalysis.completedAt).to.equal(completed)
+      expect(saves).to.equal(savedCount)
+      expect(worker.queue).to.have.length(0)
     } finally {
       global.MetadataPath = oldMetadata
       if (oldFpcalc === undefined) delete process.env.FPCALC_PATH
@@ -108,17 +141,15 @@ describe('sanitized ad-analysis diagnostics', () => {
     }
   })
 
-  it('drains pre-save rejection with sanitized lifecycle evidence, not a fake durable result', async () => {
+  it('continues draining after unexpected rejection, does not warn for cancellation', async () => {
     const worker = new manager.AdAnalysisManager()
     const log = sinon.stub(Logger, 'warn')
     const secret = 'SECRET /private/audio https://token@example.org'
-    const old = { status: 'failed', reason: 'unsafe_public_metadata', startedAt: '2026-10-22T09:00:00.000Z' }
     const seen = []
     worker.queue = [{ itemId: 'item', episodeId: 'first', key: 'first' }, { itemId: 'item', episodeId: 'second', key: 'second' }]
     worker.analyze = async (job) => { seen.push(job.episodeId); if (job.key === 'first') throw Object.assign(new Error(secret), { stderr: secret, code: secret, signal: secret }) }
     await worker.drain()
     expect(seen).to.deep.equal(['first', 'second'])
-    expect(old.startedAt).to.equal('2026-10-22T09:00:00.000Z')
     expect(log.calledOnce).to.equal(true)
     expect(JSON.stringify(log.args)).not.to.include(secret)
     expect(JSON.stringify(log.args)).to.include('unexpected_error')
