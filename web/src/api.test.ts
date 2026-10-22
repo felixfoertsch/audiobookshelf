@@ -25,6 +25,35 @@ afterEach(() => {
 	setAuthSocket(null)
 	window.history.replaceState(null, '', '/')
 })
+describe('API error messages', () => {
+	it.each([
+		['text/html; charset=utf-8', 'Maintenance pause'],
+		['text/plain', ' \n<!doctype html><title>Pause</title>'],
+	])('hides non-JSON HTML errors (%s)', async (contentType, body) => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			new Response(body, {
+				status: 409,
+				headers: { 'content-type': contentType },
+			}),
+		)
+		await expect(api('/api/test', z.unknown())).rejects.toMatchObject({
+			message: 'Request failed (409)',
+			status: 409,
+		})
+	})
+	it.each([
+		['application/json', '{"error":"Queue full"}'],
+		['text/plain', 'Queue full'],
+	])('preserves server messages (%s)', async (contentType, body) => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			new Response(body, {
+				status: 409,
+				headers: { 'content-type': contentType },
+			}),
+		)
+		await expect(api('/api/test', z.unknown())).rejects.toThrow('Queue full')
+	})
+})
 describe('auth boundary', () => {
 	it('preserves native auth discovery path and query instead of adding API prefix', async () => {
 		const fetcher = vi

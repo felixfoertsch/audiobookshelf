@@ -203,7 +203,14 @@ async function request(
 			try {
 				body = JSON.parse(text)
 			} catch {
-				body = text
+				if (
+					!response.headers
+						.get('content-type')
+						?.toLowerCase()
+						.includes('text/html') &&
+					!text.trimStart().startsWith('<')
+				)
+					body = text
 			}
 			if (typeof body === 'string' && body.length > 0 && body.length < 1000)
 				message = body

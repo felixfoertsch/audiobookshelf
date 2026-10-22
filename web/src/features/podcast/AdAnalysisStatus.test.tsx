@@ -6,13 +6,15 @@ import {
 	waitFor,
 } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { ApiError } from '../../api'
 import { AdAnalysisStatus } from './AdAnalysisStatus'
 
 const mocks = vi.hoisted(() => ({
 	type: 'admin',
 	api: vi.fn(async () => ({})),
 }))
-vi.mock('../../api', () => ({
+vi.mock('../../api', async (importOriginal) => ({
+	...(await importOriginal<typeof import('../../api')>()),
 	api: mocks.api,
 	useAuth: (select: (s: { user: { type: string } }) => unknown) =>
 		select({ user: { type: mocks.type } }),
@@ -102,6 +104,19 @@ it('queues existing endpoint, updates without reload from socket', async () => {
 	)
 	expect(
 		screen.getByRole('img', { name: 'No inserted ads found' }),
+	).toBeTruthy()
+})
+it('explains queue conflicts without displaying proxy HTML, preserves retry', async () => {
+	mocks.api.mockRejectedValueOnce(
+		new ApiError('<!doctype html><title>Pause</title>', 409),
+	)
+	show({ status: 'inconclusive' })
+	fireEvent.click(screen.getByRole('button', { name: 'Analysis inconclusive' }))
+	expect((await screen.findByRole('alert')).textContent).toBe(
+		'Analysis queue is busy or this episode is already queued. Try again later.',
+	)
+	expect(
+		screen.getByRole('button', { name: 'Analysis inconclusive' }),
 	).toBeTruthy()
 })
 it('shows queue failures, preserves retry', async () => {

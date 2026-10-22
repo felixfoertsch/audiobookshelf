@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
-import { api, useAuth } from '../../api'
+import { ApiError, api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
 import {
 	Tooltip,
@@ -61,6 +61,8 @@ const labels = {
 	caveat:
 		'Copies compared with no insertion differences found. Shared or baked-in ads can remain undetected.',
 	retry: 'Select to queue analysis.',
+	queueBusy:
+		'Analysis queue is busy or this episode is already queued. Try again later.',
 	unsupportedDetail:
 		'Episode audio must be downloaded and a supported matching catalog copy must be available.',
 	candidateDetail: 'Candidate insertion differences, not proof of advertising.',
@@ -185,7 +187,11 @@ export function AdAnalysisStatus({ itemId, episode, enabled }: Props) {
 			)
 		} catch (cause) {
 			setError(
-				cause instanceof Error ? cause.message : 'Analysis could not be queued',
+				cause instanceof ApiError && cause.status === 409
+					? t('AdAnalysis.queueBusy', [], labels.queueBusy)
+					: cause instanceof Error
+						? cause.message
+						: 'Analysis could not be queued',
 			)
 		} finally {
 			setBusy(false)
