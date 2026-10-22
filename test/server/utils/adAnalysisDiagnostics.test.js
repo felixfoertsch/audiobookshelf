@@ -37,6 +37,7 @@ describe('sanitized ad-analysis diagnostics', () => {
     const episode = { id: 'ep', title: 'Episode', publishedAt: new Date('2026-01-01'), audioFile, duration: 60, extraData: {}, save: async () => {} }
     const item = { id: 'item', extraData: { adAnalysisEnabled: true }, media: { title: 'Show & punctuation!', author: 'Public Author', podcastEpisodes: [episode] } }
     let failAt = 'catalog_search'
+    let feedPadding = 0
     let corpusFailure = ''
     let inventoryCalls = 0
     let loadOutcome = ''
@@ -58,10 +59,12 @@ describe('sanitized ad-analysis diagnostics', () => {
         const { PERIOD, DELAY } = realRequire('../utils/daiAlignment')
         callback(null, { stdout: JSON.stringify({ fingerprint: Array(Math.round((60 - DELAY) / PERIOD)).fill(1) }) })
       } }
-      if (name === 'axios') return { get: async (url) => {
+      if (name === 'axios') return { get: async (url, config) => {
         const stage = url.includes('itunes.apple.com') || url.includes('gpodder.net') ? 'catalog_search' : url.endsWith('/rss') ? 'catalog_feed' : 'catalog_audio'
         if (stage === failAt) throw new Error('maxContentLength SECRET /private/audio')
         let data = stage === 'catalog_search' ? JSON.stringify(url.includes('itunes.apple.com') ? { results: [{ feedUrl: 'https://example.org/rss', collectionName: item.media.title }] } : [{ url: 'https://example.org/rss', title: item.media.title }]) : '<rss version="2.0"><channel><title>Show</title><item><title>Episode</title><pubDate>Thu, 01 Jan 2026 00:00:00 GMT</pubDate><enclosure url="https://example.org/audio" type="audio/mpeg" length="100"/></item></channel></rss>'
+        if (stage === 'catalog_feed') data = data.replace('</channel>', `<description>${'x'.repeat(feedPadding)}</description></channel>`)
+        if (Buffer.byteLength(data) > config.maxContentLength) throw new Error('maxContentLength exceeded')
         return { status: 200, headers: {}, data: Buffer.from(data) }
       } }
       return realRequire(name)
@@ -94,6 +97,14 @@ describe('sanitized ad-analysis diagnostics', () => {
         expect(JSON.stringify(episode.extraData.adAnalysis)).not.to.include('SECRET')
       }
       failAt = ''
+      feedPadding = 6 * 1024 * 1024
+      await worker.analyze(job)
+      expect(episode.extraData.adAnalysis.catalogs[0].diagnostic).to.equal(undefined)
+      expect(episode.extraData.adAnalysis.samples[1].collectionStatus).to.equal('duplicate')
+      feedPadding = 16 * 1024 * 1024
+      await worker.analyze(job)
+      expect(episode.extraData.adAnalysis.catalogs[0].diagnostic).to.deep.equal({ stage: 'catalog_feed', reason: 'response_too_large' })
+      feedPadding = 0
       for (corpusFailure of ['retain', 'inventory', 'provider_inventory', 'post_retain_inventory']) {
         inventoryCalls = 0
         await worker.analyze(job)

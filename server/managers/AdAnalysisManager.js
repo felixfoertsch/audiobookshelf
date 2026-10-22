@@ -39,6 +39,7 @@ function combineSegments(segments) {
 }
 const MAX_DURATION = 14400
 const MAX_AUDIO = 256 * 1024 * 1024
+const MAX_FEED = 16 * 1024 * 1024
 const algorithm = 'chromaprint-test2-inward-v1'
 let fpcalcPath
 
@@ -335,7 +336,7 @@ class AdAnalysisManager {
               providerFeeds++
               feeds.set(candidate.url, null)
               setStage('catalog_feed')
-              const response = await guardedRequest(candidate.url)
+              const response = await guardedRequest(candidate.url, MAX_FEED)
               feed = (await parsePodcastRssFeedXml(response.data.toString()))?.podcast
               feeds.set(candidate.url, feed)
             }
