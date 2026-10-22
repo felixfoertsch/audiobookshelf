@@ -783,7 +783,22 @@ export function PodcastDownloadQueue({ libraryId }: { libraryId: string }) {
 					'episode_download_queue_cleared',
 				].includes(detail?.event)
 			)
-				void load(() => active)
+				void load(() => active).then(() => {
+					const failure = z
+						.object({
+							failed: z.literal(true),
+							episodeDisplayTitle: z.string().nullish(),
+						})
+						.safeParse(detail.payload)
+					if (
+						active &&
+						detail.event === 'episode_download_finished' &&
+						failure.success
+					)
+						setError(
+							`Download failed: ${failure.data.episodeDisplayTitle || 'Podcast episode'}`,
+						)
+				})
 		}
 		window.addEventListener('abs:socket', receive)
 		return () => {

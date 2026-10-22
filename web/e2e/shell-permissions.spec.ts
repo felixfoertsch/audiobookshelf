@@ -38,3 +38,40 @@ for (const user of ['listener', 'admin', 'root'])
 			page.getByRole('link', { name: 'Open Classic', exact: true }),
 		).toBeVisible()
 	})
+
+for (const prefix of ['', '/abs']) {
+	test(`podcast download queue enforces backend permissions ${prefix || 'root'}`, async ({
+		page,
+	}) => {
+		for (const [user, status] of [
+			['listener', 403],
+			['admin', 200],
+		] as const) {
+			await page.context().clearCookies()
+			await page.goto(`${prefix}/new/`)
+			await page.evaluate(() => localStorage.clear())
+			await page.reload()
+			await page.getByLabel('Username', { exact: true }).fill(user)
+			await page.getByLabel('Password', { exact: true }).fill('password')
+			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+			const response = page.waitForResponse(
+				(result) =>
+					new URL(result.url()).pathname ===
+					`${prefix}/api/libraries/podcasts/episode-downloads`,
+			)
+			await page.goto(`${prefix}/new/library/podcasts/podcast/download-queue`)
+			expect((await response).status()).toBe(status)
+			if (user === 'listener')
+				await expect(page.getByRole('alert')).toContainText(
+					'Permission denied.',
+				)
+			else
+				await expect(
+					page.getByRole('heading', {
+						name: 'Podcast download queue',
+						exact: true,
+					}),
+				).toBeVisible()
+		}
+	})
+}

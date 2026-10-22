@@ -26,6 +26,13 @@ const dist = process.env.FIXTURE_DIST_PATH
 	: new URL('../dist/', import.meta.url)
 const mediaRoot = new URL('./media/', import.meta.url)
 const catalog = items
+const downloadQueues = new Map<
+	string,
+	{ queue: unknown[]; currentDownload: unknown }
+>()
+const socketPeers = new Map<FixtureSocket, string>()
+const socketAuthCounts = new Map<string, number>()
+const heldSocketUsers = new Set<string>()
 const cookies = new Map<string, (typeof fixtureUsers)[number]>()
 let initialized = process.env.FIXTURE_UNINITIALIZED !== '1'
 const json = (data: unknown, status = 200, headers: HeadersInit = {}) =>
@@ -241,6 +248,50 @@ async function handleRequest(request: Request) {
 		request.headers.get('authorization')?.replace(/^Bearer /, '') ||
 		url.searchParams.get('token')
 	const user = fixtureUsers.find((user) => user.accessToken === token)
+	if (path === '/__fixture/socket' && user) {
+		if (request.method === 'GET')
+			return json({
+				authCount: socketAuthCounts.get(user.id) || 0,
+				connections: [...socketPeers.values()].filter((id) => id === user.id)
+					.length,
+			})
+		const input = z
+			.object({
+				action: z.enum(['disconnect', 'reconnect', 'event', 'queue', 'title']),
+				event: z.string().optional(),
+				payload: z.unknown().optional(),
+				title: z.string().optional(),
+			})
+			.parse(await request.json())
+		if (input.action === 'disconnect') {
+			heldSocketUsers.add(user.id)
+			for (const [socket, id] of socketPeers)
+				if (id === user.id) socket.conn.close()
+		}
+		if (input.action === 'reconnect') heldSocketUsers.delete(user.id)
+		if (input.action === 'title' && input.title) {
+			const item = catalog.find((item) => item.id === 'podcast-1')
+			if (!item) throw new Error('Missing reconnect fixture item')
+			item.media.metadata.title = input.title
+		}
+		if (input.action === 'queue')
+			downloadQueues.set(
+				user.id,
+				z
+					.object({ queue: z.array(z.unknown()), currentDownload: z.unknown() })
+					.parse(input.payload),
+			)
+		if (input.event)
+			for (const io of socketServers)
+				io.to(user.id).emit(input.event, input.payload)
+		return json({ ok: true })
+	}
+	if (path === '/api/libraries/podcasts/episode-downloads' && user)
+		return ['admin', 'root'].includes(user.type)
+			? json(
+					downloadQueues.get(user.id) || { queue: [], currentDownload: null },
+				)
+			: json({ error: 'Forbidden' }, 403)
 	const isCover = /^\/api\/items\/[^/]+\/cover$/.test(path)
 	if (path.startsWith('/api/') && !user && !(isCover && cookieUser))
 		return json({}, 401)
@@ -789,6 +840,8 @@ const server = createServer(async (incoming, outgoing) => {
 // Optional local comparison adapter; portable web-only CI has no backend packages.
 // Narrow structural contract describes only installed Socket.IO consumer surface.
 interface FixtureSocket {
+	conn: { close(): void }
+	on(event: 'disconnect', listener: () => void): void
 	on(event: 'auth', listener: (token: unknown) => void): void
 	join(room: string): void
 	leave(room: string): void
@@ -809,7 +862,7 @@ type SocketConstructor = new (
 	},
 ) => FixtureSocketServer
 let SocketServer: SocketConstructor | undefined
-if (process.env.CLASSIC_COMPARE === '1') {
+if (process.env.CLASSIC_COMPARE === '1' || process.env.FIXTURE_SOCKET === '1') {
 	const require = createRequire(import.meta.url)
 	let packageExports: unknown
 	try {
@@ -847,6 +900,7 @@ const socketServers = (
 	})
 	io.on('connection', (socket) => {
 		let authenticatedUserId: string | undefined
+		socket.on('disconnect', () => socketPeers.delete(socket))
 		socket.on('auth', (token: unknown) => {
 			if (authenticatedUserId) socket.leave(authenticatedUserId)
 			authenticatedUserId = undefined
@@ -856,6 +910,12 @@ const socketServers = (
 				socket.emit('auth_failed', { message: 'Invalid token' })
 				return
 			}
+			if (heldSocketUsers.has(user.id)) {
+				socket.conn.close()
+				return
+			}
+			socketPeers.set(socket, user.id)
+			socketAuthCounts.set(user.id, (socketAuthCounts.get(user.id) || 0) + 1)
 			socket.join('authenticated')
 			socket.join(user.id)
 			authenticatedUserId = user.id

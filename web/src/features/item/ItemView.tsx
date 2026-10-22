@@ -168,8 +168,10 @@ export function ItemView({ id }: { id: string }) {
 			} | null
 			if (detail?.event === 'item_updated' && detail.payload?.id === id)
 				reload()
-			if (detail?.event === 'init' || detail?.event === 'reconnect')
+			if (detail?.event === 'init' || detail?.event === 'reconnect') {
+				reload()
 				void reloadProgress()
+			}
 		}
 		window.addEventListener('abs:socket', receive)
 		if (userId) void reloadProgress()

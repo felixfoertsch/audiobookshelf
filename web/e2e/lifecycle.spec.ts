@@ -7,87 +7,93 @@ import {
 	signOut,
 } from './shell-controls'
 
-async function openBook(page: import('@playwright/test').Page) {
-	await page.goto('/new/')
+async function openBook(page: import('@playwright/test').Page, prefix = '') {
+	await page.goto(`${prefix}/new/`)
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 	await openSidebar(page)
 	await expect(appMenu(page)).toBeVisible()
 	await closeSidebar(page)
-	await page.goto('/new/item/book-1')
+	await page.goto(`${prefix}/new/item/book-1`)
 	await expect(
 		page.getByRole('heading', { name: 'The Glass Orchard', exact: true }),
 	).toBeVisible()
 }
-test('local logout closes playback before revocation and stays signed out', async ({
-	page,
-}) => {
-	await openBook(page)
-	await page.getByRole('button', { name: 'Play audiobook' }).click()
-	await expect(page.getByRole('region', { name: 'Audio player' })).toBeVisible()
-	await expect(page.getByLabel('Audio playback')).toBeAttached()
-	// Keep short fixture audio from ending while refresh is deliberately blocked.
-	await page
-		.getByLabel('Audio playback')
-		.evaluate((audio: HTMLAudioElement) => audio.pause())
-	let releaseRefresh!: () => void
-	let refreshStarted!: () => void
-	const started = new Promise<void>((resolve) => {
-		refreshStarted = resolve
+for (const prefix of ['', '/abs'])
+	test(`local logout closes playback before revocation and stays signed out ${prefix || 'root'}`, async ({
+		page,
+	}) => {
+		await openBook(page, prefix)
+		await page.getByRole('button', { name: 'Play audiobook' }).click()
+		await expect(
+			page.getByRole('region', { name: 'Audio player' }),
+		).toBeVisible()
+		await expect(page.getByLabel('Audio playback')).toBeAttached()
+		// Keep short fixture audio from ending while refresh is deliberately blocked.
+		await page
+			.getByLabel('Audio playback')
+			.evaluate((audio: HTMLAudioElement) => audio.pause())
+		let releaseRefresh!: () => void
+		let refreshStarted!: () => void
+		const started = new Promise<void>((resolve) => {
+			refreshStarted = resolve
+		})
+		const release = new Promise<void>((resolve) => {
+			releaseRefresh = resolve
+		})
+		await page.route(`**${prefix}/api/me/sessions?*`, (route) =>
+			route.fulfill({ status: 401, json: {} }),
+		)
+		await page.route(`**${prefix}/auth/refresh`, async (route) => {
+			const response = await route.fetch()
+			refreshStarted()
+			await release
+			await route.fulfill({ response })
+		})
+		await openSidebar(page)
+		await appMenu(page).click()
+		await page.getByRole('menuitem', { name: /Account$/ }).click()
+		await started
+		const requests: string[] = []
+		page.on('request', (req) => {
+			if (req.method() === 'POST') requests.push(new URL(req.url()).pathname)
+		})
+		const revoked = page.waitForResponse(
+			(response) => new URL(response.url()).pathname === `${prefix}/logout`,
+		)
+		await signOut(page)
+		await revoked
+		await expect(
+			page.getByRole('button', { name: 'Sign in', exact: true }),
+		).toBeVisible()
+		const delayedRefresh = page.waitForResponse(
+			(response) =>
+				new URL(response.url()).pathname === `${prefix}/auth/refresh`,
+		)
+		releaseRefresh()
+		await (await delayedRefresh).finished()
+		await expect(
+			page.getByRole('button', { name: 'Sign in', exact: true }),
+		).toBeVisible()
+		const closeIndex = requests.findIndex((path) => path.endsWith('/close'))
+		const logoutIndex = requests.indexOf(`${prefix}/logout`)
+		expect(closeIndex).toBeGreaterThanOrEqual(0)
+		expect(logoutIndex).toBeGreaterThan(closeIndex)
+		expect(await page.evaluate(() => localStorage.getItem('token'))).toBeNull()
+		expect(
+			(await page.context().cookies()).some(
+				(cookie) => cookie.name === 'fixture_session',
+			),
+		).toBe(false)
+		expect((await page.request.post(`${prefix}/auth/refresh`)).status()).toBe(
+			401,
+		)
+		await page.reload()
+		await expect(
+			page.getByRole('button', { name: 'Sign in', exact: true }),
+		).toBeVisible()
 	})
-	const release = new Promise<void>((resolve) => {
-		releaseRefresh = resolve
-	})
-	await page.route('**/api/me/sessions?*', (route) =>
-		route.fulfill({ status: 401, json: {} }),
-	)
-	await page.route('**/auth/refresh', async (route) => {
-		const response = await route.fetch()
-		refreshStarted()
-		await release
-		await route.fulfill({ response })
-	})
-	await openSidebar(page)
-	await appMenu(page).click()
-	await page.getByRole('menuitem', { name: /Account$/ }).click()
-	await started
-	const requests: string[] = []
-	page.on('request', (req) => {
-		if (req.method() === 'POST') requests.push(new URL(req.url()).pathname)
-	})
-	const revoked = page.waitForResponse(
-		(response) => new URL(response.url()).pathname === '/logout',
-	)
-	await signOut(page)
-	await revoked
-	await expect(
-		page.getByRole('button', { name: 'Sign in', exact: true }),
-	).toBeVisible()
-	const delayedRefresh = page.waitForResponse(
-		(response) => new URL(response.url()).pathname === '/auth/refresh',
-	)
-	releaseRefresh()
-	await (await delayedRefresh).finished()
-	await expect(
-		page.getByRole('button', { name: 'Sign in', exact: true }),
-	).toBeVisible()
-	const closeIndex = requests.findIndex((path) => path.endsWith('/close'))
-	const logoutIndex = requests.indexOf('/logout')
-	expect(closeIndex).toBeGreaterThanOrEqual(0)
-	expect(logoutIndex).toBeGreaterThan(closeIndex)
-	expect(await page.evaluate(() => localStorage.getItem('token'))).toBeNull()
-	expect(
-		(await page.context().cookies()).some(
-			(cookie) => cookie.name === 'fixture_session',
-		),
-	).toBe(false)
-	expect((await page.request.post('/auth/refresh')).status()).toBe(401)
-	await page.reload()
-	await expect(
-		page.getByRole('button', { name: 'Sign in', exact: true }),
-	).toBeVisible()
-})
 test('failed metadata preserves resume when closing', async ({ page }) => {
 	let closedTime = -1
 	await page.route('**/api/items/book-1/play', async (route) => {
