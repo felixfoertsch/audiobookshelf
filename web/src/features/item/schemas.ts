@@ -114,6 +114,7 @@ export const itemSchema = z
 					.passthrough(),
 			)
 			.optional(),
+		adAnalysisEnabled: z.boolean().optional(),
 		isMissing: z.boolean().optional(),
 		isInvalid: z.boolean().optional(),
 	})

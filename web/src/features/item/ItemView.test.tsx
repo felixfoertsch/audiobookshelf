@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ItemView } from './ItemView'
+import { itemSchema } from './schemas'
 
 const mocks = vi.hoisted(() => ({
 	user: {
@@ -16,8 +17,10 @@ const mocks = vi.hoisted(() => ({
 	},
 	getItem: vi.fn(),
 	updateProgress: vi.fn(),
+	api: vi.fn(),
 }))
 vi.mock('../../api', () => ({
+	api: mocks.api,
 	useAuth: (select: (state: { user: typeof mocks.user }) => unknown) =>
 		select({ user: mocks.user }),
 }))
@@ -111,6 +114,49 @@ it('bounds episode pages, reaches last page, and discloses descriptions', {
 			.hasAttribute('disabled'),
 	).toBe(true)
 })
+it('shows candidate status only when expanded item explicitly enables analysis', async () => {
+	const response = (adAnalysisEnabled?: boolean) =>
+		itemSchema.parse({
+			id: 'show',
+			mediaType: 'podcast',
+			...(adAnalysisEnabled === undefined ? {} : { adAnalysisEnabled }),
+			media: {
+				metadata: { title: 'Show' },
+				episodes: [
+					{
+						id: 'ep-0',
+						title: 'Episode 1',
+						audioFile: { duration: 100 },
+						adAnalysisEnabled: true,
+						adAnalysis: {
+							status: 'candidates',
+							segments: [{ start: 10, end: 20 }],
+						},
+					},
+				],
+			},
+		})
+	mocks.getItem.mockResolvedValue(response(true))
+	render(<ItemView id="show" />)
+	expect(
+		await screen.findByRole('img', {
+			name: /Inserted audio found: 1 breaks, 10 seconds/,
+		}),
+	).toBeTruthy()
+	expect(mocks.api).not.toHaveBeenCalled()
+
+	for (const item of [response(false), response()]) {
+		cleanup()
+		mocks.getItem.mockResolvedValue(item)
+		render(<ItemView id="show" />)
+		await screen.findByRole('heading', { name: 'Episode 1' })
+		expect(
+			screen.queryByRole('img', { name: /Inserted audio found/ }),
+		).toBeNull()
+		expect(mocks.api).not.toHaveBeenCalled()
+	}
+})
+
 it('keeps podcast management in scoped modal, returns focus with Escape', async () => {
 	mocks.user.type = 'admin'
 	render(<ItemView id="show" />)

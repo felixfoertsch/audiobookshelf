@@ -569,13 +569,7 @@ export function ItemView({ id }: { id: string }) {
 												<AdAnalysisStatus
 													itemId={id}
 													episode={ep}
-													enabled={
-														(
-															item.extraData as
-																| { adAnalysisEnabled?: boolean }
-																| undefined
-														)?.adAnalysisEnabled === true
-													}
+													enabled={item.adAnalysisEnabled === true}
 												/>
 												<Button
 													className="rounded-full"

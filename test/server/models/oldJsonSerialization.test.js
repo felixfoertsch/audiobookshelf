@@ -147,6 +147,26 @@ describe('old JSON serialization', () => {
   })
 
   describe('LibraryItem', () => {
+    it('projects owning podcast consent without reverse associations or private extraData', async () => {
+      const item = await Database.libraryItemModel.getExpandedById(podcastLibraryItemId)
+      expect(item.media.podcastEpisodes[0].podcast).to.equal(undefined)
+      for (const enabled of [true, false, undefined]) {
+        item.extraData = { adAnalysisEnabled: enabled, privateValue: 'not public' }
+        // A stale reverse association must never override explicit parent consent.
+        item.media.podcastEpisodes[0].podcast = enabled === true ? undefined : { libraryItem: { extraData: { adAnalysisEnabled: true } } }
+        const expanded = item.toOldJSONExpanded()
+        expect(expanded.adAnalysisEnabled).to.equal(enabled === true)
+        expect(expanded.media.episodes.map((episode) => episode.adAnalysisEnabled)).to.deep.equal([enabled === true])
+        expect(expanded).not.to.have.property('extraData')
+        expect(JSON.stringify(expanded)).not.to.include('not public')
+        assertExpandedSuperset(item.toOldJSONMinified(), expanded)
+      }
+      const book = await Database.libraryItemModel.getExpandedById(bookLibraryItemId)
+      book.extraData = { adAnalysisEnabled: true }
+      expect(book.toOldJSONExpanded()).not.to.have.property('adAnalysisEnabled')
+      assertExpandedSuperset(book.toOldJSONMinified(), book.toOldJSONExpanded())
+    })
+
     it('book library item expanded is a strict superset of minified', async () => {
       const libraryItem = await Database.libraryItemModel.getExpandedById(bookLibraryItemId)
       const minified = libraryItem.toOldJSONMinified()

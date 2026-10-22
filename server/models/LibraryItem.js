@@ -1030,11 +1030,18 @@ class LibraryItem extends Model {
    * Must be a strict superset of `toOldJSONMinified()` — built by spreading minified, then adding expanded-only fields.
    */
   toOldJSONExpanded() {
+    const media = this.media.toOldJSONExpanded(this.id)
+    const adAnalysisEnabled = this.extraData?.adAnalysisEnabled === true
+    if (this.mediaType === 'podcast') {
+      // Expanded episodes need owning consent even without reverse associations.
+      media.episodes = media.episodes.map((episode) => ({ ...episode, adAnalysisEnabled }))
+    }
     return {
       ...this.toOldJSONMinified(),
+      ...(this.mediaType === 'podcast' ? { adAnalysisEnabled } : {}),
       lastScan: this.lastScan?.valueOf(),
       scanVersion: this.lastScanVersion,
-      media: this.media.toOldJSONExpanded(this.id),
+      media,
       // LibraryFile JSON includes a fileType property that may not be saved in libraryFiles column in the database
       libraryFiles: this.getLibraryFilesJson()
     }
