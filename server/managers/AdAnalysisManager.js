@@ -296,7 +296,7 @@ class AdAnalysisManager {
       }
       const title = initial.item.media.title
       const author = initial.item.media.author
-      if (!result.corpus.collectionPaused && (!normalize(title) || title.length > 200 || (author && author.length > 200) || /https?:|[?=&]/i.test(`${title} ${author || ''}`))) throw new Error('unsafe_public_metadata')
+      if (!result.corpus.collectionPaused && (!normalize(title) || title.length > 200 || (author && author.length > 200) || /https?:|[\r\n\u0000]/i.test(`${title} ${author || ''}`))) throw new Error('unsafe_public_metadata')
       const query = encodeURIComponent(`${title} ${author || ''}`.trim())
       const feeds = new Map()
       const audioUrls = new Set()
@@ -384,8 +384,8 @@ class AdAnalysisManager {
         result.reason = result.segments.length ? 'candidate_insertions_not_advertising_proof' : result.status === 'no_difference' ? 'no_inserted_audio' : fingerprints.size < 2 ? 'insufficient_diversity' : 'no_safe_candidates'
       }
     } catch (error) {
-      result.status = error.message === 'cancelled' || controller.signal.aborted ? 'cancelled' : ['unsupported_runtime', 'duration_limit'].includes(error.message) ? 'unsupported' : 'failed'
-      result.reason = ['corpus_unavailable', 'unsupported_runtime', 'duration_limit', 'duration_or_decode_mismatch', 'incomplete_fingerprint', 'unsafe_public_metadata'].includes(error.message) ? error.message : 'analysis_failed'
+      result.status = error.message === 'cancelled' || controller.signal.aborted ? 'cancelled' : ['unsupported_runtime', 'duration_limit', 'audio_size_limit'].includes(error.message) ? 'unsupported' : 'failed'
+      result.reason = ['corpus_unavailable', 'unsupported_runtime', 'duration_limit', 'audio_size_limit', 'duration_or_decode_mismatch', 'incomplete_fingerprint', 'unsafe_public_metadata'].includes(error.message) ? error.message : 'analysis_failed'
       result.segments = []
     } finally {
       this.active.delete(job.itemId)

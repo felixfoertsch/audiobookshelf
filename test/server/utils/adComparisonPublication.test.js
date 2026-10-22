@@ -51,6 +51,27 @@ describe('Manager comparison publication boundary', () => {
     else delete require.cache[modulePath]
     await fs.rm(dir, { recursive: true, force: true })
   })
+  it('searches ordinary public metadata punctuation without query injection', async () => {
+    item.media.title = 'Show & Friends?'
+    item.media.author = 'Alice & Bob = hosts'
+    network.callsFake(async (url) => {
+      if (url.includes('itunes.apple.com')) {
+        const parsed = new URL(url)
+        expect(parsed.searchParams.get('term')).to.equal('Show & Friends? Alice & Bob = hosts')
+        expect([...parsed.searchParams.keys()]).to.deep.equal(['media', 'entity', 'limit', 'term'])
+      }
+      return { status: 200, headers: {}, data: Buffer.from(url.includes('itunes.apple.com') ? '{"results":[]}' : '[]') }
+    })
+    await worker.analyze(job)
+    expect(network.called).to.equal(true)
+    expect(episode.extraData.adAnalysis.reason).to.not.equal('unsafe_public_metadata')
+  })
+  it('reports oversized original as unsupported rather than an unexplained failure', async () => {
+    await fs.truncate(job.path, 256 * 1024 * 1024 + 1)
+    await worker.analyze(job)
+    expect(episode.extraData.adAnalysis).to.include({ status: 'unsupported', reason: 'audio_size_limit' })
+    expect(network.called).to.equal(false)
+  })
   for (const action of ['consent', 'source', 'abort', 'success']) {
     it(`${action}: checks manager callback after real staging, preserves published evidence`, async () => {
       const retain = ComparisonCorpus.prototype.retain
