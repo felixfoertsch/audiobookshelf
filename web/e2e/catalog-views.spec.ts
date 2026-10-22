@@ -124,15 +124,23 @@ for (const prefix of ['', '/abs']) {
 						page.getByRole('combobox', { name: 'View', exact: true }),
 					).toHaveCount(0)
 					await page.keyboard.press('Escape')
+					// Wait for Sheet teardown to restore focus before choosing a new target.
+					await expect(
+						page.getByRole('button', { name: 'View options', exact: true }),
+					).toBeFocused()
 				}
 				expect(
 					await page.evaluate(
 						() => document.documentElement.scrollWidth <= innerWidth,
 					),
 				).toBe(true)
-				await entry.getByRole('link').first().focus()
+				const link = entry.getByRole('link').first()
+				const href = await link.getAttribute('href')
+				if (!href) throw new Error('Entity link must have a destination')
+				await link.focus()
+				await expect(link).toBeFocused()
 				await page.keyboard.press('Enter')
-				await expect(page).not.toHaveURL(/\/bookshelf\//)
+				await expect(page).toHaveURL(new URL(href, page.url()).href)
 			}
 		})
 	}
