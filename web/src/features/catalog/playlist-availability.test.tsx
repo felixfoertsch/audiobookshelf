@@ -52,7 +52,10 @@ test('empty and unavailable playlists disable playback without hiding membership
 		'Play',
 	])
 		expect(
-			(screen.getByRole('button', { name: new RegExp(`^${name}$`) }) as HTMLButtonElement)
-				.disabled,
+			(
+				screen.getByRole('button', {
+					name: new RegExp(`^${name}$`),
+				}) as HTMLButtonElement
+			).disabled,
 		).toBe(true)
 })
