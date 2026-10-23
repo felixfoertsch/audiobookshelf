@@ -87,9 +87,30 @@ export async function removeCover(id: string) {
 	})
 }
 export async function updateMetadata(id: string, payload: unknown) {
+	const parsed = z
+		.object({
+			metadata: z
+				.object({
+					series: z
+						.array(
+							z
+								.object({
+									id: z.string().optional(),
+									name: z.string().trim().min(1),
+									sequence: z.string().nullable().optional(),
+								})
+								.passthrough(),
+						)
+						.optional(),
+				})
+				.passthrough()
+				.optional(),
+		})
+		.passthrough()
+		.parse(payload)
 	return api(`/api/items/${encodeURIComponent(id)}/media`, responseSchema, {
 		method: 'PATCH',
-		body: JSON.stringify(payload),
+		body: JSON.stringify(parsed),
 	})
 }
 export const matchOptionsSchema = z

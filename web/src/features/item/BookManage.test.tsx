@@ -73,6 +73,73 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 describe('BookManage private drafts', () => {
+	it('roundtrips series membership and sequence with native metadata', async () => {
+		const value = book('A')
+		mocks.getItem.mockResolvedValue({
+			...value,
+			media: {
+				...value.media,
+				metadata: {
+					title: 'A',
+					series: [{ id: 's1', name: 'Old series', sequence: '1' }],
+				},
+			},
+		})
+		render(<BookManage id="A" section="edit" />)
+		fireEvent.change(await screen.findByLabelText('Series name 1'), {
+			target: { value: 'New series' },
+		})
+		fireEvent.change(screen.getByLabelText('Series sequence 1'), {
+			target: { value: '2.5' },
+		})
+		fireEvent.click(screen.getByRole('button', { name: 'Add series' }))
+		fireEvent.change(screen.getByLabelText('Series name 2'), {
+			target: { value: 'Second' },
+		})
+		fireEvent.click(screen.getByRole('button', { name: 'Save metadata' }))
+		await waitFor(() =>
+			expect(mocks.api).toHaveBeenCalledWith(
+				'/api/items/A/media',
+				expect.anything(),
+				expect.objectContaining({
+					body: expect.stringContaining('"sequence":"2.5"'),
+				}),
+			),
+		)
+		const body = JSON.parse(
+			mocks.api.mock.calls.find(([url]) => url === '/api/items/A/media')?.[2]
+				.body,
+		)
+		expect(body.metadata.series).toEqual([
+			{ id: 's1', name: 'New series', sequence: '2.5' },
+			{ id: expect.stringMatching(/^new-/), name: 'Second', sequence: '' },
+		])
+	})
+	it('resets chapter draft without writing and confirms remove-all before save', async () => {
+		render(<BookManage id="A" section="chapters" />)
+		fireEvent.change(await screen.findByLabelText('Title'), {
+			target: { value: 'Draft' },
+		})
+		fireEvent.click(screen.getByRole('button', { name: 'Reset chapters' }))
+		expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
+			'A chapter',
+		)
+		expect(mocks.api).not.toHaveBeenCalled()
+		vi.mocked(window.confirm).mockReturnValueOnce(false)
+		fireEvent.click(screen.getByRole('button', { name: 'Remove all chapters' }))
+		expect(screen.getByLabelText('Title')).toBeTruthy()
+		fireEvent.click(screen.getByRole('button', { name: 'Remove all chapters' }))
+		expect(screen.queryByLabelText('Title')).toBeNull()
+		expect(mocks.api).not.toHaveBeenCalled()
+		fireEvent.click(screen.getByRole('button', { name: 'Save chapters' }))
+		await waitFor(() =>
+			expect(mocks.api).toHaveBeenCalledWith(
+				'/api/items/A/chapters',
+				expect.anything(),
+				{ method: 'POST', body: '{"chapters":[]}' },
+			),
+		)
+	})
 	it('keeps metadata save separate from match, names track moves and activates upload picker', async () => {
 		const value = book('A')
 		mocks.getItem.mockResolvedValue({
@@ -108,13 +175,106 @@ describe('BookManage private drafts', () => {
 		}) as HTMLButtonElement
 		expect(save.form?.id).toBe('book-metadata-form')
 		expect(
-			(screen.getByRole('button', { name: 'Apply match' }) as HTMLButtonElement)
+			(screen.getByRole('button', { name: 'Search' }) as HTMLButtonElement)
 				.form,
 		).not.toBe(save.form)
 		const picker = screen.getByLabelText('Upload cover file')
 		const click = vi.spyOn(picker, 'click')
 		fireEvent.click(screen.getByRole('button', { name: 'Upload cover' }))
 		expect(click).toHaveBeenCalledOnce()
+	})
+	it('sorts tracks by filename, metadata and disc; resets draft and reloads saved server order', async () => {
+		const source = book('A')
+		const files = [
+			{
+				ino: 1,
+				filename: '02.mp3',
+				index: 1,
+				trackNumFromMeta: 2,
+				discNumFromMeta: 1,
+			},
+			{
+				ino: 2,
+				filename: '01.mp3',
+				index: 2,
+				trackNumFromMeta: 1,
+				discNumFromMeta: 2,
+			},
+		]
+		mocks.getItem.mockResolvedValue({
+			...source,
+			media: { ...source.media, audioFiles: files },
+		})
+		render(<BookManage id="A" section="edit" />)
+		await screen.findByLabelText('Title')
+		const names = () =>
+			screen
+				.getAllByRole('button', { name: /^Move .* up$/ })
+				.map((button) => button.getAttribute('aria-label'))
+		fireEvent.click(screen.getByRole('button', { name: 'Sort by filename' }))
+		expect(names()).toEqual(['Move 01.mp3 up', 'Move 02.mp3 up'])
+		fireEvent.click(screen.getByRole('button', { name: 'Reset track order' }))
+		expect(names()).toEqual(['Move 02.mp3 up', 'Move 01.mp3 up'])
+		fireEvent.click(
+			screen.getByRole('button', { name: 'Sort by metadata track' }),
+		)
+		expect(names()[0]).toBe('Move 01.mp3 up')
+		fireEvent.click(
+			screen.getByRole('button', { name: 'Sort by metadata disc' }),
+		)
+		expect(names()[0]).toBe('Move 02.mp3 up')
+		fireEvent.click(screen.getByRole('button', { name: 'Sort by filename' }))
+		mocks.getItem.mockResolvedValue({
+			...source,
+			media: { ...source.media, audioFiles: [...files].reverse() },
+		})
+		fireEvent.click(screen.getByRole('button', { name: 'Save track order' }))
+		await screen.findByText('Changes saved')
+		expect(names()[0]).toBe('Move 01.mp3 up')
+		expect(mocks.getItem).toHaveBeenCalledTimes(2)
+		expect(
+			JSON.parse(
+				mocks.api.mock.calls.find(([url]) => url === '/api/items/A/tracks')?.[2]
+					.body,
+			).orderedFileData.map((file: { ino: number }) => file.ino),
+		).toEqual([2, 1])
+	})
+	it('locks shift ranges, increments starts and previews chapter track-relative time', async () => {
+		const source = book('A')
+		mocks.getItem.mockResolvedValue({
+			...source,
+			media: {
+				...source.media,
+				chapters: [
+					{ title: 'One', start: 0, end: 8 },
+					{ title: 'Two', start: 8, end: 20 },
+				],
+				tracks: [
+					{ contentUrl: '/audio.wav', duration: 5, startOffset: 0 },
+					{ contentUrl: '/audio2.wav', duration: 15, startOffset: 5 },
+				],
+			},
+		})
+		render(<BookManage id="A" section="chapters" />)
+		await screen.findByDisplayValue('One')
+		fireEvent.click(screen.getByRole('button', { name: 'Lock chapter 2' }))
+		fireEvent.change(screen.getByLabelText('Shift seconds'), {
+			target: { value: '1' },
+		})
+		fireEvent.click(screen.getByRole('button', { name: 'Shift all' }))
+		expect(
+			(screen.getAllByLabelText('Start (seconds)')[1] as HTMLInputElement)
+				.value,
+		).toBe('8')
+		expect(
+			(screen.getAllByLabelText('End (seconds)')[0] as HTMLInputElement).value,
+		).toBe('9')
+		fireEvent.click(
+			screen.getByRole('button', { name: 'Add one second to chapter 2' }),
+		)
+		fireEvent.click(screen.getByRole('button', { name: 'Preview chapter 2' }))
+		expect(screen.getByText('Two — track 2: track time 4.000 s')).toBeTruthy()
+		expect(mocks.api).not.toHaveBeenCalled()
 	})
 	it('hides A draft while B loads and saves only B draft to B', async () => {
 		const pending = deferred<ReturnType<typeof book>>()
@@ -208,19 +368,12 @@ describe('BookManage private drafts', () => {
 		expect(screen.getByDisplayValue('Unsaved metadata')).toBeTruthy()
 		expect(mocks.getItem).toHaveBeenCalledTimes(1)
 		view.rerender(<BookManage id="A" section="manage" />)
-		fireEvent.click(
-			screen.getByRole('button', { name: 'Check metadata object' }),
-		)
-		await screen.findByText('Metadata object retrieved. No changes made.')
-		fireEvent.click(
-			screen.getByRole('button', { name: 'Start metadata embed' }),
-		)
-		await screen.findByText('Metadata embed started')
-		expect(screen.queryByText('Changes saved')).toBeNull()
-		mocks.api.mockRejectedValueOnce(new Error('Queue rejected'))
-		fireEvent.click(screen.getByRole('button', { name: 'Start M4B encoding' }))
-		await screen.findByText('Queue rejected')
-		expect(screen.queryByText('M4B encoding started')).toBeNull()
+		expect(
+			await screen.findByText('This audiobook has no audio files.'),
+		).toBeTruthy()
+		expect(
+			screen.queryByRole('button', { name: 'Start metadata embed' }),
+		).toBeNull()
 	})
 	it('shows contextual book heading and return link, with cover only in edit', async () => {
 		const { rerender } = render(<BookManage id="A" section="chapters" />)

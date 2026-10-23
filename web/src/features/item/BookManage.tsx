@@ -1,23 +1,22 @@
 import { Link } from '@tanstack/react-router'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { z } from 'zod'
-import { api, useAuth } from '../../api'
+import { useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
 import { Input } from '../../shared/components/ui/input'
 import { NativeSelect } from '../../shared/components/ui/native-select'
+import { BookMatch } from './BookMatch'
+import { BookTools } from './BookTools'
 import {
 	audibleChapters,
 	type Chapter,
 	findChapters,
-	matchItem,
 	removeCover,
 	saveChapters,
 	saveTrackOrder,
 	searchCovers,
 	setCoverUrl,
 	setLocalCover,
-	shiftChapters,
 	updateMetadata,
 	uploadCover,
 	validateChapters,
@@ -25,14 +24,19 @@ import {
 import type { Item } from './schemas'
 import { getItem } from './service'
 
-const itemResult = z.object({}).passthrough()
 type Props = { id: string; section: 'chapters' | 'edit' | 'manage' }
 type Track = {
 	ino: number
 	index: number
 	filename: string
 	exclude?: boolean
-	metadata?: { filename?: string }
+	metadata?: { filename?: string; size?: number }
+	trackNumFromMeta?: number | null
+	trackNumFromFilename?: number | null
+	discNumFromMeta?: number | null
+	discNumFromFilename?: number | null
+	duration?: number
+	error?: string | null
 }
 
 export function BookManage(props: Props) {
@@ -69,6 +73,14 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 	const [chapters, setChapters] = useState<Chapter[]>([])
 	const [tracks, setTracks] = useState<Track[]>([])
 	const [metadata, setMetadata] = useState<Record<string, unknown>>({})
+	const [lockedChapters, setLockedChapters] = useState<Set<number>>(new Set())
+	const lastLock = useRef<number | null>(null)
+	const [preview, setPreview] = useState<{
+		url: string
+		time: number
+		title: string
+	} | null>(null)
+	const previewAudio = useRef<HTMLAudioElement>(null)
 	const [bulkTitle, setBulkTitle] = useState('')
 	const [shiftSeconds, setShiftSeconds] = useState('0')
 	const [asin, setAsin] = useState('')
@@ -77,10 +89,6 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 	const [coverUrl, setCover] = useState('')
 	const [searchTerm, setSearchTerm] = useState('')
 	const [coverResults, setCoverResults] = useState<string[]>([])
-	const [codec, setCodec] = useState('aac')
-	const [bitrate, setBitrate] = useState('128k')
-	const [channels, setChannels] = useState('2')
-	const [backup, setBackup] = useState(true)
 	const [busy, setBusy] = useState(false)
 	const [error, setError] = useState('')
 	const [notice, setNotice] = useState('')
@@ -220,6 +228,111 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 			{section === 'chapters' && (
 				<>
 					<p>Duration: {duration.toFixed(2)} s</p>
+					<Button
+						variant="outline"
+						disabled={
+							!Array.isArray(item.media.tracks) || !item.media.tracks.length
+						}
+						onClick={() => {
+							if (!window.confirm('Replace draft chapters with audio tracks?'))
+								return
+							let start = 0
+							setChapters(
+								(
+									(item.media.tracks ?? []) as Array<{
+										duration: number
+										startOffset?: number
+										title?: string
+										metadata?: { filename?: string }
+									}>
+								).map((track, index) => {
+									const offset = track.startOffset ?? start
+									start = offset + track.duration
+									return {
+										id: index,
+										title:
+											track.title ||
+											track.metadata?.filename ||
+											`Chapter ${index + 1}`,
+										start: offset,
+										end: start,
+									}
+								}),
+							)
+						}}
+					>
+						Set chapters from tracks
+					</Button>
+					<div className="flex flex-wrap gap-2">
+						<Button
+							variant="outline"
+							disabled={busy}
+							onClick={() => {
+								setChapters(
+									(item.media.chapters ?? []).map((chapter) => ({
+										...chapter,
+									})),
+								)
+								setLockedChapters(new Set())
+								setPreview(null)
+							}}
+						>
+							Reset chapters
+						</Button>
+						<Button
+							variant="destructive"
+							disabled={busy || !chapters.length}
+							onClick={() => {
+								if (
+									window.confirm(
+										'Remove all chapters from draft? Save chapters to write changes.',
+									)
+								) {
+									setChapters([])
+									setLockedChapters(new Set())
+									setPreview(null)
+								}
+							}}
+						>
+							Remove all chapters
+						</Button>
+						<Button
+							variant="outline"
+							onClick={() =>
+								setLockedChapters(
+									lockedChapters.size === chapters.length
+										? new Set()
+										: new Set(chapters.map((_, index) => index)),
+								)
+							}
+						>
+							{lockedChapters.size === chapters.length && chapters.length
+								? 'Unlock all chapters'
+								: 'Lock all chapters'}
+						</Button>
+					</div>
+					{preview && (
+						<div>
+							<p>
+								{preview.title}: track time {preview.time.toFixed(3)} s
+							</p>
+							<audio
+								ref={previewAudio}
+								aria-label="Chapter preview"
+								onError={() =>
+									setError('Chapter preview audio could not be loaded')
+								}
+								controls
+								src={preview.url}
+								onLoadedMetadata={() => {
+									if (previewAudio.current)
+										previewAudio.current.currentTime = preview.time
+								}}
+							>
+								<track kind="captions" />
+							</audio>
+						</div>
+					)}
 					{chapters.map((chapter, index) => (
 						<div
 							key={chapter.id ?? index}
@@ -271,6 +384,97 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 									}
 								/>
 							</label>
+							<div className="flex flex-wrap gap-2">
+								<Button
+									variant="outline"
+									aria-label={`Subtract one second from chapter ${index + 1}`}
+									disabled={chapter.start < 1}
+									onClick={() =>
+										setChapter(index, { start: chapter.start - 1 })
+									}
+								>
+									−1 s
+								</Button>
+								<Button
+									variant="outline"
+									aria-label={`Add one second to chapter ${index + 1}`}
+									disabled={chapter.start + 1 >= duration}
+									onClick={() =>
+										setChapter(index, { start: chapter.start + 1 })
+									}
+								>
+									+1 s
+								</Button>
+								<Button
+									variant="outline"
+									aria-label={`Lock chapter ${index + 1}`}
+									aria-pressed={lockedChapters.has(index)}
+									onClick={(event) => {
+										const next = new Set(lockedChapters)
+										const start =
+											event.shiftKey && lastLock.current !== null
+												? Math.min(lastLock.current, index)
+												: index
+										const end =
+											event.shiftKey && lastLock.current !== null
+												? Math.max(lastLock.current, index)
+												: index
+										for (let i = start; i <= end; i++) {
+											if (lockedChapters.has(index)) next.delete(i)
+											else next.add(i)
+										}
+										lastLock.current = index
+										setLockedChapters(next)
+									}}
+								>
+									{lockedChapters.has(index) ? 'Locked' : 'Unlocked'}
+								</Button>
+								<Button
+									variant="outline"
+									disabled={
+										!Array.isArray(item.media.tracks) ||
+										!item.media.tracks.length
+									}
+									onClick={() => {
+										const audioTracks = (item.media.tracks ?? []) as Array<{
+											contentUrl: string
+											startOffset?: number
+											duration?: number
+											index?: number
+										}>
+										let offset = 0
+										for (const track of audioTracks) {
+											const start = track.startOffset ?? offset
+											if (
+												chapter.start >= start &&
+												chapter.start < start + (track.duration ?? 0)
+											) {
+												const url = new URL(
+													track.contentUrl.startsWith('/api/')
+														? `${window.__ABS_WEB_CONFIG__?.apiBasePath ?? ''}${track.contentUrl}`
+														: track.contentUrl,
+													window.location.origin,
+												)
+												if (url.origin !== window.location.origin) {
+													setError('Preview audio must use this server')
+													return
+												}
+												const token = localStorage.getItem('token')
+												if (token) url.searchParams.set('token', token)
+												setPreview({
+													url: url.href,
+													time: chapter.start - start,
+													title: `${chapter.title} — track ${track.index ?? audioTracks.indexOf(track) + 1}`,
+												})
+												return
+											}
+											offset = start + (track.duration ?? 0)
+										}
+									}}
+								>
+									Preview chapter {index + 1}
+								</Button>
+							</div>
 							<Button
 								variant="destructive"
 								disabled={busy}
@@ -330,8 +534,22 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 							variant="outline"
 							onClick={() => {
 								try {
+									const amount = Number(shiftSeconds)
+									if (!Number.isFinite(amount))
+										throw new Error('Shift must be a finite number')
 									setChapters((current) =>
-										shiftChapters(current, Number(shiftSeconds)),
+										current.map((chapter, index) =>
+											lockedChapters.has(index)
+												? chapter
+												: {
+														...chapter,
+														start:
+															index === 0
+																? 0
+																: Math.max(0, chapter.start + amount),
+														end: Math.min(duration, chapter.end + amount),
+													},
+										),
 									)
 								} catch (e) {
 									setError(e instanceof Error ? e.message : 'Invalid shift')
@@ -403,6 +621,22 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 					</div>
 					{lookup != null && (
 						<div className="space-y-2">
+							{(() => {
+								try {
+									return (
+										<ol>
+											{audibleChapters(lookup, duration).map((chapter) => (
+												<li key={`${chapter.start}-${chapter.title}`}>
+													{chapter.start.toFixed(3)}–{chapter.end.toFixed(3)} s:{' '}
+													{chapter.title}
+												</li>
+											))}
+										</ol>
+									)
+								} catch {
+									return <p role="alert">Invalid chapter lookup data</p>
+								}
+							})()}
 							<p>
 								Found chapter data. Applying replaces unsaved chapters; review
 								before saving.
@@ -473,6 +707,57 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 			{section === 'edit' && (
 				<>
 					<h2 className="text-xl font-semibold">Audio tracks</h2>
+					<div className="flex flex-wrap gap-2">
+						<Button
+							variant="outline"
+							onClick={() =>
+								setTracks(
+									((item.media.audioFiles ?? []) as Track[]).map((track) => ({
+										...track,
+									})),
+								)
+							}
+						>
+							Reset track order
+						</Button>
+						{(
+							[
+								'filename',
+								'trackNumFromMeta',
+								'trackNumFromFilename',
+								'discNumFromMeta',
+								'discNumFromFilename',
+							] as const
+						).map((field) => (
+							<Button
+								key={field}
+								variant="outline"
+								onClick={() =>
+									setTracks((current) =>
+										[...current].sort((a, b) =>
+											field === 'filename'
+												? (a.metadata?.filename ?? a.filename).localeCompare(
+														b.metadata?.filename ?? b.filename,
+														undefined,
+														{ numeric: true },
+													)
+												: (a[field] ?? Infinity) - (b[field] ?? Infinity),
+										),
+									)
+								}
+							>
+								{
+									{
+										filename: 'Sort by filename',
+										trackNumFromMeta: 'Sort by metadata track',
+										trackNumFromFilename: 'Sort by filename track',
+										discNumFromMeta: 'Sort by metadata disc',
+										discNumFromFilename: 'Sort by filename disc',
+									}[field]
+								}
+							</Button>
+						))}
+					</div>
 					{tracks.map((track, index) => (
 						<div
 							key={track.ino}
@@ -481,6 +766,23 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 							<span className="min-w-0 grow">
 								{index + 1}. {track.metadata?.filename ?? track.filename}
 							</span>
+							<dl className="flex flex-wrap gap-3 text-sm">
+								{Object.entries({
+									'Current order': track.index,
+									'Track from filename': track.trackNumFromFilename,
+									'Track from metadata': track.trackNumFromMeta,
+									'Disc from filename': track.discNumFromFilename,
+									'Disc from metadata': track.discNumFromMeta,
+									'Size (bytes)': track.metadata?.size,
+									'Duration (seconds)': track.duration,
+									Notes: track.error,
+								}).map(([label, value]) => (
+									<div key={label}>
+										<dt>{label}</dt>
+										<dd>{value ?? '—'}</dd>
+									</div>
+								))}
+							</dl>
 							<label>
 								<input
 									type="checkbox"
@@ -539,6 +841,14 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 						onSubmit={(e) => {
 							e.preventDefault()
 							const { tags, authorName, ...mediaMetadata } = metadata
+							if (Array.isArray(mediaMetadata.series))
+								mediaMetadata.series = mediaMetadata.series.map(
+									(row: {
+										id?: string
+										name: string
+										sequence?: string | null
+									}) => ({ ...row, name: row.name.trim() }),
+								)
 							if (typeof authorName === 'string')
 								mediaMetadata.authors = authorName
 									.split(',')
@@ -628,6 +938,90 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 								)}
 							</div>
 						))}
+						<fieldset className="space-y-2 sm:col-span-2">
+							<legend>Series membership</legend>
+							{(
+								(metadata.series ?? []) as Array<{
+									id?: string
+									name: string
+									sequence?: string | null
+								}>
+							).map((series, index) => (
+								<div key={series.id} className="flex flex-wrap gap-2">
+									<label htmlFor={`series-name-${index}`}>
+										Series name {index + 1}
+										<Input
+											id={`series-name-${index}`}
+											required
+											value={series.name}
+											onChange={(event) =>
+												setMetadata((current) => ({
+													...current,
+													series: (current.series as (typeof series)[]).map(
+														(row, i) =>
+															i === index
+																? { ...row, name: event.target.value }
+																: row,
+													),
+												}))
+											}
+										/>
+									</label>
+									<label htmlFor={`series-sequence-${index}`}>
+										Series sequence {index + 1}
+										<Input
+											id={`series-sequence-${index}`}
+											value={series.sequence ?? ''}
+											onChange={(event) =>
+												setMetadata((current) => ({
+													...current,
+													series: (current.series as (typeof series)[]).map(
+														(row, i) =>
+															i === index
+																? { ...row, sequence: event.target.value }
+																: row,
+													),
+												}))
+											}
+										/>
+									</label>
+									<Button
+										type="button"
+										variant="outline"
+										aria-label={`Remove series ${index + 1}`}
+										onClick={() =>
+											setMetadata((current) => ({
+												...current,
+												series: (current.series as (typeof series)[]).filter(
+													(_, i) => i !== index,
+												),
+											}))
+										}
+									>
+										Remove series
+									</Button>
+								</div>
+							))}
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() =>
+									setMetadata((current) => ({
+										...current,
+										series: [
+											...(Array.isArray(current.series) ? current.series : []),
+											{
+												id: `new-${crypto.randomUUID()}`,
+												name: '',
+												sequence: '',
+											},
+										],
+									}))
+								}
+							>
+								Add series
+							</Button>
+						</fieldset>
 						{(['explicit', 'abridged'] as const).map((key) => (
 							<label key={key}>
 								<input
@@ -644,173 +1038,22 @@ function BookEditor({ id, section, ownerId }: Props & { ownerId?: string }) {
 							</label>
 						))}
 					</form>
-					<form
-						className="flex flex-wrap gap-2"
-						onSubmit={(e) => {
-							e.preventDefault()
-							void action(() =>
-								matchItem(id, {
-									provider: 'google',
-									title: String(metadata.title ?? ''),
-									author: String(metadata.authorName ?? ''),
-									isbn: String(metadata.isbn ?? ''),
-									asin: String(metadata.asin ?? ''),
-									overrideDetails: true,
-									overrideCover: false,
-								}),
-							)
-						}}
-					>
-						<Button variant="outline" disabled={busy}>
-							Apply match
-						</Button>
-						<Button form="book-metadata-form" disabled={busy}>
-							Save metadata
-						</Button>
-					</form>
+					<Button form="book-metadata-form" disabled={busy}>
+						Save metadata
+					</Button>
+					<BookMatch id={id} metadata={metadata} onApplied={load} />
 				</>
 			)}
 			{section === 'manage' && (
-				<>
-					<p>
-						Metadata object and audio encoding require administrator access and
-						are not exposed as update-permission controls.
-					</p>
-					{isAdmin && (
-						<div className="grid justify-items-start gap-3">
-							<h3 className="font-semibold">Metadata embedding</h3>
-							<Button
-								variant="outline"
-								disabled={busy}
-								onClick={() =>
-									void action(
-										async () => {
-											await api(
-												`/api/items/${encodeURIComponent(id)}/metadata-object`,
-												itemResult,
-											)
-										},
-										false,
-										'Metadata object retrieved. No changes made.',
-									)
-								}
-							>
-								Check metadata object
-							</Button>
-							<label>
-								<input
-									type="checkbox"
-									checked={backup}
-									onChange={(e) => setBackup(e.target.checked)}
-								/>{' '}
-								Back up audio before embedding metadata
-							</label>
-							<Button
-								disabled={busy}
-								onClick={() => {
-									if (
-										window.confirm('Embed metadata into audiobook audio files?')
-									)
-										void action(
-											() =>
-												api(
-													`/api/tools/item/${encodeURIComponent(id)}/embed-metadata?backup=${backup ? 1 : 0}`,
-													itemResult,
-													{ method: 'POST' },
-												),
-											false,
-											'Metadata embed started',
-										)
-								}}
-							>
-								Start metadata embed
-							</Button>
-							<h3 className="mt-4 font-semibold">Audio encoding</h3>
-							<label
-								className="grid content-start gap-1"
-								htmlFor="book-control-2"
-							>
-								Codec
-								<NativeSelect
-									id="book-control-2"
-									className="rounded border bg-background p-2"
-									value={codec}
-									onChange={(e) => setCodec(e.target.value)}
-								>
-									{['copy', 'aac', 'opus'].map((value) => (
-										<option key={value}>{value}</option>
-									))}
-								</NativeSelect>
-							</label>
-							<label
-								className="grid content-start gap-1"
-								htmlFor="book-control-3"
-							>
-								Bitrate
-								<NativeSelect
-									id="book-control-3"
-									className="rounded border bg-background p-2"
-									value={bitrate}
-									onChange={(e) => setBitrate(e.target.value)}
-								>
-									{['32k', '64k', '128k', '192k'].map((value) => (
-										<option key={value}>{value}</option>
-									))}
-								</NativeSelect>
-							</label>
-							<label
-								className="grid content-start gap-1"
-								htmlFor="book-control-4"
-							>
-								Channels
-								<NativeSelect
-									id="book-control-4"
-									className="rounded border bg-background p-2"
-									value={channels}
-									onChange={(e) => setChannels(e.target.value)}
-								>
-									<option value="1">1 (mono)</option>
-									<option value="2">2 (stereo)</option>
-								</NativeSelect>
-							</label>
-							<Button
-								disabled={busy}
-								onClick={() =>
-									void action(
-										() =>
-											api(
-												`/api/tools/item/${encodeURIComponent(id)}/encode-m4b?${new URLSearchParams({ codec, bitrate, channels })}`,
-												itemResult,
-												{ method: 'POST' },
-											),
-										false,
-										'M4B encoding started',
-									)
-								}
-							>
-								Start M4B encoding
-							</Button>
-							<Button
-								variant="destructive"
-								disabled={busy}
-								onClick={() =>
-									void action(
-										() =>
-											api(
-												`/api/tools/item/${encodeURIComponent(id)}/encode-m4b`,
-												itemResult,
-												{ method: 'DELETE' },
-											),
-										false,
-										'M4B cancellation requested',
-									)
-								}
-							>
-								Cancel M4B encoding
-							</Button>
-						</div>
-					)}
-				</>
+				<BookTools
+					id={id}
+					hasAudio={
+						!item.isMissing &&
+						((item.media.audioFiles ?? []) as Track[]).some(
+							(track) => !track.exclude,
+						)
+					}
+				/>
 			)}
 			{section === 'edit' && (
 				<section className="space-y-4 border-t pt-4">

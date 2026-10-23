@@ -5,6 +5,7 @@ import {
 	matchOptionsSchema,
 	saveChapters,
 	shiftChapters,
+	updateMetadata,
 	validateChapters,
 } from './book-manage'
 
@@ -92,6 +93,18 @@ describe('book management contracts', () => {
 			{ title: 'One', start: 3, end: 5 },
 		])
 		expect(() => shiftChapters([], Number.NaN)).toThrow(/finite/)
+	})
+	it('rejects blank series membership before metadata request', async () => {
+		await expect(
+			updateMetadata('synthetic', {
+				metadata: { series: [{ name: '  ', sequence: '1' }] },
+			}),
+		).rejects.toThrow()
+		await expect(
+			updateMetadata('synthetic', {
+				metadata: { series: [{ name: 'Saga', sequence: 2 }] },
+			}),
+		).rejects.toThrow()
 	})
 	it('validates match endpoint options shape', () => {
 		expect(
