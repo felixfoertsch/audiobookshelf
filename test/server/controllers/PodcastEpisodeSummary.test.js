@@ -51,6 +51,14 @@ describe('Podcast episode summary', () => {
     expect(podcastUtils.getPodcastFeed.calledOnce).to.equal(true)
   })
 
+  it('does not fetch when podcast has no feed URL', async () => {
+    const fetch = sinon.stub(podcastUtils, 'getPodcastFeed')
+    const res = response()
+    await controller.getEpisodeSummary({ libraryItem: { media: { podcastEpisodes: [] } }, user: { mediaProgresses: [] } }, res)
+    expect(fetch.called).to.equal(false)
+    expect(res.body).to.deep.equal({ total: 0, unplayed: 0, source: 'downloaded' })
+  })
+
   it('falls back to downloaded episodes on feed failure', async () => {
     sinon.stub(podcastUtils, 'getPodcastFeed').resolves(null)
     const req = {
