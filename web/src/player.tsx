@@ -1952,7 +1952,7 @@ function SegmentMarkers({
 				<span
 					key={`${s.start}-${s.end}`}
 					data-testid="segment-marker"
-					className="absolute h-full rounded-full bg-amber-700 dark:bg-amber-400"
+					className="absolute h-full rounded-full bg-amber-300"
 					style={{
 						left: `${(s.start / total) * 100}%`,
 						width: `${((s.end - s.start) / total) * 100}%`,

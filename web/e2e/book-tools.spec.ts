@@ -68,6 +68,7 @@ for (const prefix of ['', '/abs']) {
 			page.getByRole('button', { name: 'Cancel M4B encoding' }),
 		).toHaveCount(0)
 		await event('task_started', task)
+		await expect(page.getByText('Encoding M4B: 0%')).toBeVisible()
 		await event('task_progress', { libraryItemId: 'book-1', progress: 47 })
 		await expect(page.getByText('Encoding M4B: 47%')).toBeVisible()
 		await page.getByRole('button', { name: 'Cancel M4B encoding' }).click()

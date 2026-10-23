@@ -21,6 +21,7 @@
 	--primary-foreground: oklch(1 0 0);
 	--secondary: oklch(0.9394 0.0046 258.3251);
 	--secondary-foreground: oklch(0.2786 0.0211 257.2774);
+	--slider-track: #787878;
 	--muted: oklch(0.9504 0.0042 236.4983);
 	--muted-foreground: oklch(0.4789 0.0204 256.3497);
 	--accent: oklch(0.9209 0.0294 257.7666);

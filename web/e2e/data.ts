@@ -549,7 +549,19 @@ export const boundaryBook = item('book-boundaries', 'books', 'book', {
 		{ id: 1, title: 'Across the bridge', start: 3, end: 8 },
 		{ id: 2, title: 'Arrival', start: 8, end: 15 },
 	],
-	audioFiles: [],
+	audioFiles: [4, 5, 6].map((duration, index) => ({
+		...books[0].audioFiles[0],
+		ino: `boundary-${index + 1}`,
+		index: index + 1,
+		duration,
+		metadata: {
+			...books[0].audioFiles[0].metadata,
+			filename: `boundary-book-${index + 1}.wav`,
+			ext: '.wav',
+			path: `/synthetic/book-boundaries/boundary-book-${index + 1}.wav`,
+			size: [64044, 80044, 96044][index],
+		},
+	})),
 	tracks: [4, 5, 6].map((duration, index) => ({
 		...books[0].tracks[0],
 		index: index + 1,

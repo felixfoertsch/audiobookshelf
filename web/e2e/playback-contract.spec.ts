@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, type Page, test } from '@playwright/test'
+import { contrast } from './contrast'
 import { appMenu, chooseTheme, settleAnimations } from './shell-controls'
 
 async function login(page: Page, prefix: string) {
@@ -235,48 +236,30 @@ for (const prefix of ['', '/abs']) {
 			for (const theme of ['light', 'dark']) {
 				await chooseTheme(page, theme)
 				await settleAnimations(page)
-				const contrast = await page
-					.getByTestId('segment-marker')
-					.evaluate((marker) => {
-						const track = document.querySelector(
-							'[data-slot="slider-track"]',
-						) as HTMLElement
-						const luminance = (color: string) => {
-							const canvas = document.createElement('canvas')
-							canvas.width = canvas.height = 1
-							const context = canvas.getContext('2d')
-							if (!context)
-								throw new Error('Canvas unavailable for contrast measurement')
-							context.fillStyle = color
-							context.fillRect(0, 0, 1, 1)
-							const rgb = Array.from(context.getImageData(0, 0, 1, 1).data)
-								.slice(0, 3)
-								.map((channel) => {
-									const value = channel / 255
-									return value <= 0.04045
-										? value / 12.92
-										: ((value + 0.055) / 1.055) ** 2.4
-								})
-							return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
-						}
-						const markerColor = getComputedStyle(marker).backgroundColor
-						const trackColor = getComputedStyle(track).backgroundColor
-						const a = luminance(markerColor)
-						const b = luminance(trackColor)
-						return {
-							ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
-							markerColor,
-							trackColor,
-							gap:
-								marker.getBoundingClientRect().top -
-								track.getBoundingClientRect().bottom,
-						}
-					})
-				expect(contrast.ratio).toBeGreaterThanOrEqual(3)
-				expect(contrast.gap).toBeGreaterThanOrEqual(0)
-				console.log(
-					`Segment contrast ${prefix || 'root'} ${theme}: ${JSON.stringify(contrast)}`,
+				const track = await contrast(
+					page.locator('[data-slot="slider-track"]').first(),
+					'backgroundColor',
 				)
+				const marker = await contrast(
+					page.getByTestId('segment-marker'),
+					'backgroundColor',
+					'[data-slot="slider-track"]',
+				)
+				console.log(JSON.stringify({ theme, track, marker }))
+				expect(track.ratio, `${theme} track/background`).toBeGreaterThanOrEqual(
+					3,
+				)
+				expect(marker.ratio, `${theme} marker/track`).toBeGreaterThanOrEqual(3)
+				const gap = await page
+					.getByTestId('segment-marker')
+					.evaluate(
+						(node) =>
+							node.getBoundingClientRect().top -
+							(document
+								.querySelector('[data-slot="slider-track"]')
+								?.getBoundingClientRect().bottom ?? Infinity),
+					)
+				expect(gap).toBeGreaterThanOrEqual(0)
 				await page.screenshot({
 					path: `/private/tmp/opencode/player-segments/player-markers${prefix ? '-abs' : ''}-${theme}.png`,
 				})
