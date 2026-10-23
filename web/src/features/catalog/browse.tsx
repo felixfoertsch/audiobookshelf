@@ -1930,7 +1930,11 @@ export function NarratorsPage({
 										<Button disabled={pending} type="submit">
 											Save
 										</Button>
-										<Button variant="outline" onClick={() => setEditing('')}>
+										<Button
+											type="button"
+											variant="outline"
+											onClick={() => setEditing('')}
+										>
 											Cancel
 										</Button>
 									</form>

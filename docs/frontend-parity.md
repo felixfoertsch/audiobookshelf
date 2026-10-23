@@ -20,7 +20,7 @@ Route files live in `web/src/routes/`; routes rendering a feature delegate to th
 | `/library/$library/bookshelf` and `/library/$library/bookshelf/$id` | `features/catalog/browse.tsx` `BrowsePage`: search/filter/sort/page/view/group controls; select items, select page, clear/done; bulk finished/un-finished, play selection, batch edit, rescan, embed metadata, add collection; collection/playlist create; issue-item bulk removal; entity-card navigation and actions. | Batch edit/collection gated by `allowed`; rescan/embed M; destructive actions confirm; per-item actions inspect `ItemActions`. | `features/catalog/browse.test.tsx`, `features/catalog/catalog-ux.test.tsx`, `features/catalog/catalog-polish.test.tsx`, `features/item/ItemActions.test.tsx` | Works; broad action integration/permissions not established |
 | `/library/$library/search` | `features/catalog/browse.tsx` `SearchPage`: query results; episode play; item/author/entity/tag/narrator/genre navigation. | Library scope enforced by API; playback requires returned item data. | `features/catalog/search-owner.test.tsx`, `features/catalog/browse.test.tsx` | Works; unverified |
 | `/library/$library/authors` | `routes/library.$library.authors.tsx`: redirect to bookshelf `authors`. | No independent screen. | No focused redirect test found. | Works; Redirect mapped, test gap |
-| `/library/$library/narrators` | `features/catalog/browse.tsx` `NarratorsPage`: narrator filter links, edit/save/cancel/remove. | Update permission or M; remove confirms. | `features/catalog/browse.test.tsx` (no dedicated narrator action test found) | Works; action coverage uncertain |
+| `/library/$library/narrators` | `features/catalog/browse.tsx` `NarratorsPage`: narrator filter links, edit/save/cancel/remove. | Update permission or M; remove confirms. | `features/catalog/narrators.test.tsx`: `edits and saves narrator name, then refreshes data`; `cancels without saving, rejects cancelled removal, confirms removal`; `hides mutations without update permission and surfaces save failure` | Verified mapped actions; Cancel previously submitted form, fixed with `type="button"` |
 | `/library/$library/series` | `routes/library.$library.series.index.tsx`: redirects `/oops?message=Series not found`. | No series-index screen in this route. | No focused redirect test found. | Explicitly unsupported: on-screen “Series not found”; use bookshelf Series grouping. |
 | `/library/$library/series/$id` | `features/catalog/browse.tsx` `SeriesPage`: series books, RSS feed controls, re-add to continue listening, mark finished/un-finished. | M for RSS controls; other actions use authenticated API. | `features/catalog/browse.test.tsx`; no focused series-action test found | Works; test gap |
 | `/library/$library/podcast/search` | `features/podcast/index.tsx`: provider search, select result, subscribe; OPML import opens parser/review flow in `features/podcast/opml.tsx`. | M for search/subscription/import; library folder required. | `features/podcast/opml.test.tsx`, `features/podcast/podcast-ux.test.tsx` | Works;  |
@@ -67,10 +67,25 @@ Route files live in `web/src/routes/`; routes rendering a feature delegate to th
 ## Confirmed coverage limits and unsupported states
 
 - `/library/$library/series` is explicitly routed to `/oops?message=Series not found` by `web/src/routes/library.$library.series.index.tsx:4`; route table does not link it as series index. Record this current Modern routing behavior, not a speculative dead control.
-- RSS feed close action has handler but reviewed `features/admin/rss-feeds.test.tsx` covers detail dialog and loading/empty/error/retry, not close mutation. This is an uncovered test assertion, not evidence that action is broken.
+- RSS feed close outcome now covered by `features/admin/rss-feeds.test.tsx` — `confirms feed closure, posts exact identity, reloads empty result`; rejected confirmation sends no request.
 - Feature-level test files exist for users, sessions, logs, metadata and settings (`features/admin/{users,sessions,logs,metadata,settings}.test.tsx`). Test existence alone does not establish action outcome coverage; avoid claiming files absent.
 - Feature-level mapping does not assert every conditional branch. Unit and browser checks below are execution evidence; a missing focused assertion remains a test gap, not an approved unsupported state.
 - Dead failure path fixed: item RSS “Copy feed URL” previously rejected silently when Clipboard API failed. `features/item/ItemActions.tsx` now reports manual-copy fallback beside the absolute URL; `features/item/ItemActions.test.tsx` covers rejected clipboard access.
+
+## Closeout action audit evidence and unresolved gate
+
+Named additions (not blanket route-completion claims):
+
+| Surface | Exact tests / outcome | Remaining action assertions |
+| --- | --- | --- |
+| Narrators | `narrators.test.tsx`: save refreshes data; Cancel sends no mutation; cancelled/confirmed removal; permission denial and save failure | Filter-link destination |
+| Collection and playlist | `entity-actions.test.tsx`: mutation requests for reorder/remove/save/delete; owner/permission gates; collection queue order; feed open/close | Add member, individual play, reverse reorder, create playlist, copy URL, Back, exact payloads for all mutations |
+| Series | `series-actions.test.tsx`: re-add invalidates data; mark-finished request | Nonempty books, unfinished, RSS open/close/copy, navigation |
+| Admin RSS | `rss-feeds.test.tsx`: confirmation rejection and accepted exact-ID close followed by reload | All current actions covered with existing details/Retry assertions |
+| Admin sessions/users/stats | `admin/actions.test.tsx`: selected session IDs in bulk-delete body; user-create request; recent-stat rendering | User edit/delete/link/unlink, session details/page/filter/sort mutations, stats year/navigation |
+| Notifications | `notifications.test.tsx`: `opens edit form, saves selected identity, cancels without writing` | Create, delete, enable/disable, test delivery, valid settings save |
+
+Two real defects fixed: narrator Cancel implicitly submitted its form; notification Edit selected record but hid editing form behind `selected === null`. Regression tests exercise both. These findings reject previous broad “Works” labels as exhaustive acceptance evidence. Existing route table remains inventory, not proof that every action has outcome assertion. Redirects, collection/playlist branches, admin CRUD branches, upload submit/reset, reader settings and player bookmark/sleep branches still need explicit named outcome evidence before exhaustive gate passes. No deferral approved for these gaps.
 
 ## Deferred and verification boundary
 

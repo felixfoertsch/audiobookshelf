@@ -200,7 +200,7 @@ export function Notifications() {
 					Create
 				</Button>
 			</div>
-			{selected === null && eventName && (
+			{eventName && (
 				<form
 					className="space-y-2 border p-3"
 					onSubmit={(e) => {
