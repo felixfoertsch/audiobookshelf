@@ -34,7 +34,17 @@ for (const width of [390, 1280])
 						node.append(probe)
 						const expected = getComputedStyle(probe).color
 						probe.remove()
-						return getComputedStyle(node).color === expected
+						const canvas = document.createElement('canvas')
+						canvas.width = canvas.height = 1
+						const context = canvas.getContext('2d')
+						if (!context) throw new Error('Canvas unavailable')
+						const rgb = (color: string) => {
+							context.clearRect(0, 0, 1, 1)
+							context.fillStyle = color
+							context.fillRect(0, 0, 1, 1)
+							return Array.from(context.getImageData(0, 0, 1, 1).data).join(',')
+						}
+						return rgb(getComputedStyle(node).color) === rgb(expected)
 					}),
 				)
 				.toBe(true)

@@ -93,8 +93,10 @@ for (const prefix of ['', '/abs']) {
 							() => document.documentElement.scrollWidth <= innerWidth,
 						),
 					).toBe(true)
-					await entry.getByRole('link').first().focus()
-					await page.keyboard.press('Enter')
+					const itemLink = entry.getByRole('link').first()
+					await itemLink.focus()
+					await expect(itemLink).toBeFocused()
+					await itemLink.press('Enter')
 					await expect(page).toHaveURL(/\/item\//)
 					await expect(
 						page.getByRole('heading', { name: title, exact: true }).first(),
