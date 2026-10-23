@@ -15,6 +15,7 @@ test('sidebar text meets AA over worst-case cover colors', async ({ page }) => {
 		}
 		const luminance = (color: number[]) =>
 			color
+				.slice(0, 3)
 				.map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
 				.reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0)
 		return ['light', 'dark'].map((theme) => {
