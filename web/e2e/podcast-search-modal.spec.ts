@@ -86,7 +86,7 @@ for (const width of [1280, 390])
 				await settleAnimations(page)
 				await page.screenshot({
 					path: `/private/tmp/opencode/podcast-ux/${name}-${width}-${theme}.png`,
-					fullPage: true,
+					fullPage: name !== 'latest',
 				})
 			}
 		})

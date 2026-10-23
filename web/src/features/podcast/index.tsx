@@ -602,7 +602,7 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 							image={
 								<img
 									className="size-16 shrink-0 rounded-lg object-cover sm:size-20"
-									src={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(e.libraryItemId)}/cover`}
+									src={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(e.libraryItemId)}/cover?token=${encodeURIComponent(localStorage.getItem('token') || '')}`}
 									alt={`${e.podcast.metadata.title || 'Podcast'} cover`}
 									loading="lazy"
 								/>
