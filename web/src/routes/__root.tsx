@@ -340,6 +340,8 @@ export function Layout({
 								<div className="flex items-center gap-2">
 									<Link
 										to="/config"
+										activeOptions={{ exact: false }}
+										activeProps={{ className: 'bg-accent font-medium' }}
 										className="flex flex-1 items-center gap-2 rounded-md px-3 py-2 hover:bg-accent"
 									>
 										<Settings aria-hidden="true" className="size-4" />
