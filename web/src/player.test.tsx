@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { skipTarget } from './features/player/skipping'
 import { authorizeHlsRequest, sessionSchema, sessionSegments } from './player'
 
 const payload = (
@@ -72,6 +73,20 @@ describe('fresh session candidate applicability', () => {
 		)
 		mismatch.episodeId = 'other'
 		expect(sessionSegments(mismatch)).toEqual([])
+	})
+	it('stale and inconclusive session evidence never skips a crossed marker', () => {
+		for (const status of [
+			'stale',
+			'inconclusive',
+			'none',
+			'queued',
+			'running',
+		]) {
+			const session = sessionSchema.parse(
+				payload(status, [{ start: 10, end: 20 }]),
+			)
+			expect(skipTarget(sessionSegments(session), 9, 11, 60, true)).toBeNull()
+		}
 	})
 	it('intersects terminal candidates with playback duration without changing evidence', () => {
 		for (const excess of [1152 / 44100, 1728 / 44100]) {

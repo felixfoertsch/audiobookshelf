@@ -186,15 +186,37 @@ for (const prefix of ['', '/abs']) {
 			await expect(progress).toHaveAccessibleDescription(
 				/Detected segment ranges: 00:00:04–00:00:10/,
 			)
-			const geometry = await page
-				.getByTestId('segment-marker')
-				.evaluate((node: HTMLElement) => ({
-					left: parseFloat(node.style.left),
-					width: parseFloat(node.style.width),
-				}))
-			const total = Number(await progress.getAttribute('aria-valuemax'))
-			expect(geometry.left).toBeCloseTo((4 / total) * 100)
-			expect(geometry.width).toBeCloseTo((6 / total) * 100)
+			const measureMarker = async () =>
+				page.getByTestId('segment-marker').evaluate((node: HTMLElement) => {
+					const bounds = node.getBoundingClientRect()
+					const slider = document.querySelector(
+						'[role="slider"][aria-label="Playback progress"]',
+					)
+					if (!slider) throw new Error('Playback progress slider missing')
+					const trackElement = slider
+						.closest('[data-slot="slider"]')
+						?.querySelector('[data-slot="slider-track"]')
+					if (!(trackElement instanceof HTMLElement))
+						throw new Error('Playback progress track missing')
+					const track = trackElement.getBoundingClientRect()
+					const total = Number(slider.getAttribute('aria-valuemax'))
+					return {
+						start: bounds.left - track.left,
+						end: bounds.right - track.left,
+						expectedStart: (4 / total) * track.width,
+						expectedEnd: (10 / total) * track.width,
+					}
+				})
+			for (const width of [390, 1280]) {
+				await page.setViewportSize({ width, height: 900 })
+				const geometry = await measureMarker()
+				expect(
+					Math.abs(geometry.start - geometry.expectedStart),
+				).toBeLessThanOrEqual(1)
+				expect(
+					Math.abs(geometry.end - geometry.expectedEnd),
+				).toBeLessThanOrEqual(1)
+			}
 			await seek(3)
 			await audio.evaluate((node: HTMLAudioElement) => node.play())
 			await expect.poll(time).toBeGreaterThanOrEqual(10)
@@ -270,6 +292,99 @@ for (const prefix of ['', '/abs']) {
 			await expect(
 				page.getByLabel('Auto-skip detected segments'),
 			).not.toBeChecked()
+		})
+		test('audiobook routes retain progress and send direct then forced HLS requests', async ({
+			page,
+		}) => {
+			const playRequests: string[] = []
+			const syncRequests: string[] = []
+			page.on('request', (request) => {
+				const pathname = new URL(request.url()).pathname
+				if (
+					request.method() === 'POST' &&
+					pathname.includes('/api/items/book-1/play')
+				)
+					playRequests.push(request.postData() ?? '')
+				if (pathname.endsWith('/sync'))
+					syncRequests.push(request.postData() ?? '')
+			})
+			await login(page, prefix)
+			await page.goto(`${prefix}/new/item/book-1`)
+			await page
+				.getByRole('button', { name: 'Play audiobook', exact: true })
+				.click()
+			const audio = page.getByLabel('Audio playback')
+			await expect
+				.poll(() =>
+					audio.evaluate((node: HTMLAudioElement) => node.currentTime),
+				)
+				.toBeGreaterThan(0.1)
+			await audio.evaluate((node: HTMLAudioElement) => {
+				node.pause()
+				node.currentTime = 5
+			})
+			await page
+				.getByRole('link', { name: 'Audiobookshelf', exact: true })
+				.click()
+			await expect(audio).toBeAttached()
+			await expect
+				.poll(() =>
+					audio.evaluate((node: HTMLAudioElement) => node.currentTime),
+				)
+				.toBeGreaterThanOrEqual(5)
+			await audio.evaluate((node: HTMLAudioElement) => node.play())
+			await expect.poll(() => syncRequests.length).toBeGreaterThan(0)
+			await page.route('**/api/items/book-1/play', async (route) => {
+				const response = await route.fetch()
+				const body = await response.json()
+				const forced = route.request().postDataJSON().forceTranscode
+				body.audioTracks[0].contentUrl = forced
+					? `${prefix}/audiobook-hls.m3u8`
+					: `${prefix}/broken-audio`
+				if (forced)
+					body.audioTracks[0].mimeType = 'application/vnd.apple.mpegurl'
+				await route.fulfill({ response, json: body })
+			})
+			await page.route('**/audiobook-hls.m3u8**', (route) =>
+				route.fulfill({
+					contentType: 'application/vnd.apple.mpegurl',
+					body: '#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:13\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:12.35025,\nsegment.ts\n#EXT-X-ENDLIST\n',
+				}),
+			)
+			await page.route('**/segment.ts**', (route) =>
+				route.fulfill({
+					contentType: 'video/mp2t',
+					body: readFileSync(
+						new URL(
+							'./media/tones/field-notes-episode-01.mpegts',
+							import.meta.url,
+						),
+					),
+				}),
+			)
+			await page.reload()
+			await page.goto(`${prefix}/new/item/book-1`)
+			const hlsResponse = page.waitForResponse(
+				(response) =>
+					response.url().endsWith('/api/items/book-1/play') && response.ok(),
+			)
+			await page
+				.getByRole('button', { name: 'Play audiobook', exact: true })
+				.click()
+			await hlsResponse
+			await page
+				.getByRole('button', { name: 'Retry with transcoding', exact: true })
+				.click()
+			await expect
+				.poll(() =>
+					audio.evaluate((node: HTMLAudioElement) => node.currentTime),
+				)
+				.toBeGreaterThan(0.1)
+			await audio.evaluate((node: HTMLAudioElement) => node.pause())
+			await expect.poll(() => syncRequests.length).toBeGreaterThan(1)
+			expect(
+				playRequests.map((body) => JSON.parse(body).forceTranscode),
+			).toEqual([false, false, true])
 		})
 		test('failed progress sync surfaces, retries successfully, finish advances queue', async ({
 			page,

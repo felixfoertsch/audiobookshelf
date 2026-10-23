@@ -52,6 +52,13 @@ for (const prefix of ['', '/abs']) {
 			'content',
 			/user-scalable=no|maximum-scale=1(?:\.0)?(?:,|$)/,
 		)
+		// No service worker: home-screen metadata must not introduce private API/audio caches.
+		expect(
+			await page.evaluate(async () => ({
+				workers: (await navigator.serviceWorker.getRegistrations()).length,
+				caches: await caches.keys(),
+			})),
+		).toEqual({ workers: 0, caches: [] })
 		// Metadata/asset checks are not Safari installation UI or offline evidence.
 	})
 }

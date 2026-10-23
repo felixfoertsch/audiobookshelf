@@ -25,6 +25,15 @@ for (const prefix of ['', '/abs'])
 		page,
 	}) => {
 		await openBook(page, prefix)
+		// Cookie-only restore must work without local access-token persistence.
+		await page.evaluate(() => localStorage.removeItem('token'))
+		await page.reload()
+		await expect(
+			page.getByRole('heading', { name: 'The Glass Orchard', exact: true }),
+		).toBeVisible()
+		await expect(
+			page.getByRole('button', { name: 'Sign in', exact: true }),
+		).toHaveCount(0)
 		await page.getByRole('button', { name: 'Play audiobook' }).click()
 		await expect(
 			page.getByRole('region', { name: 'Audio player' }),

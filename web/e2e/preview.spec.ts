@@ -213,6 +213,13 @@ for (const prefix of ['', '/abs'])
 			node.currentTime = 7
 			node.pause()
 		})
+		await page
+			.getByRole('link', { name: 'Audiobookshelf', exact: true })
+			.click()
+		await expect(audio).toBeAttached()
+		await expect
+			.poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
+			.toBeGreaterThanOrEqual(7)
 		await openPlayerOptions(page)
 		await page.getByRole('button', { name: 'Close player' }).click()
 		await expect(page.getByLabel('Audio playback')).toHaveCount(0)

@@ -1505,33 +1505,40 @@ export function Player() {
 										</label>
 									</div>
 									{remote && (
-										<label className="flex items-center gap-3">
+										<div className="flex items-center gap-3">
 											Original timeline{' '}
 											<span className="relative flex min-w-0 flex-1 items-center">
 												<SegmentMarkers
 													segments={segments}
 													total={session.duration}
 												/>
-												<input
-													className="relative w-full accent-primary opacity-75"
+												<Slider
+													className="h-6"
 													aria-label="Seek position"
+													ref={(node) => {
+														node
+															?.querySelector('[role="slider"]')
+															?.setAttribute(
+																'aria-describedby',
+																markerDescription,
+															)
+													}}
 													aria-describedby={markerDescription}
 													aria-valuetext={`${duration(position)} of ${duration(session.duration)}`}
-													type="range"
-													min="0"
+													min={0}
 													max={session.duration}
-													step="0.1"
-													value={position}
-													onChange={(event) => {
-														seekPlayback(Number(event.target.value))
-														setPosition(Number(event.target.value))
+													step={0.1}
+													value={[position]}
+													onValueChange={([value]) => {
+														seekPlayback(value)
+														setPosition(value)
 													}}
 												/>
 											</span>
 											<span className="text-xs tabular-nums">
 												{duration(position)} / {duration(session.duration)}
 											</span>
-										</label>
+										</div>
 									)}
 									{!remote && (
 										<form
