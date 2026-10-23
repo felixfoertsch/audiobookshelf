@@ -2,6 +2,7 @@ const { expect } = require('chai')
 const sinon = require('sinon')
 const controller = require('../../../server/controllers/PodcastController')
 const podcastUtils = require('../../../server/utils/podcastUtils')
+const Database = require('../../../server/Database')
 
 const response = () => ({ body: null, json(body) { this.body = body; return this } })
 
@@ -9,6 +10,15 @@ describe('Podcast episode summary', () => {
   afterEach(() => {
     sinon.restore()
     podcastUtils.clearPodcastFeedCache()
+  })
+
+  it('rejects summary access before exposing inaccessible podcast', async () => {
+    sinon.stub(Database.libraryItemModel, 'getExpandedById').resolves({ isPodcast: true, media: {} })
+    const next = sinon.spy()
+    const res = { sendStatus: sinon.spy() }
+    await controller.middleware({ params: { id: 'private' }, method: 'GET', user: { checkCanAccessLibraryItem: () => false } }, res, next)
+    expect(res.sendStatus.calledWith(403)).to.equal(true)
+    expect(next.called).to.equal(false)
   })
 
   it('counts feed episodes and uses matched downloaded user progress', async () => {
