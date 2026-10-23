@@ -1,4 +1,11 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { Player, sessionSchema, usePlayer } from '../../player'
 
@@ -239,6 +246,86 @@ test('transport, progress keys and volume use the audio engine without hijacking
 		key: 'ArrowRight',
 	})
 	expect(audio.volume).toBe(0.01)
+})
+
+test('bookmark create, edit, delete and seek report UI and request outcomes', async () => {
+	const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+		const url = String(input)
+		if (url.includes('/bookmarks/book'))
+			return Response.json({
+				bookmarks: [{ time: 12, title: 'Initial' }],
+			})
+		if (init?.method === 'POST')
+			return Response.json({ time: 0, title: 'Created' })
+		if (init?.method === 'PATCH')
+			return Response.json({ time: 12, title: 'Edited' })
+		if (url.includes('/play'))
+			return Response.json({
+				id: 'bookmark-session',
+				libraryItemId: 'book',
+				episodeId: null,
+				currentTime: 0,
+				duration: 60,
+				audioTracks: [{ contentUrl: '/audio.wav', duration: 60 }],
+				libraryItem: null,
+			})
+		return Response.json({})
+	})
+	vi.spyOn(window, 'prompt').mockReturnValue('Edited')
+	vi.spyOn(window, 'confirm').mockReturnValue(true)
+	start()
+	vi.mocked(globalThis.fetch).mockImplementation(fetch)
+	const session = usePlayer.getState().session
+	if (!session) throw new Error('Missing test session')
+	act(() =>
+		usePlayer.getState().set({
+			...session,
+			libraryItemId: 'book',
+			episodeId: null,
+		}),
+	)
+	const audio = screen.getByLabelText('Audio playback') as HTMLAudioElement
+	fireEvent.loadedMetadata(audio)
+	fireEvent.click(screen.getByRole('button', { name: 'Player options' }))
+	await screen.findByRole('button', { name: /Initial/ })
+	const title = screen.getByRole('textbox', { name: 'Bookmark title' })
+	fireEvent.change(title, { target: { value: 'Created' } })
+	fireEvent.click(screen.getByRole('button', { name: 'Add bookmark' }))
+	await screen.findByRole('button', { name: /Created/ })
+	expect(fetch).toHaveBeenCalledWith(
+		'/api/me/item/book/bookmark',
+		expect.objectContaining({ method: 'POST' }),
+	)
+	fireEvent.click(screen.getByRole('button', { name: /00:12 Initial/ }))
+	expect(audio.currentTime).toBe(12)
+	fireEvent.click(screen.getAllByRole('button', { name: 'Edit bookmark' })[0])
+	await screen.findByRole('button', { name: /Edited/ })
+	expect(fetch).toHaveBeenCalledWith(
+		'/api/me/item/book/bookmark',
+		expect.objectContaining({ method: 'PATCH' }),
+	)
+	fireEvent.click(screen.getAllByRole('button', { name: 'Delete bookmark' })[0])
+	await waitFor(() => {
+		expect(screen.queryByRole('button', { name: /Edited/ })).toBeNull()
+	})
+	expect(fetch).toHaveBeenCalledWith(
+		'/api/me/item/book/bookmark/12',
+		expect.objectContaining({ method: 'DELETE' }),
+	)
+})
+
+test('auto-skip toggle persists setting and changes rendered control state', () => {
+	start()
+	fireEvent.click(screen.getByRole('button', { name: 'Player options' }))
+	const toggle = screen.getByRole('checkbox', {
+		name: 'Auto-skip detected segments',
+	}) as HTMLInputElement
+	expect(toggle.checked).toBe(true)
+	fireEvent.click(toggle)
+	expect(toggle.checked).toBe(false)
+	expect(
+		JSON.parse(localStorage.getItem('userSettings') || '{}').autoSkip,
+	).toBe(false)
 })
 
 test('volume chosen while loading survives track switch before metadata', () => {

@@ -17,9 +17,15 @@ vi.mock('./browse-api', async (load) => ({
 const router = vi.hoisted(() => ({ invalidate: vi.fn() }))
 vi.mock('@tanstack/react-router', () => ({
 	useRouter: () => router,
-	Link: ({ children }: { children: React.ReactNode }) => (
-		<span>{children}</span>
-	),
+	Link: ({
+		children,
+		to,
+		search,
+	}: {
+		children: React.ReactNode
+		to: string
+		search?: Record<string, string>
+	}) => <a href={`${to}?filter=${search?.filter || ''}`}>{children}</a>,
 }))
 const data = { narrators: [{ id: 'n1', name: 'Narrator One', numBooks: 3 }] }
 afterEach(() => {
@@ -38,6 +44,12 @@ describe('narrator actions', () => {
 				type: 'admin',
 			},
 		})
+	})
+	it('narrator book-count link targets matching narrator filter', () => {
+		render(<NarratorsPage library="lib" data={data} />)
+		expect(
+			screen.getByRole('link', { name: 'Narrator One' }).getAttribute('href'),
+		).toBe('/library/$library/bookshelf?filter=narrators.n1')
 	})
 	it('edits and saves narrator name, then refreshes data', async () => {
 		render(<NarratorsPage library="lib" data={data} />)

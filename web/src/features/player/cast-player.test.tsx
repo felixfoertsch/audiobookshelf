@@ -212,6 +212,10 @@ it('same transport, progress, rate and volume controls drive Cast instead of loc
 		key: 'Home',
 	})
 	expect(setCastVolume).toHaveBeenCalledWith(0)
+	const audio = view.getByLabelText('Audio playback') as HTMLAudioElement
+	expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled()
+	expect(HTMLMediaElement.prototype.pause).toHaveBeenCalledTimes(1) // Session replacement pauses local audio once.
+	expect(audio.currentTime).not.toBe(42)
 })
 it('Cast poll skips crossings, not seek destinations, and skips repeated crossings', () => {
 	vi.useFakeTimers()

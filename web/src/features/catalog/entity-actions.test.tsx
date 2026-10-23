@@ -428,10 +428,31 @@ test('playlist owner adds individual item with exact request payload', async () 
 	).toEqual({ libraryItemId: 'book3' })
 })
 
-test('collection feed opens for admin, hides for regular user without feed, and closes after confirmation', async () => {
+test('collection feed copy failure exposes manual-copy fallback', async () => {
+	user('admin', {})
+	const withFeed = collectionSchema.parse({
+		...collection,
+		rssFeed: { id: 'feed', feedUrl: '/feed/books', meta: {} },
+	})
+	const writeText = vi.fn().mockRejectedValue(new Error('Clipboard denied'))
+	Object.defineProperty(navigator, 'clipboard', {
+		configurable: true,
+		value: { writeText },
+	})
+	render(<CollectionDetail collection={withFeed} />)
+	fireEvent.click(screen.getByRole('button', { name: 'Copy feed URL' }))
+	expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/feed/books'))
+	await waitFor(() =>
+		expect(screen.getByRole('alert').textContent).toBe('Clipboard denied'),
+	)
+	expect(
+		(screen.getByLabelText('Feed URL') as HTMLInputElement).value,
+	).toContain('/feed/books')
+})
+test('collection feed opens with exact admin payload, rejects unconfirmed close, then closes after confirmation', async () => {
 	user('admin', {})
 	const fetcher = fetchApi()
-	vi.spyOn(window, 'confirm').mockReturnValue(true)
+	const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
 	const withFeed = collectionSchema.parse({
 		...collection,
 		rssFeed: {
@@ -446,11 +467,31 @@ test('collection feed opens for admin, hides for regular user without feed, and 
 	})
 	fireEvent.click(screen.getByRole('button', { name: 'Open RSS feed' }))
 	await waitFor(() =>
-		expect(
-			fetcher.mock.calls.some(([url]) => String(url).includes('/open')),
-		).toBe(true),
+		expect(fetcher).toHaveBeenCalledWith(
+			'/api/feeds/collection/collection/open',
+			expect.objectContaining({
+				method: 'POST',
+				body: JSON.stringify({
+					serverAddress: 'http://localhost:3000',
+					slug: 'my-feed',
+					metadataDetails: {
+						preventIndexing: true,
+						ownerName: '',
+						ownerEmail: '',
+					},
+				}),
+			}),
+		),
 	)
 	rerender(<CollectionDetail collection={withFeed} />)
+	fireEvent.click(screen.getByRole('button', { name: 'Close RSS feed' }))
+	expect(confirm).toHaveBeenCalledWith(
+		'Close collection RSS feed? Subscribers lose access.',
+	)
+	expect(
+		fetcher.mock.calls.some(([url]) => String(url).includes('/close')),
+	).toBe(false)
+	confirm.mockReturnValue(true)
 	fireEvent.click(screen.getByRole('button', { name: 'Close RSS feed' }))
 	await waitFor(() =>
 		expect(
