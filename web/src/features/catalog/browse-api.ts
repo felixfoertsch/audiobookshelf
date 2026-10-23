@@ -41,6 +41,15 @@ export const entitySchema = z
 export const entrySchema = z.union([
 	itemSchema.extend({
 		recentEpisode: episodeSchema.nullish(),
+		userMediaProgress: z
+			.object({
+				id: z.string().optional(),
+				currentTime: z.number().nonnegative().optional(),
+				duration: z.number().nonnegative().optional(),
+				isFinished: z.boolean().optional(),
+				hideFromContinueListening: z.boolean().optional(),
+			})
+			.nullish(),
 		collapsedSeries: z
 			.object({
 				id: z.string(),

@@ -35,6 +35,7 @@ import {
 import { PodcastManagementSettings } from '../podcast'
 import { AdAnalysisStatus } from '../podcast/AdAnalysisStatus'
 import { Reader, readerItemSchema } from '../reader'
+import { BookFiles } from './BookFiles'
 import { EpisodeEdit } from './EpisodeEdit'
 import { ItemActions } from './ItemActions'
 import { episodeProgress, refreshProgress } from './progress'
@@ -43,6 +44,7 @@ import {
 	checkPodcastFeed,
 	deleteEpisode,
 	getItem,
+	resetProgress,
 	updateProgress,
 } from './service'
 
@@ -283,19 +285,38 @@ export function ItemView({ id }: { id: string }) {
 						{metadata.title ?? 'Untitled'}
 					</h1>
 					{metadata.subtitle && <p className="text-xl">{metadata.subtitle}</p>}
-					<p>
-						{metadata.author ??
-							metadata.authorName ??
-							metadata.authors?.map((a) => a.name).join(', ') ??
-							''}
-					</p>
+					{metadata.authors?.length ? (
+						<p>
+							{metadata.authors.map((author, index) => (
+								<span key={author.id}>
+									{index > 0 && ', '}
+									<Link
+										className="underline"
+										to="/author/$id"
+										params={{ id: author.id }}
+									>
+										{author.name}
+									</Link>
+								</span>
+							))}
+						</p>
+					) : metadata.author || metadata.authorName ? (
+						<p>{metadata.author || metadata.authorName}</p>
+					) : null}
 					{metadata.narrators?.length ? (
 						<p>Narrated by {metadata.narrators.join(', ')}</p>
 					) : null}
 					{metadata.series?.map((s) => (
 						<p key={s.id}>
-							Series: {s.name}
-							{s.sequence ? ` #${s.sequence}` : ''}
+							Series:{' '}
+							<Link
+								className="underline"
+								to="/library/$library/series/$id"
+								params={{ library: item.libraryId || '', id: s.id }}
+							>
+								{s.name}
+							</Link>
+							{s.sequence != null && s.sequence !== '' ? ` #${s.sequence}` : ''}
 						</p>
 					))}
 					{(!!metadata.genres?.length || item.mediaType === 'podcast') && (
@@ -377,13 +398,38 @@ export function ItemView({ id }: { id: string }) {
 							<Button
 								variant="outline"
 								disabled={busy}
-								onClick={() =>
+								onClick={() => {
+									if (
+										progress &&
+										!window.confirm(
+											'Mark unfinished? This resets the saved listening position to the beginning.',
+										)
+									)
+										return
 									void action(() =>
 										updateProgress(id, { isFinished: !progress }),
 									)
-								}
+								}}
 							>
 								{progress ? 'Mark unfinished' : 'Mark finished'}
+							</Button>
+						)}
+						{item.mediaType === 'book' && bookProgress?.id && (
+							<Button
+								variant="outline"
+								disabled={busy}
+								onClick={() => {
+									if (
+										window.confirm(
+											'Reset audiobook progress and mark unfinished? This removes the saved listening position.',
+										)
+									)
+										void action(() =>
+											resetProgress(String(bookProgress.id), id),
+										)
+								}}
+							>
+								Reset progress
 							</Button>
 						)}
 						{item.mediaType === 'podcast' && admin && (
@@ -799,7 +845,18 @@ export function ItemView({ id }: { id: string }) {
 						))}
 				</dl>
 			</section>
-			<ItemActions item={item} onChanged={() => void action(async () => {})} />
+			{item.mediaType === 'book' && (
+				<BookFiles
+					key={`${user?.id}:${id}`}
+					item={item}
+					onChanged={() => void action(async () => {})}
+				/>
+			)}
+			<ItemActions
+				key={`${user?.id}:${id}`}
+				item={item}
+				onChanged={() => void action(async () => {})}
+			/>
 		</article>
 	)
 }

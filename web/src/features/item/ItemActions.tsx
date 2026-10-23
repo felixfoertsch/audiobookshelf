@@ -5,6 +5,7 @@ import { Button } from '../../shared/components/ui/button'
 import { Input } from '../../shared/components/ui/input'
 import { NativeSelect } from '../../shared/components/ui/native-select'
 import { useT } from '../i18n'
+import { BookMembership } from './BookMembership'
 import {
 	feedAddress as feedTransportAddress,
 	itemActions,
@@ -105,6 +106,7 @@ export function ItemActions({
 			className="flex flex-wrap gap-3 border-t pt-4 [overflow-wrap:anywhere]"
 		>
 			{error && <p role="alert">{error}</p>}
+			<BookMembership item={item} onChanged={onChanged} />
 			{admin && (
 				<WorkflowSheet
 					title="Sharing"

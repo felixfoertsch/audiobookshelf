@@ -49,6 +49,26 @@ export async function updateProgress(
 		}
 	}
 }
+export async function resetProgress(progressId: string, itemId: string) {
+	await api(`/api/me/progress/${encodeURIComponent(progressId)}`, emptySchema, {
+		method: 'DELETE',
+	})
+	window.dispatchEvent(
+		new CustomEvent('abs:progress-changed', {
+			detail: { libraryItemId: itemId },
+		}),
+	)
+	try {
+		await refreshProgress()
+		return {}
+	} catch {
+		return {
+			refreshWarning:
+				'Progress reset, but listening status could not refresh. Refresh to verify current status.',
+		}
+	}
+}
+
 export const checkPodcastFeed = (id: string) =>
 	api(`/api/podcasts/${encodeURIComponent(id)}/checknew`, zEpisodes, {})
 const zEpisodes = z.object({ episodes: z.array(z.unknown()) })

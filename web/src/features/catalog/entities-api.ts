@@ -69,6 +69,34 @@ export const playlistSchema = entityBase.extend({
 export type Author = z.infer<typeof authorSchema>
 export type Collection = z.infer<typeof collectionSchema>
 export type Playlist = z.infer<typeof playlistSchema>
+export const collectionMembershipsSchema = z.object({
+	collections: z.array(collectionSchema),
+})
+export const playlistMembershipsSchema = z.object({
+	playlists: z.array(playlistSchema),
+})
+export const createMembershipCollection = (
+	libraryId: string,
+	name: string,
+	itemId: string,
+) =>
+	api('/api/collections', collectionSchema, {
+		method: 'POST',
+		body: JSON.stringify({ libraryId, name, books: [itemId] }),
+	})
+export const createMembershipPlaylist = (
+	libraryId: string,
+	name: string,
+	itemId: string,
+) =>
+	api('/api/playlists', playlistSchema, {
+		method: 'POST',
+		body: JSON.stringify({
+			libraryId,
+			name,
+			items: [{ libraryItemId: itemId }],
+		}),
+	})
 
 export const getAuthor = (id: string) =>
 	api(

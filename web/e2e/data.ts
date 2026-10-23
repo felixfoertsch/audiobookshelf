@@ -313,7 +313,19 @@ const item = <T extends Record<string, unknown>>(
 	size: 0,
 	lastScan: now,
 	scanVersion: '2.29.0',
-	libraryFiles: [],
+	libraryFiles:
+		mediaType === 'book' && Array.isArray(media.audioFiles)
+			? (
+					media.audioFiles as {
+						ino: string
+						metadata: Record<string, unknown>
+					}[]
+				).map((file) => ({
+					ino: file.ino,
+					metadata: file.metadata,
+					fileType: 'audio',
+				}))
+			: [],
 })
 const expandedPodcasts = [
 	podcast('podcast-1', 'Field Notes', true),

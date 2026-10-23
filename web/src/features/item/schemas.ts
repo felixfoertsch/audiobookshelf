@@ -1,10 +1,37 @@
 import { z } from 'zod'
 
 const text = z.string().nullish()
+const fileMetadata = z
+	.object({
+		filename: text,
+		path: text,
+		ext: text,
+		size: z.number().nullish(),
+	})
+	.passthrough()
+const audioFileSchema = z
+	.object({
+		ino: z.union([z.string(), z.number()]).nullish(),
+		index: z.number().nullish(),
+		metadata: fileMetadata.nullish(),
+		duration: z.number().nullish(),
+		format: text,
+		codec: text,
+		bitRate: z.number().nullish(),
+		channels: z.number().nullish(),
+		channelLayout: text,
+		timeBase: text,
+		language: text,
+		exclude: z.boolean().optional(),
+		error: text,
+		metaTags: z.record(z.string(), z.unknown()).nullish(),
+	})
+	.passthrough()
 export const itemSchema = z
 	.object({
 		userMediaProgress: z
 			.object({
+				id: z.string().optional(),
 				isFinished: z.boolean().optional(),
 				currentTime: z.number().nonnegative().optional(),
 				duration: z.number().nonnegative().optional(),
@@ -60,6 +87,7 @@ export const itemSchema = z
 							.optional(),
 					})
 					.passthrough(),
+				audioFiles: z.array(audioFileSchema).optional(),
 				chapters: z
 					.array(
 						z
@@ -102,13 +130,7 @@ export const itemSchema = z
 						id: z.string().optional(),
 						fileType: text,
 						ino: z.union([z.string(), z.number()]).optional(),
-						metadata: z
-							.object({
-								ext: z.string().optional(),
-								filename: z.string().optional(),
-							})
-							.passthrough()
-							.optional(),
+						metadata: fileMetadata.optional(),
 						ebookFormat: text,
 					})
 					.passthrough(),

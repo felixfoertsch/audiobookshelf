@@ -448,16 +448,31 @@ export function EntryCard({
 	library,
 	view = 'grid',
 	select,
+	shelfId,
 	headingLevel = 2,
 }: {
 	entry: Entry
 	library: string
 	headingLevel?: 2 | 3
 	view?: string
+	shelfId?: string
 	select?: { checked: boolean; toggle: () => void }
 }) {
+	const [shelfError, setShelfError] = useState('')
+	const [hidden, setHidden] = useState(false)
 	const parsed = itemSchema.safeParse(entry)
 	const item = parsed.success ? parsed.data : null
+	const shelfUser = useAuth((state) => state.user)
+	const progressResult = z
+		.object({
+			id: z.string().optional(),
+			currentTime: z.number().nullish(),
+			duration: z.number().nullish(),
+		})
+		.safeParse(
+			episodeProgress(shelfUser, item?.id || '') ?? item?.userMediaProgress,
+		)
+	const shelfProgress = progressResult.success ? progressResult.data : undefined
 	const parsedEntity = entitySchema.safeParse(entry)
 	const entity = parsedEntity.success ? parsedEntity.data : null
 	const recent =
@@ -476,6 +491,7 @@ export function EntryCard({
 					.object({ id: z.string(), name: z.string().nullish() })
 					.safeParse(entry.collapsedSeries)
 			: null
+	if (hidden) return null
 	const name =
 		item?.media.metadata.title ||
 		(typeof entry.name === 'string' ? entry.name : '') ||
@@ -578,6 +594,83 @@ export function EntryCard({
 							{item.mediaItemShare && <p>Public share active</p>}
 						</details>
 					)}
+
+					{item.mediaType === 'book' &&
+						(shelfId === 'continue-listening' ||
+							shelfId === 'continue-series') &&
+						!hidden && (
+							<div className="space-y-1 text-xs">
+								{shelfProgress?.currentTime != null && (
+									<p>
+										Progress: {duration(shelfProgress.currentTime)}
+										{shelfProgress.duration != null
+											? ` / ${duration(shelfProgress.duration)}`
+											: ''}
+									</p>
+								)}
+								{item.media.metadata.series?.map((series) => (
+									<p key={series.id}>
+										<Link
+											to="/library/$library/series/$id"
+											params={{ library, id: series.id }}
+										>
+											{series.name}
+											{series.sequence ? ` · ${series.sequence}` : ''}
+										</Link>
+									</p>
+								))}
+								<Button
+									size="sm"
+									variant="outline"
+									onClick={() =>
+										void playEpisode(
+											item.id,
+											undefined,
+											false,
+											shelfProgress?.currentTime ?? 0,
+										).catch((error: unknown) =>
+											setShelfError(
+												error instanceof Error
+													? error.message
+													: 'Could not resume audiobook',
+											),
+										)
+									}
+								>
+									Resume
+								</Button>
+								{shelfId === 'continue-listening' && shelfProgress?.id && (
+									<Button
+										size="sm"
+										variant="ghost"
+										onClick={() => {
+											void api(
+												`/api/me/progress/${encodeURIComponent(String(shelfProgress.id))}/remove-from-continue-listening`,
+												z.unknown(),
+											)
+												.then(() => {
+													setHidden(true)
+													window.dispatchEvent(
+														new CustomEvent('abs:progress-changed', {
+															detail: { libraryItemId: item.id },
+														}),
+													)
+												})
+												.catch((error: unknown) =>
+													setShelfError(
+														error instanceof Error
+															? error.message
+															: 'Could not hide audiobook',
+													),
+												)
+										}}
+									>
+										Hide from Continue Listening
+									</Button>
+								)}
+								{shelfError && <p role="alert">{shelfError}</p>}
+							</div>
+						)}
 
 					{view === 'detail' && (
 						<>
@@ -712,6 +805,7 @@ export function HomePage({
 						{shelf.entities.map((entry) => (
 							<EntryCard
 								key={entry.id}
+								shelfId={shelf.id}
 								headingLevel={3}
 								library={library}
 								entry={{

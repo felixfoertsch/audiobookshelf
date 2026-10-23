@@ -31,6 +31,107 @@ async function signIn(page: import('@playwright/test').Page, prefix = '') {
 			'Field Notes',
 		)
 }
+for (const prefix of ['', '/abs']) {
+	test(`continue listening hides only selected audiobook ${prefix || 'root'}`, async ({
+		page,
+	}) => {
+		await signIn(page, prefix)
+		await page.evaluate(async (base) => {
+			const headers = {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${localStorage.getItem('token')}`,
+			}
+			const records = await (
+				await fetch(`${base}/api/me/progress`, { headers })
+			).json()
+			for (const record of records.mediaProgress)
+				if (['book-1', 'book-2'].includes(record.libraryItemId))
+					await fetch(
+						`${base}/api/me/progress/${encodeURIComponent(record.id)}`,
+						{ method: 'DELETE', headers },
+					)
+			for (const id of ['book-1', 'book-2'])
+				await fetch(`${base}/api/me/progress/${id}`, {
+					method: 'PATCH',
+					headers: {
+						'Content-Type': 'application/json',
+						Authorization: `Bearer ${localStorage.getItem('token')}`,
+					},
+					body: JSON.stringify({
+						currentTime: 7,
+						duration: 13.883375,
+						progress: 0.5,
+						isFinished: false,
+					}),
+				})
+		}, prefix)
+		const headers = page.getByRole('heading', { name: 'Continue Listening' })
+		await page.goto(`${prefix}/new/library/books`)
+		await expect(headers).toBeVisible()
+		const shelf = headers.locator('xpath=..')
+		await expect(
+			shelf.getByRole('link', { name: 'The Glass Orchard' }),
+		).toBeVisible()
+		const target = shelf.locator('article').filter({
+			has: page.getByRole('link', { name: 'The Glass Orchard', exact: true }),
+		})
+		await target.getByRole('button', { name: 'Resume', exact: true }).click()
+		await expect
+			.poll(() =>
+				page
+					.getByLabel('Audio playback')
+					.evaluate((node: HTMLAudioElement) => node.currentTime),
+			)
+			.toBeGreaterThan(6.9)
+		await target
+			.getByRole('button', { name: 'Hide from Continue Listening' })
+			.click()
+		await expect(
+			shelf.getByRole('link', { name: 'Northbound Letters', exact: true }),
+		).toBeVisible()
+		await expect(
+			shelf.getByRole('link', { name: 'The Glass Orchard' }),
+		).toHaveCount(0)
+		await page.goto(`${prefix}/new/library/books/series/series-1`)
+		const readd = page.getByRole('button', {
+			name: 'Re-add series to continue listening',
+		})
+		await expect(readd).toBeVisible()
+		const readdResponse = page.waitForResponse((response) =>
+			response
+				.url()
+				.endsWith('/api/me/series/series-1/readd-to-continue-listening'),
+		)
+		await readd.click()
+		expect((await readdResponse).status()).toBe(200)
+		await page.evaluate(async (base) => {
+			await fetch(`${base}/api/me/progress/book-1`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${localStorage.getItem('token')}`,
+				},
+				body: JSON.stringify({ isFinished: true }),
+			})
+		}, prefix)
+		await page.goto(`${prefix}/new/library/books`)
+		const seriesShelf = page
+			.getByRole('heading', { name: 'Continue Series', exact: true })
+			.locator('xpath=..')
+		await expect(
+			seriesShelf.getByRole('link', {
+				name: 'Atlas of Small Stars',
+				exact: true,
+			}),
+		).toBeVisible()
+		await expect(
+			seriesShelf.getByRole('link', {
+				name: 'The Orchard Cycle · 3',
+				exact: true,
+			}),
+		).toBeVisible()
+	})
+}
 for (const prefix of ['', '/abs'])
 	test(`browse and original audio lifecycle ${prefix || 'root'}`, async ({
 		page,

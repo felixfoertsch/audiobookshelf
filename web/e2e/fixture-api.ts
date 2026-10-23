@@ -52,7 +52,7 @@ export const fixtureUsers = ['listener', 'admin', 'root', 'guest'].map(
 		},
 		librariesAccessible: [],
 		itemTagsSelected: [],
-		seriesHideFromContinueListening: [],
+		seriesHideFromContinueListening: [] as string[],
 		hasOpenIDLink: false,
 	}),
 )
@@ -479,8 +479,18 @@ export async function fixtureApi(
 						}
 					: lib,
 			)
-		if (library[2] === 'personalized')
-			return json([
+		if (library[2] === 'personalized') {
+			const inProgress = subset.filter((item) => {
+				const record = progress.get(`${user.id}:${item.id}:`)
+				return (
+					record &&
+					record.isFinished !== true &&
+					typeof record.currentTime === 'number' &&
+					record.currentTime > 0 &&
+					!record.hideFromContinueListening
+				)
+			})
+			const shelves = [
 				{
 					id: 'recently-added',
 					label: 'Recently Added',
@@ -489,7 +499,53 @@ export async function fixtureApi(
 					entities: subset,
 					total: subset.length,
 				},
-			])
+			]
+			if (inProgress.length)
+				shelves.unshift({
+					id: 'continue-listening',
+					label: 'Continue Listening',
+					labelStringKey: 'LabelContinueListening',
+					type: 'book',
+					entities: inProgress.map((item) => ({
+						...item,
+						userMediaProgress: progress.get(`${user.id}:${item.id}:`),
+					})),
+					total: inProgress.length,
+				})
+			if (lib.mediaType === 'book') {
+				const continued = subset
+					.filter((candidate) => {
+						if (!('series' in candidate.media.metadata)) return false
+						return candidate.media.metadata.series.some(
+							(series) =>
+								!user.seriesHideFromContinueListening.includes(series.id) &&
+								subset.some(
+									(previous) =>
+										previous.id !== candidate.id &&
+										progress.get(`${user.id}:${previous.id}:`)?.isFinished ===
+											true &&
+										'series' in previous.media.metadata &&
+										previous.media.metadata.series.some(
+											(entry) =>
+												entry.id === series.id &&
+												Number(entry.sequence) < Number(series.sequence),
+										),
+								),
+						)
+					})
+					.slice(0, 1)
+				if (continued.length)
+					shelves.push({
+						id: 'continue-series',
+						label: 'Continue Series',
+						labelStringKey: 'LabelContinueSeries',
+						type: 'book',
+						entities: continued,
+						total: continued.length,
+					})
+			}
+			return json(shelves)
+		}
 		if (library[2] === 'filterdata')
 			return json({
 				authors: lib.mediaType === 'book' ? authors : [],
@@ -583,8 +639,51 @@ export async function fixtureApi(
 		return json({
 			mediaProgress: [...progress.values()].filter((p) => p.userId === user.id),
 		})
+	const seriesDetail = /^\/api\/libraries\/([^/]+)\/series\/([^/]+)$/.exec(path)
+	if (seriesDetail && method === 'GET') {
+		const match = books
+			.flatMap((item) =>
+				'series' in item.media.metadata ? item.media.metadata.series : [],
+			)
+			.find((series) => series.id === decodeURIComponent(seriesDetail[2]))
+		if (!match) return json({ error: 'Series not found' }, 404)
+		return json({ id: match.id, name: match.name })
+	}
+	const seriesContinue =
+		/^\/api\/me\/series\/([^/]+)\/(remove-from|readd-to)-continue-listening$/.exec(
+			path,
+		)
+	if (seriesContinue && method === 'GET') {
+		const id = decodeURIComponent(seriesContinue[1])
+		const hidden = new Set(user.seriesHideFromContinueListening)
+		if (seriesContinue[2] === 'remove-from') hidden.add(id)
+		else hidden.delete(id)
+		user.seriesHideFromContinueListening = [...hidden]
+		emitUserUpdated(user)
+		return json(browserUser(user))
+	}
 	const mp = /^\/api\/me\/progress\/([^/]+)(?:\/([^/]+))?$/.exec(path)
 	if (mp) {
+		if (method === 'DELETE') {
+			const entry = [...progress.entries()].find(
+				([, value]) =>
+					value.id === decodeURIComponent(mp[1]) && value.userId === user.id,
+			)
+			if (!entry) return json({ error: 'Progress not found' }, 404)
+			progress.delete(entry[0])
+			emitUserUpdated(user)
+			return ok()
+		}
+		if (method === 'GET' && mp[2] === 'remove-from-continue-listening') {
+			const entry = [...progress.entries()].find(
+				([, record]) =>
+					record.id === decodeURIComponent(mp[1]) && record.userId === user.id,
+			)
+			if (!entry) return json({ error: 'Progress not found' }, 404)
+			progress.set(entry[0], { ...entry[1], hideFromContinueListening: true })
+			emitUserUpdated(user)
+			return json(browserUser(user))
+		}
 		if (!items.some((i) => i.id === mp[1]))
 			return json({ error: 'Item not found' }, 404)
 		const key = `${user.id}:${mp[1]}:${mp[2] || ''}`
@@ -616,15 +715,13 @@ export async function fixtureApi(
 				finishedAt: null,
 				...progress.get(key),
 				...input.data,
+				...(input.data.isFinished === false && progress.get(key)?.isFinished
+					? { currentTime: 0, progress: 0 }
+					: {}),
 				lastUpdate: Date.now(),
 				startedAt: now,
 				hideFromContinueListening: false,
 			})
-			emitUserUpdated(user)
-			return ok()
-		}
-		if (method === 'DELETE') {
-			progress.delete(key)
 			emitUserUpdated(user)
 			return ok()
 		}

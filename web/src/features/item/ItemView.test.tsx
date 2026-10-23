@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 	},
 	getItem: vi.fn(),
 	updateProgress: vi.fn(),
+	resetProgress: vi.fn(),
 	api: vi.fn(),
 }))
 vi.mock('../../api', () => ({
@@ -50,6 +51,7 @@ vi.mock('./service', () => ({
 	deleteEpisode: vi.fn(),
 	updateMedia: vi.fn(),
 	updateProgress: mocks.updateProgress,
+	resetProgress: mocks.resetProgress,
 }))
 beforeEach(() => {
 	mocks.user = {
@@ -314,4 +316,71 @@ it('recovers unavailable status and clears only progress errors after reconnect 
 	await waitFor(() => expect(screen.queryByText('Progress offline')).toBeNull())
 	expect(screen.getAllByText('Unplayed').length).toBe(25)
 	refresh.mockRestore()
+})
+
+it('book reset and unfinished cancel without writes; confirmed actions refresh canonical item', async () => {
+	const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+	mocks.resetProgress.mockResolvedValue({})
+	mocks.updateProgress.mockResolvedValue({})
+	mocks.getItem.mockResolvedValue({
+		id: 'book',
+		mediaType: 'book',
+		userMediaProgress: {
+			id: 'progress-book',
+			isFinished: true,
+			currentTime: 70,
+		},
+		media: { metadata: { title: 'Book' } },
+	})
+	render(<ItemView id="book" />)
+	const reset = await screen.findByRole('button', { name: 'Reset progress' })
+	const unfinished = screen.getByRole('button', { name: 'Mark unfinished' })
+	mocks.resetProgress.mockClear()
+	mocks.updateProgress.mockClear()
+	mocks.getItem.mockClear()
+	fireEvent.click(reset)
+	fireEvent.click(unfinished)
+	expect(mocks.resetProgress).not.toHaveBeenCalled()
+	expect(mocks.updateProgress).not.toHaveBeenCalled()
+	confirm.mockReturnValue(true)
+	fireEvent.click(unfinished)
+	await waitFor(() =>
+		expect(mocks.updateProgress).toHaveBeenCalledWith('book', {
+			isFinished: false,
+		}),
+	)
+	await waitFor(() => expect(mocks.getItem).toHaveBeenCalledWith('book'))
+	await waitFor(() => expect(reset.hasAttribute('disabled')).toBe(false))
+	fireEvent.click(reset)
+	await waitFor(() =>
+		expect(mocks.resetProgress).toHaveBeenCalledWith('progress-book', 'book'),
+	)
+	expect(confirm).toHaveBeenCalledWith(
+		expect.stringContaining('saved listening position'),
+	)
+	confirm.mockRestore()
+})
+
+it('book metadata links native author and series routes and retains zero sequence', async () => {
+	mocks.getItem.mockResolvedValue({
+		id: 'book',
+		libraryId: 'books',
+		mediaType: 'book',
+		media: {
+			metadata: {
+				title: 'Book',
+				authors: [{ id: 'author', name: 'Writer' }],
+				series: [{ id: 'series', name: 'Saga', sequence: '0' }],
+			},
+		},
+	})
+	render(<ItemView id="book" />)
+	expect(
+		(await screen.findByRole('link', { name: 'Writer' })).getAttribute('href'),
+	).toBe('/author/$id')
+	expect(screen.getByRole('link', { name: 'Saga' }).getAttribute('href')).toBe(
+		'/library/$library/series/$id',
+	)
+	expect(screen.getByText(/#0/)).toBeTruthy()
+	expect(screen.queryByText('Publisher')).toBeNull()
 })

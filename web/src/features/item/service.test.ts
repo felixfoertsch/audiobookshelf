@@ -2,12 +2,48 @@ import { afterEach, expect, it, vi } from 'vitest'
 import {
 	checkPodcastFeed,
 	getItem,
+	resetProgress,
 	updateEpisode,
 	updateMedia,
 	updateProgress,
 } from './service'
 
 afterEach(() => vi.unstubAllGlobals())
+
+it('deletes only the owned progress ID and canonically refreshes', async () => {
+	const fetch = vi
+		.fn()
+		.mockResolvedValueOnce(new Response('OK'))
+		.mockResolvedValueOnce(new Response(JSON.stringify({ mediaProgress: [] })))
+	vi.stubGlobal('fetch', fetch)
+	await resetProgress('progress/a', 'book')
+	expect(fetch.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
+		['/api/me/progress/progress%2Fa', 'DELETE'],
+		['/api/me/progress', undefined],
+	])
+})
+
+it('reset failure never refreshes or invalidates progress', async () => {
+	const fetch = vi
+		.fn()
+		.mockResolvedValue(new Response('Denied', { status: 403 }))
+	vi.stubGlobal('fetch', fetch)
+	await expect(resetProgress('other-user-progress', 'book')).rejects.toThrow()
+	expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+it('reset refresh failure reports successful deletion separately', async () => {
+	vi.stubGlobal(
+		'fetch',
+		vi
+			.fn()
+			.mockResolvedValueOnce(new Response('OK'))
+			.mockResolvedValueOnce(new Response('Unavailable', { status: 500 })),
+	)
+	expect((await resetProgress('progress', 'book')).refreshWarning).toContain(
+		'Progress reset',
+	)
+})
 
 it('fetches expanded item and validates richer response', async () => {
 	const fetch = vi.fn().mockResolvedValue(
