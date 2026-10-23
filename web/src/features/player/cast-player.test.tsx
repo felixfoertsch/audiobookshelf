@@ -38,9 +38,11 @@ import {
 	handoffPlayback,
 	Player,
 	playEpisode,
+	seekPlayback,
 	sessionSchema,
 	usePlayer,
 } from '../../player'
+import { seekCast } from './cast'
 
 const native = {
 	id: 'local',
@@ -210,4 +212,67 @@ it('same transport, progress, rate and volume controls drive Cast instead of loc
 		key: 'Home',
 	})
 	expect(setCastVolume).toHaveBeenCalledWith(0)
+})
+it('Cast poll skips crossings, not seek destinations, and skips repeated crossings', () => {
+	vi.useFakeTimers()
+	vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+	vi.stubGlobal(
+		'fetch',
+		vi.fn().mockResolvedValue(Response.json({ bookmarks: [] })),
+	)
+	vi.mocked(seekCast).mockClear()
+	cast.state.connected = true
+	const snapshot = { currentTime: 9, paused: false, volume: 1, ended: false }
+	cast.snapshot.mockImplementation(() => snapshot)
+	usePlayer.setState({
+		session: sessionSchema.parse({
+			...native,
+			currentTime: 9,
+			episodeId: 'ep',
+			modernCast: true,
+			modernCastLoaded: true,
+			libraryItem: {
+				media: {
+					episodes: [
+						{
+							id: 'ep',
+							adAnalysis: {
+								status: 'candidates',
+								segments: [
+									{ start: 10, end: 20 },
+									{ start: 30, end: 40 },
+								],
+							},
+						},
+					],
+				},
+			},
+		}),
+		error: '',
+	})
+	const view = render(<Player />)
+	const descriptionId = view
+		.getByRole('slider', { name: 'Playback progress' })
+		.getAttribute('aria-describedby')
+	expect(document.getElementById(descriptionId || '')?.textContent).toBe(
+		'Detected segment ranges: 00:00:10–00:00:20, 00:00:30–00:00:40',
+	)
+	expect(view.getAllByTestId('segment-marker')).toHaveLength(2)
+	const tick = (time: number) =>
+		act(() => {
+			snapshot.currentTime = time
+			vi.advanceTimersByTime(1000)
+		})
+	tick(10.2)
+	expect(seekCast).toHaveBeenLastCalledWith(20)
+	act(() => seekPlayback(15))
+	tick(15.2)
+	expect(seekCast).toHaveBeenLastCalledWith(15)
+	tick(30.2)
+	expect(seekCast).toHaveBeenLastCalledWith(40)
+	act(() => seekPlayback(9))
+	tick(10.2)
+	expect(seekCast).toHaveBeenLastCalledWith(20)
+	view.unmount()
+	vi.useRealTimers()
 })

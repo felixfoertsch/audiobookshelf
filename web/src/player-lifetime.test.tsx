@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { useAuth } from './api'
-import { Player, sessionSchema, usePlayer } from './player'
+import { Player, seekPlayback, sessionSchema, usePlayer } from './player'
 
 vi.mock('@tanstack/react-router', () => ({
 	Link: ({ children }: { children: React.ReactNode }) => (
@@ -13,7 +13,7 @@ afterEach(() => {
 	usePlayer.getState().set(null)
 	vi.restoreAllMocks()
 })
-test('mounted player preserves same-episode skip set across session reload and resets on item/episode/account change', () => {
+test('mounted player skips crossings again after seek-back and tracks fresh sessions', () => {
 	vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
 	vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -25,7 +25,7 @@ test('mounted player preserves same-episode skip set across session reload and r
 			id,
 			libraryItemId: item,
 			episodeId: episode,
-			currentTime: 11,
+			currentTime: 9,
 			duration: 60,
 			audioTracks: [{ contentUrl: '/media/local.mp3', duration: 60 }],
 			libraryItem: {
@@ -68,9 +68,12 @@ test('mounted player preserves same-episode skip set across session reload and r
 	expect(screen.getByText('Transcoding 25%')).toBeTruthy()
 	stream('first', '101%')
 	expect(screen.queryByText('Transcoding 101%')).toBeNull()
+	act(() => seekPlayback(11))
 	expect(tick()).toBe(11)
+	act(() => seekPlayback(9))
+	expect(tick()).toBe(20)
 	act(() => usePlayer.getState().set(session('reload')))
-	expect(tick()).toBe(11)
+	expect(tick()).toBe(20)
 	act(() =>
 		usePlayer.getState().set(session('other-episode', 'podcast', 'other')),
 	)

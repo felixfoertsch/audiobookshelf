@@ -67,15 +67,12 @@ for (const prefix of ['', '/abs'])
 			.toBeGreaterThan(8)
 		await openPlayerOptions(page)
 		await expect(
-			page.getByRole('checkbox', { name: 'Skip detected inserted audio' }),
+			page.getByRole('checkbox', { name: 'Auto-skip detected segments' }),
 		).toBeEnabled()
 		await expect(
-			page.getByRole('checkbox', { name: 'Skip detected inserted audio' }),
+			page.getByRole('checkbox', { name: 'Auto-skip detected segments' }),
 		).toBeChecked()
-		await audio.evaluate((node: HTMLAudioElement) => {
-			node.currentTime = 2.2
-			node.dispatchEvent(new Event('timeupdate'))
-		})
+		// Continuous playback, rather than a seek into the candidate, touches its start.
 		await expect
 			.poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
 			.toBeGreaterThanOrEqual(3.8)

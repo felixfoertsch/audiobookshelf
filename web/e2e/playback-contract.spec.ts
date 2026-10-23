@@ -112,19 +112,23 @@ for (const prefix of ['', '/abs']) {
 			page,
 		}) => {
 			await page.route('**/api/items/podcast-1/play/*', async (route) => {
-				if (!route.request().postDataJSON().forceTranscode) {
-					const response = await route.fetch()
-					const body = await response.json()
-					body.audioTracks[0].contentUrl = `${prefix}/broken-audio`
-					await route.fulfill({ response, json: body })
-					return
-				}
 				const response = await route.fetch()
 				const body = await response.json()
-				body.audioTracks[0] = {
-					...body.audioTracks[0],
-					contentUrl: `${prefix}/hls/contract.m3u8`,
-					mimeType: 'application/vnd.apple.mpegurl',
+				const episode = body.libraryItem.media.episodes.find(
+					(item: { id: string }) => item.id === 'podcast-1-ep-1',
+				)
+				episode.adAnalysis = {
+					status: 'candidates',
+					segments: [{ start: 4, end: 10 }],
+				}
+				if (!route.request().postDataJSON().forceTranscode) {
+					body.audioTracks[0].contentUrl = `${prefix}/broken-audio`
+				} else {
+					body.audioTracks[0] = {
+						...body.audioTracks[0],
+						contentUrl: `${prefix}/hls/contract.m3u8`,
+						mimeType: 'application/vnd.apple.mpegurl',
+					}
 				}
 				await route.fulfill({ response, json: body })
 			})
@@ -163,6 +167,63 @@ for (const prefix of ['', '/abs']) {
 						.evaluate((node: HTMLAudioElement) => node.currentTime),
 				)
 				.toBeGreaterThan(0.1)
+			const audio = page.getByLabel('Audio playback')
+			const progress = page.getByRole('slider', { name: 'Playback progress' })
+			const time = () =>
+				audio.evaluate((node: HTMLAudioElement) => node.currentTime)
+			const options = async () => {
+				await page.getByRole('button', { name: 'More player actions' }).click()
+				await page.getByRole('menuitem', { name: 'Player options' }).click()
+			}
+			const seek = async (seconds: number) => {
+				await audio.evaluate((node: HTMLAudioElement) => node.pause())
+				await progress.focus()
+				await page.keyboard.press('Home')
+				for (let i = 0; i < seconds; i++)
+					await page.keyboard.press('ArrowRight')
+			}
+			await expect(page.getByTestId('segment-marker')).toBeVisible()
+			await expect(progress).toHaveAccessibleDescription(
+				/Detected segment ranges: 00:00:04–00:00:10/,
+			)
+			const geometry = await page
+				.getByTestId('segment-marker')
+				.evaluate((node: HTMLElement) => ({
+					left: parseFloat(node.style.left),
+					width: parseFloat(node.style.width),
+				}))
+			const total = Number(await progress.getAttribute('aria-valuemax'))
+			expect(geometry.left).toBeCloseTo((4 / total) * 100)
+			expect(geometry.width).toBeCloseTo((6 / total) * 100)
+			await seek(3)
+			await audio.evaluate((node: HTMLAudioElement) => node.play())
+			await expect.poll(time).toBeGreaterThanOrEqual(10)
+			await seek(5)
+			await audio.evaluate((node: HTMLAudioElement) => node.play())
+			await expect.poll(time).toBeGreaterThan(5.3)
+			expect(await time()).toBeLessThan(10)
+			await options()
+			await page.getByLabel('Auto-skip detected segments').uncheck()
+			await page.keyboard.press('Escape')
+			await seek(3)
+			await audio.evaluate((node: HTMLAudioElement) => node.play())
+			await expect.poll(time).toBeGreaterThan(4.3)
+			expect(await time()).toBeLessThan(10)
+			await audio.evaluate((node: HTMLAudioElement) => node.pause())
+			await page.screenshot({
+				path: `/private/tmp/opencode/player-segments/player-markers${prefix ? '-abs' : ''}.png`,
+			})
+			await page.reload()
+			await page
+				.getByRole('button', {
+					name: 'Play The Quiet Observatory',
+					exact: true,
+				})
+				.click()
+			await options()
+			await expect(
+				page.getByLabel('Auto-skip detected segments'),
+			).not.toBeChecked()
 		})
 		test('failed progress sync surfaces, retries successfully, finish advances queue', async ({
 			page,

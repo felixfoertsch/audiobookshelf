@@ -16,3 +16,9 @@ it('reuses Classic browser settings without dropping unrelated fields', () => {
 	})
 	expect(() => savePlayerSetting('playbackRate', 0)).toThrow()
 })
+
+it('persists auto-skip independently of playback sessions', () => {
+	expect(readPlayerSettings().autoSkip ?? true).toBe(true)
+	savePlayerSetting('autoSkip', false)
+	expect(readPlayerSettings().autoSkip).toBe(false)
+})

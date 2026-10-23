@@ -12,7 +12,7 @@ import {
 	Volume2,
 	VolumeX,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { z } from 'zod'
 import { create } from 'zustand'
 import {
@@ -23,6 +23,7 @@ import {
 	useAuth,
 } from './api'
 import { duration } from './catalog'
+import { useT } from './features/i18n'
 import { CastControl } from './features/player/CastControl'
 import {
 	castSnapshot,
@@ -38,7 +39,7 @@ import {
 	readPlayerSettings,
 	savePlayerSetting,
 } from './features/player/settings'
-import { candidateAt } from './features/player/skipping'
+import { skipTarget } from './features/player/skipping'
 import { originalTime, trackAt } from './features/player/timeline'
 import { Button } from './shared/components/ui/button'
 import {
@@ -626,25 +627,15 @@ export function Player() {
 		window.addEventListener('abs:socket', receive)
 		return () => window.removeEventListener('abs:socket', receive)
 	}, [session])
-	const [optIn, setOptIn] = useState(true)
-	const optInRef = useRef(optIn)
-	optInRef.current = optIn
-	const skipped = useRef(new Set<number>())
-	const skippedIdentity = useRef('')
+	const t = useT()
+	const markerDescription = useId()
+	const previousPosition = useRef<number | null>(null)
 	const segments = session ? sessionSegments(session) : []
 	useEffect(() => {
-		const identity = session
-			? JSON.stringify([
-					getAuthGeneration(),
-					useAuth.getState().user?.id,
-					session.libraryItemId,
-					session.episodeId,
-				])
-			: ''
-		if (session && identity !== skippedIdentity.current) {
-			skipped.current.clear()
-			skippedIdentity.current = identity
-		}
+		previousPosition.current =
+			session && session.currentTime > 0.5
+				? session.currentTime
+				: -Number.EPSILON
 		if (!session || !audio.current) return
 		const element = audio.current
 		const remote = session.modernCast === true
@@ -794,9 +785,12 @@ export function Player() {
 			if (!active || finishing || closed || (remote && !initialized)) return
 			if (remote) finishing = true
 			if (!remote && trackIndex.current < session.audioTracks.length - 1) {
+				const previous = previousPosition.current
 				seekCurrent?.(
 					originalTime(session.audioTracks, trackIndex.current + 1, 0),
 				)
+				// Track rollover continues playback; it is not a user seek.
+				previousPosition.current = previous
 				return
 			}
 			void sync(true)
@@ -815,7 +809,6 @@ export function Player() {
 		element.addEventListener('pause', pause)
 		element.addEventListener('ended', ended)
 		window.addEventListener('pagehide', pagehide)
-		setOptIn(true)
 		let engine: Hls | undefined
 		const loadSource = (nextUrl: URL) => {
 			// Restore before loading: readyState can advance before loadedmetadata fires.
@@ -853,6 +846,7 @@ export function Player() {
 			}
 		}
 		seekCurrent = (time) => {
+			previousPosition.current = Math.max(0, Math.min(time, session.duration))
 			if (remote) {
 				void seekCast(time).catch(report)
 				return
@@ -917,17 +911,15 @@ export function Player() {
 					setMuted(snapshot.volume === 0)
 					if (!snapshot.paused) {
 						listened += Math.min((now - lastTick) / 1000, 2)
-						const index = candidateAt(
+						const target = skipTarget(
 							sessionSegments(session),
+							previousPosition.current,
 							remotePosition,
-							skipped.current,
+							session.duration,
+							readPlayerSettings().autoSkip !== false,
 						)
-						if (optInRef.current && index >= 0) {
-							skipped.current.add(index)
-							void seekCast(
-								Math.min(sessionSegments(session)[index].end, session.duration),
-							).catch(report)
-						}
+						previousPosition.current = target ?? remotePosition
+						if (target !== null) void seekCast(target).catch(report)
 					}
 					if (snapshot.ended) ended()
 				} else if (initialized && !disconnected) {
@@ -976,12 +968,16 @@ export function Player() {
 			element.pause()
 			setSleepChapter(null)
 		}
-		if (optIn && !element.paused) {
-			const index = candidateAt(segments, current, skipped.current)
-			if (index >= 0) {
-				skipped.current.add(index)
-				seekPlayback(Math.min(segments[index].end, session.duration))
-			}
+		if (!element.paused && !element.seeking) {
+			const target = skipTarget(
+				segments,
+				previousPosition.current,
+				current,
+				session.duration,
+				readPlayerSettings().autoSkip !== false,
+			)
+			previousPosition.current = target ?? current
+			if (target !== null) seekPlayback(target)
 		}
 		setPosition(current)
 	}
@@ -995,6 +991,12 @@ export function Player() {
 			className="fixed inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-3xl rounded-2xl border bg-card/80 px-3 py-1 shadow-xl sm:py-1.5 backdrop-blur-xl sm:rounded-full md:left-[calc(var(--sidebar-width,0px)+0.5rem)]"
 		>
 			<div className="space-y-1 break-words">
+				<p id={markerDescription} className="sr-only">
+					{t('Player.SegmentRanges', {}, 'Detected segment ranges')}:{' '}
+					{segments
+						.map((s) => `${duration(s.start)}–${duration(s.end)}`)
+						.join(', ') || t('Player.NoSegments', {}, 'None')}
+				</p>
 				{streamMessage && <p role="status">{streamMessage}</p>}
 				{error && (
 					<p role="alert" className="text-destructive">
@@ -1093,16 +1095,25 @@ export function Player() {
 							>
 								{duration(position)}
 							</span>
-							<Slider
-								aria-label="Playback progress"
-								aria-valuetext={`${duration(position)} of ${duration(session.duration)}`}
-								className="h-6"
-								min={0}
-								max={session.duration}
-								step={1}
-								value={[Math.min(position, session.duration)]}
-								onValueChange={([value]) => seekPlayback(value)}
-							/>
+							<div className="relative flex min-w-0 flex-1 items-center">
+								<Slider
+									aria-label="Playback progress"
+									aria-describedby={markerDescription}
+									ref={(node) => {
+										node
+											?.querySelector('[role="slider"]')
+											?.setAttribute('aria-describedby', markerDescription)
+									}}
+									aria-valuetext={`${duration(position)} of ${duration(session.duration)}`}
+									className="h-6 [&_[data-slot=slider-thumb]]:z-10"
+									min={0}
+									max={session.duration}
+									step={1}
+									value={[Math.min(position, session.duration)]}
+									onValueChange={([value]) => seekPlayback(value)}
+								/>
+								<SegmentMarkers segments={segments} total={session.duration} />
+							</div>
 							<span
 								role="timer"
 								aria-label="Remaining time"
@@ -1497,24 +1508,14 @@ export function Player() {
 										<label className="flex items-center gap-3">
 											Original timeline{' '}
 											<span className="relative flex min-w-0 flex-1 items-center">
-												<span
-													aria-hidden="true"
-													className="pointer-events-none absolute inset-x-0 flex h-2"
-												>
-													{segments.map((s) => (
-														<span
-															key={`${s.start}-${s.end}`}
-															className="absolute h-2 bg-yellow-400"
-															style={{
-																left: `${(s.start / session.duration) * 100}%`,
-																width: `${((s.end - s.start) / session.duration) * 100}%`,
-															}}
-														/>
-													))}
-												</span>
+												<SegmentMarkers
+													segments={segments}
+													total={session.duration}
+												/>
 												<input
 													className="relative w-full accent-primary opacity-75"
 													aria-label="Seek position"
+													aria-describedby={markerDescription}
 													aria-valuetext={`${duration(position)} of ${duration(session.duration)}`}
 													type="range"
 													min="0"
@@ -1809,16 +1810,31 @@ export function Player() {
 									<label className="flex items-center gap-2 text-sm">
 										<input
 											type="checkbox"
-											checked={optIn}
-											disabled={!segments.length}
-											onChange={(event) => setOptIn(event.target.checked)}
+											checked={settings.autoSkip !== false}
+											onChange={(event) => {
+												try {
+													setSettings(
+														savePlayerSetting('autoSkip', event.target.checked),
+													)
+												} catch (error) {
+													usePlayer.setState({ error: String(error) })
+												}
+											}}
 										/>
-										Skip detected inserted audio
+										{t('Player.AutoSkip', {}, 'Auto-skip detected segments')}
 									</label>
 									<p className="text-xs text-muted-foreground">
 										{segments.length
-											? `${segments.length} candidate segments. May include false positives; original audio unchanged. Each candidate skips once.`
-											: 'No applicable candidate segments. Skipping unavailable.'}
+											? t(
+													'Player.CandidateWarning',
+													{ count: segments.length },
+													`${segments.length} candidate segments. May include false positives; original audio unchanged. Segments skip only when playback reaches their start.`,
+												)
+											: t(
+													'Player.NoCandidates',
+													{},
+													'No applicable candidate segments.',
+												)}
 									</p>
 									{!!segments.length && (
 										<p className="text-xs text-muted-foreground">
@@ -1835,5 +1851,32 @@ export function Player() {
 				)}
 			</div>
 		</section>
+	)
+}
+
+function SegmentMarkers({
+	segments,
+	total,
+}: {
+	segments: { start: number; end: number }[]
+	total: number
+}) {
+	return (
+		<span
+			aria-hidden="true"
+			className="pointer-events-none absolute inset-x-0 flex h-1.5"
+		>
+			{segments.map((s) => (
+				<span
+					key={`${s.start}-${s.end}`}
+					data-testid="segment-marker"
+					className="absolute h-full rounded-full bg-destructive ring-1 ring-background"
+					style={{
+						left: `${(s.start / total) * 100}%`,
+						width: `${((s.end - s.start) / total) * 100}%`,
+					}}
+				/>
+			))}
+		</span>
 	)
 }
