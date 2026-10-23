@@ -11,9 +11,7 @@ test('sidebar text meets AA over worst-case cover colors', async ({ page }) => {
 			ctx.clearRect(0, 0, 1, 1)
 			ctx.fillStyle = color
 			ctx.fillRect(0, 0, 1, 1)
-			return [...ctx.getImageData(0, 0, 1, 1).data]
-				.slice(0, 3)
-				.map((v) => v / 255)
+			return [...ctx.getImageData(0, 0, 1, 1).data].map((v) => v / 255)
 		}
 		const luminance = (color: number[]) =>
 			color
@@ -22,12 +20,16 @@ test('sidebar text meets AA over worst-case cover colors', async ({ page }) => {
 		return ['light', 'dark'].map((theme) => {
 			document.documentElement.classList.toggle('dark', theme === 'dark')
 			const style = getComputedStyle(document.documentElement)
-			const background = rgb(style.getPropertyValue('--sidebar'))
+			const background = rgb(style.getPropertyValue('--glass-tint'))
 			const foreground = rgb(style.getPropertyValue('--sidebar-foreground'))
 			// Black behind light glass and white behind dark glass bound any cover image, even without blur.
-			const composite = background.map(
-				(v) => v * 0.7 + (theme === 'light' ? 0 : 1) * 0.3,
-			)
+			const composite = background
+				.slice(0, 3)
+				.map(
+					(v) =>
+						v * background[3] +
+						(theme === 'light' ? 0 : 1) * (1 - background[3]),
+				)
 			const values = [luminance(foreground), luminance(composite)].sort(
 				(a, b) => a - b,
 			)
