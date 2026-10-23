@@ -41,10 +41,11 @@ for (const theme of ['light', 'dark']) {
 				4.5,
 			],
 			[
-				'description',
-				page
-					.getByRole('button', { name: 'Read description', exact: true })
-					.first(),
+				'episode progress',
+				page.getByRole('button', {
+					name: 'Mark finished: The Quiet Observatory',
+					exact: true,
+				}),
 				4.5,
 			],
 		] as const
