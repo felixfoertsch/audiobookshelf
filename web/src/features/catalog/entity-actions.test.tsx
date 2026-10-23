@@ -332,7 +332,10 @@ test('playlist owner can play, reorder, remove, save and delete; other user cann
 	vi.spyOn(window, 'confirm').mockReturnValue(true)
 	const { rerender } = render(<PlaylistDetail playlist={playlist} />)
 	expect(screen.getByText('2 items · 00:02:00')).toBeTruthy()
-	fireEvent.click(screen.getByRole('button', { name: 'Add to queue' }))
+	fireEvent.keyDown(screen.getByRole('button', { name: 'Playlist actions' }), {
+		key: 'Enter',
+	})
+	fireEvent.click(await screen.findByRole('menuitem', { name: 'Add to queue' }))
 	expect(enqueue).toHaveBeenCalledWith([
 		{ libraryItemId: 'book', episodeId: undefined, title: 'Book' },
 		{ libraryItemId: 'book2', episodeId: undefined, title: 'Book 2' },
@@ -349,19 +352,26 @@ test('playlist owner can play, reorder, remove, save and delete; other user cann
 		{ libraryItemId: 'book', episodeId: undefined, title: 'Book' },
 		{ libraryItemId: 'book2', episodeId: undefined, title: 'Book 2' },
 	])
-	fireEvent.click(screen.getAllByRole('button', { name: 'Play' })[1])
+	fireEvent.click(screen.getByRole('button', { name: 'Play Book 2' }))
 	await waitFor(() =>
 		expect(playEpisode).toHaveBeenCalledWith('book2', undefined),
 	)
 	router.invalidate.mockClear()
-	fireEvent.click(screen.getAllByRole('button', { name: 'Move down' })[0])
+	fireEvent.keyDown(screen.getByRole('button', { name: 'Actions for Book' }), {
+		key: 'Enter',
+	})
+	fireEvent.click(await screen.findByRole('menuitem', { name: 'Move down' }))
 	await waitFor(() => expect(router.invalidate).toHaveBeenCalledTimes(1))
 	const down = fetcher.mock.calls.find(([, init]) => init?.method === 'PATCH')
 	expect(down?.[0]).toBe('/api/playlists/playlist')
 	expect(JSON.parse(String(down?.[1]?.body))).toEqual({
 		items: [{ libraryItemId: 'book2' }, { libraryItemId: 'book' }],
 	})
-	fireEvent.click(screen.getAllByRole('button', { name: 'Move up' })[1])
+	fireEvent.keyDown(
+		screen.getByRole('button', { name: 'Actions for Book 2' }),
+		{ key: 'Enter' },
+	)
+	fireEvent.click(await screen.findByRole('menuitem', { name: 'Move up' }))
 	await waitFor(() => expect(router.invalidate).toHaveBeenCalledTimes(2))
 	const up = fetcher.mock.calls.filter(
 		([, init]) => init?.method === 'PATCH',
@@ -370,7 +380,10 @@ test('playlist owner can play, reorder, remove, save and delete; other user cann
 	expect(JSON.parse(String(up?.[1]?.body))).toEqual({
 		items: [{ libraryItemId: 'book2' }, { libraryItemId: 'book' }],
 	})
-	fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0])
+	fireEvent.keyDown(screen.getByRole('button', { name: 'Actions for Book' }), {
+		key: 'Enter',
+	})
+	fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }))
 	await waitFor(() =>
 		expect(
 			fetcher.mock.calls.some(
@@ -390,6 +403,10 @@ test('playlist owner can play, reorder, remove, save and delete; other user cann
 		'/api/playlists/playlist/item/book',
 		expect.objectContaining({ method: 'DELETE' }),
 	])
+	fireEvent.keyDown(screen.getByRole('button', { name: 'Playlist actions' }), {
+		key: 'Enter',
+	})
+	fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit details' }))
 	fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
 	await waitFor(() => expect(router.invalidate).toHaveBeenCalledTimes(4))
 	const save = fetcher.mock.calls.find(
@@ -404,7 +421,12 @@ test('playlist owner can play, reorder, remove, save and delete; other user cann
 		items: [{ libraryItemId: 'book' }, { libraryItemId: 'book2' }],
 	})
 	const confirm = vi.mocked(window.confirm)
-	fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+	fireEvent.keyDown(screen.getByRole('button', { name: 'Playlist actions' }), {
+		key: 'Enter',
+	})
+	fireEvent.click(
+		await screen.findByRole('menuitem', { name: 'Delete playlist' }),
+	)
 	expect(confirm).toHaveBeenCalledWith('Delete “Playlist”?')
 	await waitFor(() =>
 		expect(fetcher.mock.calls).toContainEqual([
@@ -412,12 +434,23 @@ test('playlist owner can play, reorder, remove, save and delete; other user cann
 			expect.objectContaining({ method: 'DELETE' }),
 		]),
 	)
-	await waitFor(() => expect(router.navigate).toHaveBeenCalledWith({ to: '/' }))
+	await waitFor(() =>
+		expect(router.navigate).toHaveBeenCalledWith({
+			to: '/library/$library/bookshelf/$id',
+			params: { library: 'library', id: 'playlists' },
+		}),
+	)
 	user('stranger')
 	rerender(<PlaylistDetail playlist={playlist} />)
 	expect(screen.queryByLabelText('Name')).toBeNull()
-	expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
-	expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+	expect(screen.queryByRole('button', { name: /^Actions for / })).toBeNull()
+	expect(screen.queryByRole('button', { name: 'Add items' })).toBeNull()
+	fireEvent.keyDown(screen.getByRole('button', { name: 'Playlist actions' }), {
+		key: 'Enter',
+	})
+	await screen.findByRole('menuitem', { name: 'Add to queue' })
+	expect(screen.queryByRole('menuitem', { name: 'Edit details' })).toBeNull()
+	expect(screen.queryByRole('menuitem', { name: 'Delete playlist' })).toBeNull()
 })
 test('playlist owner adds individual item with exact request payload', async () => {
 	user()
@@ -437,6 +470,7 @@ test('playlist owner adds individual item with exact request payload', async () 
 		return Response.json(playlist)
 	})
 	render(<PlaylistDetail playlist={playlist} />)
+	fireEvent.click(screen.getByRole('button', { name: 'Add items' }))
 	fireEvent.click(screen.getByRole('button', { name: 'Search' }))
 	await screen.findByRole('option', { name: 'Book 3' })
 	fireEvent.change(screen.getByLabelText('Item to add'), {

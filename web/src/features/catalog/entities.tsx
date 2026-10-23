@@ -1,11 +1,40 @@
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import {
+	ArrowDown,
+	ArrowUp,
+	MoreHorizontal,
+	Music2,
+	Play,
+	Plus,
+	Shuffle,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { duration, getItem, getItems } from '../../catalog'
 import { enqueue, playEpisode, playQueue } from '../../player'
 import { Button } from '../../shared/components/ui/button'
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from '../../shared/components/ui/dialog'
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from '../../shared/components/ui/dropdown-menu'
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+} from '../../shared/components/ui/sheet'
+import { episodeProgress } from '../item/progress'
 import { useCatalogRefresh } from './browse'
 import { CollectionFeed } from './collection-feed'
 import {
@@ -318,12 +347,15 @@ function AddItem({
 					void load(0)
 				}}
 			>
-				<input
-					aria-label="Search items"
-					value={query}
-					onChange={(event) => setQuery(event.target.value)}
-					className="min-w-0 flex-1 rounded border bg-background p-2"
-				/>
+				<label className="min-w-0 flex-1">
+					Search items
+					<input
+						aria-label="Search items"
+						value={query}
+						onChange={(event) => setQuery(event.target.value)}
+						className="block w-full rounded border bg-background p-2"
+					/>
+				</label>
 				<Button variant="outline" disabled={pending || loading}>
 					Search
 				</Button>
@@ -732,55 +764,146 @@ export function CollectionDetail({ collection }: { collection: Collection }) {
 		</EntityPage>
 	)
 }
-export function PlaylistDetail({ playlist }: { playlist: Playlist }) {
-	const user = useAuth((state) => state.user)
-	const owner = user?.id === playlist.userId
-	const canUpdate = owner
-	const canDelete = owner
-	const playableItems = playlist.items.filter(canPlayPlaylistItem)
-	const totalDuration = playlist.items.reduce(
-		(total, item) =>
-			total +
-			(item.episodeId
-				? (item.episode?.duration ?? item.episode?.audioFile?.duration ?? 0)
-				: (item.libraryItem.media.duration ?? 0)),
-		0,
+function PlaylistOverlay({
+	title,
+	open,
+	onOpenChange,
+	children,
+}: {
+	title: string
+	open: boolean
+	onOpenChange: (open: boolean) => void
+	children: React.ReactNode
+}) {
+	const [mobile, setMobile] = useState(false)
+	useEffect(() => {
+		if (!window.matchMedia) return
+		const query = window.matchMedia('(max-width: 639px)')
+		const update = () => setMobile(query.matches)
+		update()
+		query.addEventListener('change', update)
+		return () => query.removeEventListener('change', update)
+	}, [])
+	return mobile ? (
+		<Sheet open={open} onOpenChange={onOpenChange}>
+			<SheetContent className="overflow-y-auto p-6">
+				<SheetHeader>
+					<SheetTitle>{title}</SheetTitle>
+					<SheetDescription>Manage your playlist.</SheetDescription>
+				</SheetHeader>
+				{children}
+			</SheetContent>
+		</Sheet>
+	) : (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent>
+				<DialogHeader>
+					<DialogTitle>{title}</DialogTitle>
+					<DialogDescription>Manage your playlist.</DialogDescription>
+				</DialogHeader>
+				{children}
+			</DialogContent>
+		</Dialog>
 	)
+}
+export function PlaylistDetail({ playlist }: { playlist: Playlist }) {
+	useCatalogRefresh()
+	const user = useAuth((state) => state.user)
+	const router = useRouter()
+	const navigate = useNavigate()
+	const owner = user?.id === playlist.userId
+	const [pending, setPending] = useState(false)
+	const lock = useRef(false)
+	const [error, setError] = useState('')
+	const [overlay, setOverlay] = useState<'add' | 'edit' | null>(null)
+	const addTrigger = useRef<HTMLButtonElement>(null)
+	const moreTrigger = useRef<HTMLButtonElement>(null)
+	const [name, setName] = useState(playlist.name || '')
+	const [description, setDescription] = useState(playlist.description || '')
+	useEffect(() => {
+		setName(playlist.name || '')
+		setDescription(playlist.description || '')
+	}, [playlist.name, playlist.description])
+	const closeOverlay = () => {
+		const target = overlay === 'add' ? addTrigger : moreTrigger
+		setOverlay(null)
+		requestAnimationFrame(() => target.current?.focus())
+	}
+	async function act(action: () => Promise<unknown>) {
+		if (lock.current) return
+		lock.current = true
+		setPending(true)
+		setError('')
+		try {
+			await action()
+			await router.invalidate()
+		} catch (cause) {
+			setError(cause instanceof Error ? cause.message : 'Action failed')
+		} finally {
+			lock.current = false
+			setPending(false)
+		}
+	}
+	const playableItems = playlist.items.filter(canPlayPlaylistItem)
+	const seconds = (item: Playlist['items'][number]) =>
+		item.episodeId
+			? (item.episode?.duration ?? item.episode?.audioFile?.duration ?? 0)
+			: (item.libraryItem.media.duration ?? 0)
+	const total = playlist.items.reduce((sum, item) => sum + seconds(item), 0)
+	const cover = (id: string) =>
+		`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(id)}/cover?token=${encodeURIComponent(localStorage.getItem('token') || '')}`
 	const coverItem = playlist.items.find(
 		(item) => item.libraryItem.media.coverPath,
 	)
+	const reorder = (index: number, direction: number) =>
+		void act(() =>
+			updatePlaylist(playlist.id, {
+				items: moved(playlist.items, index, index + direction).map(
+					({ libraryItemId, episodeId }) => ({ libraryItemId, episodeId }),
+				),
+			}),
+		)
 	return (
-		<EntityPage
-			title={playlist.name ?? ''}
-			description={playlist.description}
-			imagePath={coverItem?.libraryItem.media.coverPath}
-			headerContent={
-				<p className="text-muted-foreground">
-					{playlist.items.length} items · {duration(totalDuration)}
-				</p>
-			}
-			imageUrl={
-				coverItem
-					? `${window.__ABS_WEB_CONFIG__?.apiBasePath ?? ''}/api/items/${encodeURIComponent(coverItem.libraryItemId)}/cover?token=${encodeURIComponent(localStorage.getItem('token') || '')}`
-					: undefined
-			}
-			canUpdate={canUpdate}
-			canDelete={canDelete}
-			onSave={async (name, description) =>
-				updatePlaylist(playlist.id, {
-					name,
-					description,
-					items: playlist.items.map((i) => ({
-						libraryItemId: i.libraryItemId,
-						episodeId: i.episodeId,
-					})),
-				})
-			}
-			onDelete={() => deletePlaylist(playlist.id)}
-		>
-			{({ act, pending }) => (
-				<>
-					<div className="flex flex-wrap gap-2">
+		<section className="space-y-8">
+			<nav
+				aria-label="Breadcrumb"
+				className="flex gap-2 text-sm text-muted-foreground"
+			>
+				<Link
+					to="/library/$library/bookshelf/$id"
+					params={{ library: playlist.libraryId, id: 'playlists' }}
+				>
+					Playlists
+				</Link>
+				<span aria-hidden="true">›</span>
+				<span aria-current="page">{playlist.name}</span>
+			</nav>
+			<header className="flex flex-col gap-6 sm:flex-row sm:items-end">
+				<div className="mx-auto flex size-48 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-muted shadow-lg sm:mx-0 sm:size-60">
+					{coverItem ? (
+						<img
+							className="size-full object-cover"
+							src={cover(coverItem.libraryItemId)}
+							alt={`${playlist.name} cover`}
+						/>
+					) : (
+						<Music2 className="size-20 text-muted-foreground" />
+					)}
+				</div>
+				<div className="min-w-0 flex-1 space-y-3">
+					<p className="text-sm font-semibold text-primary">Playlist</p>
+					<h1 className="text-3xl font-bold tracking-tight sm:text-5xl">
+						{playlist.name || 'Untitled'}
+					</h1>
+					{playlist.description && (
+						<p className="max-w-2xl text-muted-foreground">
+							{playlist.description}
+						</p>
+					)}
+					<p className="text-sm text-muted-foreground">
+						{playlist.items.length} items · {duration(total)}
+					</p>
+					<div className="flex flex-wrap items-center gap-2 pt-2">
 						<Button
 							disabled={pending || !playableItems.length}
 							onClick={() =>
@@ -791,18 +914,8 @@ export function PlaylistDetail({ playlist }: { playlist: Playlist }) {
 								)
 							}
 						>
+							<Play />
 							Play playlist
-						</Button>
-						<Button
-							variant="outline"
-							disabled={pending || !playableItems.length}
-							onClick={() =>
-								void act(async () =>
-									enqueue(playlistItems({ ...playlist, items: playableItems })),
-								)
-							}
-						>
-							Add to queue
 						</Button>
 						<Button
 							variant="outline"
@@ -818,112 +931,272 @@ export function PlaylistDetail({ playlist }: { playlist: Playlist }) {
 								)
 							}
 						>
+							<Shuffle />
 							Shuffle playlist
 						</Button>
-					</div>
-					{playlist.items.length === 0 && <p>No items in this playlist.</p>}
-					<ol className="space-y-2">
-						{playlist.items.map((item, index) => (
-							<li
-								key={`${item.libraryItemId}:${item.episodeId ?? ''}`}
-								className="flex min-w-0 flex-wrap items-center gap-2 rounded border p-3 sm:gap-3"
-							>
-								<span className="min-w-0 flex-1 basis-full sm:basis-auto">
-									<ItemLink
-										id={item.libraryItemId}
-										title={
-											item.episode?.title ||
-											item.libraryItem.media.metadata.title ||
-											''
-										}
-									/>
-								</span>
-								<PlayButton
-									id={item.libraryItemId}
-									episodeId={item.episodeId}
-									act={act}
-									pending={pending}
-									disabled={!canPlayPlaylistItem(item)}
-								/>
-								{canUpdate && (
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button
+									ref={moreTrigger}
+									variant="outline"
+									size="icon"
+									aria-label="Playlist actions"
+								>
+									<MoreHorizontal />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end">
+								<DropdownMenuItem
+									disabled={pending || !playableItems.length}
+									onSelect={() =>
+										void act(async () =>
+											enqueue(
+												playlistItems({ ...playlist, items: playableItems }),
+											),
+										)
+									}
+								>
+									Add to queue
+								</DropdownMenuItem>
+								{owner && (
 									<>
+										<DropdownMenuItem onSelect={() => setOverlay('edit')}>
+											Edit details
+										</DropdownMenuItem>
+										<DropdownMenuItem
+											variant="destructive"
+											onSelect={() => {
+												if (window.confirm(`Delete “${playlist.name}”?`))
+													void act(async () => {
+														await deletePlaylist(playlist.id)
+														await navigate({
+															to: '/library/$library/bookshelf/$id',
+															params: {
+																library: playlist.libraryId,
+																id: 'playlists',
+															},
+														})
+													})
+											}}
+										>
+											Delete playlist
+										</DropdownMenuItem>
+									</>
+								)}
+							</DropdownMenuContent>
+						</DropdownMenu>
+						{owner && (
+							<Button
+								ref={addTrigger}
+								variant="ghost"
+								onClick={() => setOverlay('add')}
+							>
+								<Plus />
+								Add items
+							</Button>
+						)}
+					</div>
+				</div>
+			</header>
+			{error && (
+				<p role="alert" className="text-destructive">
+					{error}
+				</p>
+			)}
+			{!playlist.items.length && (
+				<div className="rounded-2xl border border-dashed p-10 text-center">
+					<h2 className="font-semibold">No items in this playlist.</h2>
+					<p className="text-muted-foreground">
+						Add books or episodes from this library to start listening.
+					</p>
+				</div>
+			)}
+			<ol className="divide-y divide-border/60">
+				{playlist.items.map((item, index) => {
+					const title =
+						item.episode?.title ||
+						item.libraryItem.media.metadata.title ||
+						'Untitled'
+					const metadata = item.libraryItem.media.metadata
+					const secondary = item.episodeId
+						? metadata.title
+						: metadata.author ||
+							metadata.authorName ||
+							metadata.authors?.map((author) => author.name).join(', ')
+					const progress = episodeProgress(
+						user,
+						item.libraryItemId,
+						item.episodeId,
+					)
+					const available = canPlayPlaylistItem(item)
+					return (
+						<li
+							key={`${item.libraryItemId}:${item.episodeId || ''}`}
+							className="group flex min-w-0 items-center gap-2 rounded-lg py-2 hover:bg-accent/50 focus-within:bg-accent/50"
+						>
+							<button
+								type="button"
+								className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left focus-visible:outline-2 focus-visible:outline-ring"
+								aria-label={`Play ${title}`}
+								disabled={pending || !available}
+								onClick={() =>
+									void act(() =>
+										playEpisode(item.libraryItemId, item.episodeId),
+									)
+								}
+							>
+								<span className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
+									{item.libraryItem.media.coverPath ? (
+										<img
+											className="size-full object-cover"
+											src={cover(item.libraryItemId)}
+											alt=""
+										/>
+									) : (
+										<Music2 className="size-5 text-muted-foreground" />
+									)}
+									<span className="absolute inset-0 flex items-center justify-center bg-black/40 text-white opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+										<Play className="size-5" />
+									</span>
+								</span>
+								<span className="min-w-0 flex-1">
+									<span className="block truncate font-medium">{title}</span>
+									<span className="block truncate text-xs text-muted-foreground">
+										{secondary ? `${secondary} · ` : ''}
+										{item.episodeId ? 'Episode' : 'Audiobook'}
+									</span>
+									<span className="block text-xs text-muted-foreground">
+										{!available
+											? 'Audio unavailable'
+											: progress?.isFinished
+												? 'Finished'
+												: (progress?.currentTime || 0) > 0
+													? 'In progress'
+													: 'Not started'}
+									</span>
+								</span>
+								<span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+									{seconds(item) ? duration(seconds(item)) : '—'}
+								</span>
+							</button>
+							{owner && (
+								<DropdownMenu>
+									<DropdownMenuTrigger asChild>
 										<Button
-											variant="outline"
+											variant="ghost"
+											size="icon"
+											aria-label={`Actions for ${title}`}
+										>
+											<MoreHorizontal />
+										</Button>
+									</DropdownMenuTrigger>
+									<DropdownMenuContent align="end">
+										<DropdownMenuItem
 											disabled={pending || index === 0}
-											aria-label="Move up"
-											onClick={() =>
-												void act(() =>
-													updatePlaylist(playlist.id, {
-														items: moved(playlist.items, index, index - 1).map(
-															(i) => ({
-																libraryItemId: i.libraryItemId,
-																episodeId: i.episodeId,
-															}),
-														),
-													}),
-												)
-											}
+											onSelect={() => reorder(index, -1)}
 										>
-											<ArrowUp aria-hidden="true" />
-										</Button>
-										<Button
-											variant="outline"
+											<ArrowUp />
+											Move up
+										</DropdownMenuItem>
+										<DropdownMenuItem
 											disabled={pending || index === playlist.items.length - 1}
-											aria-label="Move down"
-											onClick={() =>
-												void act(() =>
-													updatePlaylist(playlist.id, {
-														items: moved(playlist.items, index, index + 1).map(
-															(i) => ({
-																libraryItemId: i.libraryItemId,
-																episodeId: i.episodeId,
-															}),
-														),
-													}),
-												)
-											}
+											onSelect={() => reorder(index, 1)}
 										>
-											<ArrowDown aria-hidden="true" />
-										</Button>
-										<Button
-											variant="outline"
+											<ArrowDown />
+											Move down
+										</DropdownMenuItem>
+										<DropdownMenuItem
+											variant="destructive"
 											disabled={pending}
-											onClick={() => {
+											onSelect={() => {
 												if (window.confirm('Remove this item?'))
 													void act(() => removePlaylistItem(playlist.id, item))
 											}}
 										>
 											Remove
-										</Button>
-									</>
-								)}
-							</li>
-						))}
-					</ol>
-					{canUpdate && (
-						<AddItem
-							allowEpisodes
-							libraryId={playlist.libraryId}
-							excluded={
-								new Set(
-									playlist.items
-										.filter((item) => item.libraryItem.mediaType === 'book')
-										.map((item) => item.libraryItemId),
-								)
-							}
-							pending={pending}
-							onAdd={(id, episodeId) =>
-								void act(() =>
-									addPlaylistItem(playlist.id, {
-										libraryItemId: id,
-										episodeId,
-									}),
-								)
-							}
-						/>
-					)}
-				</>
-			)}
-		</EntityPage>
+										</DropdownMenuItem>
+									</DropdownMenuContent>
+								</DropdownMenu>
+							)}
+						</li>
+					)
+				})}
+			</ol>
+			<PlaylistOverlay
+				title={overlay === 'add' ? 'Add items' : 'Edit details'}
+				open={overlay !== null}
+				onOpenChange={(open) => {
+					if (!open) closeOverlay()
+				}}
+			>
+				{overlay === 'add' ? (
+					<AddItem
+						allowEpisodes
+						libraryId={playlist.libraryId}
+						excluded={
+							new Set(
+								playlist.items
+									.filter((item) => !item.episodeId)
+									.map((item) => item.libraryItemId),
+							)
+						}
+						pending={pending}
+						onAdd={(libraryItemId, episodeId) =>
+							void act(() =>
+								addPlaylistItem(playlist.id, { libraryItemId, episodeId }),
+							)
+						}
+					/>
+				) : (
+					<form
+						className="space-y-4"
+						onSubmit={(event) => {
+							event.preventDefault()
+							if (name.trim())
+								void act(async () => {
+									await updatePlaylist(playlist.id, {
+										name: name.trim(),
+										description,
+										items: playlist.items.map(
+											({ libraryItemId, episodeId }) => ({
+												libraryItemId,
+												episodeId,
+											}),
+										),
+									})
+									closeOverlay()
+								})
+						}}
+					>
+						<label className="block space-y-1">
+							Name
+							<input
+								className="block w-full rounded-md border bg-background p-2"
+								required
+								maxLength={255}
+								value={name}
+								onChange={(event) => setName(event.target.value)}
+							/>
+						</label>
+						<label className="block space-y-1">
+							Description
+							<textarea
+								className="block w-full rounded-md border bg-background p-2"
+								value={description}
+								onChange={(event) => setDescription(event.target.value)}
+							/>
+						</label>
+						<Button disabled={pending} type="submit">
+							Save changes
+						</Button>
+					</form>
+				)}
+				{error && (
+					<p role="alert" className="text-destructive">
+						{error}
+					</p>
+				)}
+			</PlaylistOverlay>
+		</section>
 	)
 }

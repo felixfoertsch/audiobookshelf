@@ -43,6 +43,8 @@ import {
 	saveNarrator,
 	searchLibrary,
 } from './browse-api'
+import { type Playlist, playlistSchema } from './entities-api'
+import { PlaylistList } from './playlist-list'
 import { persistSearch, useCoverSize, useShelfPosition } from './preferences'
 import { SelectionToolbar } from './selection-toolbar'
 import { SelectionTools } from './selection-tools'
@@ -1065,6 +1067,7 @@ export function BrowsePage({
 	const [error, setError] = useState('')
 	const [pending, setPending] = useState(false)
 	const [collections, setCollections] = useState<Entry[]>([])
+	const [playlists, setPlaylists] = useState<Playlist[]>([])
 	const [progressStatus, setProgressStatus] = useState('')
 	useEffect(() => () => progressCancel.current?.(), [])
 	const runProgress = async (isFinished: boolean) => {
@@ -1142,6 +1145,26 @@ export function BrowsePage({
 			setPending(false)
 		}
 	}
+	useEffect(() => {
+		if (section !== 'playlists') return
+		let active = true
+		void api(
+			`/api/libraries/${encodeURIComponent(library)}/playlists`,
+			z.object({ results: z.array(playlistSchema) }),
+		)
+			.then((result) => {
+				if (active) setPlaylists(result.results)
+			})
+			.catch((cause: unknown) => {
+				if (active)
+					setError(
+						cause instanceof Error ? cause.message : 'Could not load playlists',
+					)
+			})
+		return () => {
+			active = false
+		}
+	}, [library, section])
 	useEffect(() => {
 		if (!selected.length || podcast) return
 		let active = true
@@ -1645,7 +1668,39 @@ export function BrowsePage({
 					</div>
 				)}
 			</div>
-			{['collections', 'playlists'].includes(section) && (
+			{section === 'playlists' && (
+				<PlaylistList
+					playlists={playlists}
+					pending={pending}
+					create={async (name) => {
+						setError('')
+						setPending(true)
+						try {
+							await api('/api/playlists', z.unknown(), {
+								method: 'POST',
+								body: JSON.stringify({ libraryId: library, name, items: [] }),
+							})
+							const result = await api(
+								`/api/libraries/${encodeURIComponent(library)}/playlists`,
+								z.object({ results: z.array(playlistSchema) }),
+							)
+							setPlaylists(result.results)
+							await router.invalidate()
+							return true
+						} catch (cause) {
+							setError(
+								cause instanceof Error
+									? cause.message
+									: 'Could not create playlist',
+							)
+							return false
+						} finally {
+							setPending(false)
+						}
+					}}
+				/>
+			)}
+			{section === 'collections' && (
 				<form
 					className="flex flex-wrap gap-2"
 					onSubmit={(e) => {
@@ -1687,115 +1742,122 @@ export function BrowsePage({
 					</Button>
 				</form>
 			)}
-			<p>
-				{data.total.toLocaleString()} items · Page {search.page + 1}
-			</p>
 			{error && <p role="alert">{error}</p>}
-			{search.filter === 'issues' && canDelete && data.total > 0 && (
-				<Button
-					variant="destructive"
-					disabled={pending}
-					onClick={() => {
-						if (
-							window.confirm(
-								`Remove all ${data.total} items with missing or invalid files from library?`,
-							)
-						)
-							void run(() =>
-								api(
-									`/api/libraries/${encodeURIComponent(library)}/issues`,
-									z.unknown(),
-									{ method: 'DELETE' },
-								),
-							)
-					}}
-				>
-					Remove all items with issues
-				</Button>
-			)}
+			{section !== 'playlists' && (
+				<>
+					<p>
+						{data.total.toLocaleString()} items · Page {search.page + 1}
+					</p>
+					{search.filter === 'issues' && canDelete && data.total > 0 && (
+						<Button
+							variant="destructive"
+							disabled={pending}
+							onClick={() => {
+								if (
+									window.confirm(
+										`Remove all ${data.total} items with missing or invalid files from library?`,
+									)
+								)
+									void run(() =>
+										api(
+											`/api/libraries/${encodeURIComponent(library)}/issues`,
+											z.unknown(),
+											{ method: 'DELETE' },
+										),
+									)
+							}}
+						>
+							Remove all items with issues
+						</Button>
+					)}
 
-			<div
-				className={view === 'grid' ? 'grid gap-4' : 'space-y-3'}
-				style={
-					view === 'grid'
-						? {
-								gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${coverSize.size}px), 1fr))`,
-							}
-						: undefined
-				}
-			>
-				{data.results.map((entry) => (
-					<EntryCard
-						key={entry.id}
-						library={library}
-						entry={{ ...entry, _type: section }}
-						view={view}
-						select={
-							selectMode && !section && 'media' in entry
+					<div
+						className={view === 'grid' ? 'grid gap-4' : 'space-y-3'}
+						style={
+							view === 'grid'
 								? {
-										checked: selected.includes(entry.id),
-										toggle: () =>
-											setSelected((ids) =>
-												ids.includes(entry.id)
-													? ids.filter((id) => id !== entry.id)
-													: [...ids, entry.id],
-											),
+										gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${coverSize.size}px), 1fr))`,
 									}
 								: undefined
 						}
-					/>
-				))}
-			</div>
-			{!data.results.length && (
-				<div className="space-y-3">
-					<p>
-						{search.filter === 'all'
-							? `No ${section || 'items'} in this library.`
-							: 'No items match this filter.'}
-					</p>
-					{search.filter !== 'all' && (
-						<Button variant="outline" onClick={() => update({ filter: 'all' })}>
-							Clear filter
+					>
+						{data.results.map((entry) => (
+							<EntryCard
+								key={entry.id}
+								library={library}
+								entry={{ ...entry, _type: section }}
+								view={view}
+								select={
+									selectMode && !section && 'media' in entry
+										? {
+												checked: selected.includes(entry.id),
+												toggle: () =>
+													setSelected((ids) =>
+														ids.includes(entry.id)
+															? ids.filter((id) => id !== entry.id)
+															: [...ids, entry.id],
+													),
+											}
+										: undefined
+								}
+							/>
+						))}
+					</div>
+					{!data.results.length && (
+						<div className="space-y-3">
+							<p>
+								{search.filter === 'all'
+									? `No ${section || 'items'} in this library.`
+									: 'No items match this filter.'}
+							</p>
+							{search.filter !== 'all' && (
+								<Button
+									variant="outline"
+									onClick={() => update({ filter: 'all' })}
+								>
+									Clear filter
+								</Button>
+							)}
+							{admin && (
+								<>
+									<Button
+										disabled={pending}
+										onClick={() => {
+											if (window.confirm('Scan library for media files?'))
+												void run(() =>
+													api(
+														`/api/libraries/${encodeURIComponent(library)}/scan`,
+														z.unknown(),
+														{ method: 'POST' },
+													),
+												)
+										}}
+									>
+										Scan library
+									</Button>
+									<Link to="/config/libraries">Configure libraries</Link>
+								</>
+							)}
+						</div>
+					)}
+					<nav aria-label="Pagination" className="flex gap-4">
+						<Button
+							variant="outline"
+							disabled={search.page === 0}
+							onClick={() => update({ page: search.page - 1 })}
+						>
+							Previous
 						</Button>
-					)}
-					{admin && (
-						<>
-							<Button
-								disabled={pending}
-								onClick={() => {
-									if (window.confirm('Scan library for media files?'))
-										void run(() =>
-											api(
-												`/api/libraries/${encodeURIComponent(library)}/scan`,
-												z.unknown(),
-												{ method: 'POST' },
-											),
-										)
-								}}
-							>
-								Scan library
-							</Button>
-							<Link to="/config/libraries">Configure libraries</Link>
-						</>
-					)}
-				</div>
+						<Button
+							variant="outline"
+							disabled={(search.page + 1) * 48 >= data.total}
+							onClick={() => update({ page: search.page + 1 })}
+						>
+							Next
+						</Button>
+					</nav>
+				</>
 			)}
-			<nav aria-label="Pagination" className="flex gap-4">
-				<Button
-					variant="outline"
-					disabled={search.page === 0}
-					onClick={() => update({ page: search.page - 1 })}
-				>
-					Previous
-				</Button>
-				<Button
-					variant="outline"
-					disabled={(search.page + 1) * 48 >= data.total}
-					onClick={() => update({ page: search.page + 1 })}
-				>
-					Next
-				</Button>
-			</nav>
 		</section>
 	)
 }

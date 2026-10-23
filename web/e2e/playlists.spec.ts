@@ -16,58 +16,98 @@ for (const prefix of ['', '/abs']) {
 					`${prefix}/new/library/books/bookshelf/playlists?view=detail`,
 				)
 				await chooseTheme(page, theme)
-				await settleAnimations(page)
-				const link = page.getByRole('link', { name: 'Evening Queue' }).first()
+				const capture = async (view: string) => {
+					await settleAnimations(page)
+					await page.screenshot({
+						path: `/private/tmp/opencode/select-playlists/v2/${view}-${prefix ? 'abs' : 'root'}-${width}-${theme}.png`,
+						fullPage: true,
+					})
+				}
+				const link = page
+					.getByRole('article')
+					.getByRole('link', { name: /Evening Queue/ })
 				await expect(link).toBeVisible()
-				await page.screenshot({
-					path: `/private/tmp/opencode/select-playlists/playlist-list-${prefix ? 'abs' : 'root'}-${width}-${theme}.png`,
-					fullPage: true,
-				})
+				await expect(page.getByRole('article')).toHaveCount(1)
+				await expect(page.getByRole('alert')).toHaveCount(0)
+				await capture('list')
 				await link.click()
 				await expect(page).toHaveURL(/\/playlist\/playlist-1$/)
-				await chooseTheme(page, theme)
-				await settleAnimations(page)
 				await expect(
 					page.getByRole('heading', { name: 'Evening Queue' }),
 				).toBeVisible()
 				await expect(page.getByText('2 items · 00:00:13')).toBeVisible()
-				await page.getByRole('button', { name: 'Add to queue' }).click()
+				await expect(page.getByText('Audio unavailable')).toBeVisible()
+				await capture('detail')
+				await page
+					.getByRole('button', { name: 'Add items', exact: true })
+					.click()
+				await expect(page.getByRole('dialog')).toBeVisible()
 				await expect(
-					page.getByRole('button', { name: 'Add to queue' }),
+					page.getByLabel('Search items', { exact: true }),
+				).toBeVisible()
+				await capture('add')
+				await page.keyboard.press('Escape')
+				await expect(
+					page.getByRole('button', { name: 'Add items', exact: true }),
+				).toBeFocused()
+				await page.getByRole('button', { name: 'Playlist actions' }).click()
+				await page
+					.getByRole('menuitem', { name: 'Add to queue', exact: true })
+					.click()
+				await expect(
+					page.getByRole('button', { name: 'Shuffle playlist' }),
 				).toBeEnabled()
-				await page.getByRole('button', { name: 'Move down' }).first().click()
+				const rows = page.locator('ol').getByRole('listitem')
+				await rows
+					.first()
+					.getByRole('button', { name: /Actions for/ })
+					.focus()
+				await page.keyboard.press('Enter')
 				await expect(
-					page.locator('ol').getByRole('listitem').first(),
-				).toContainText('Northbound Letters')
-				await page.getByLabel('Name').fill('Renamed Queue')
-				await page.getByRole('button', { name: 'Save changes' }).click()
-				await expect(
-					page.getByRole('heading', { name: 'Renamed Queue' }),
-				).toBeVisible()
-				await page.getByLabel('Name').fill('Evening Queue')
-				await page.getByRole('button', { name: 'Save changes' }).click()
-				await expect(
-					page.getByRole('heading', { name: 'Evening Queue' }),
-				).toBeVisible()
-				await page.getByRole('button', { name: 'Move down' }).first().click()
-				await expect(
-					page.locator('ol').getByRole('listitem').first(),
-				).toContainText('The Glass Orchard')
-				await expect(
-					page.getByRole('button', { name: 'Move up' }).first(),
+					page.getByRole('menuitem', { name: 'Move up', exact: true }),
 				).toBeDisabled()
+				await capture('row-menu')
+				await page
+					.getByRole('menuitem', { name: 'Move down', exact: true })
+					.focus()
+				await page.keyboard.press('Enter')
+				await expect(rows.first()).toContainText('Northbound Letters')
+				for (const name of ['Renamed Queue', 'Evening Queue']) {
+					await page.getByRole('button', { name: 'Playlist actions' }).click()
+					await page.getByRole('menuitem', { name: 'Edit details' }).click()
+					await page.getByLabel('Name', { exact: true }).fill(name)
+					await page.getByRole('button', { name: 'Save changes' }).click()
+					await expect(
+						page.getByRole('heading', { name, exact: true }),
+					).toBeVisible()
+					await expect(page.getByRole('dialog')).not.toBeVisible()
+					await expect(
+						page.getByRole('button', { name: 'Playlist actions' }),
+					).toBeFocused()
+				}
+				await rows
+					.first()
+					.getByRole('button', { name: /Actions for/ })
+					.focus()
+				await page.keyboard.press('Enter')
+				await page
+					.getByRole('menuitem', { name: 'Move down', exact: true })
+					.focus()
+				await page.keyboard.press('Enter')
+				await expect(rows.first()).toContainText('The Glass Orchard')
+				await rows
+					.last()
+					.getByRole('button', { name: /Actions for/ })
+					.click()
 				await expect(
-					page.getByRole('button', { name: 'Move down' }).last(),
+					page.getByRole('menuitem', { name: 'Move down', exact: true }),
 				).toBeDisabled()
+				await page.keyboard.press('Escape')
 				expect(
 					await page.evaluate(
 						() => document.documentElement.scrollWidth <= innerWidth,
 					),
 				).toBe(true)
-				await page.screenshot({
-					path: `/private/tmp/opencode/select-playlists/playlist-${prefix ? 'abs' : 'root'}-${width}-${theme}.png`,
-					fullPage: true,
-				})
 			})
 		}
 	}
