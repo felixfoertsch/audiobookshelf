@@ -1,10 +1,4 @@
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-} from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import * as i18n from '../i18n'
 import { PodcastDownloadQueue, PodcastLatest } from './index'
@@ -63,7 +57,7 @@ it('queue translates failed downloads with an interpolated English fallback', as
 		)
 	}
 })
-it('latest previews safe descriptions, expands on explicit disclosure', async () => {
+it('latest previews safe short descriptions without empty disclosure', async () => {
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(
 		new Response(
 			JSON.stringify({
@@ -82,9 +76,22 @@ it('latest previews safe descriptions, expands on explicit disclosure', async ()
 	render(<PodcastLatest libraryId="lib" />)
 	await screen.findByRole('heading', { name: 'Episode identity' })
 	expect(screen.getByText('Hidden & safe')).toBeTruthy()
-	expect(screen.getByText('Read description').closest('details')?.open).toBe(
-		false,
+	expect(screen.queryByText('Read description')).toBeNull()
+	expect(screen.queryByText('actions=')).toBeNull()
+	expect(screen.getAllByRole('button')[0].getAttribute('aria-label')).toBe(
+		'Play Episode identity',
 	)
-	fireEvent.click(screen.getByText('Read description'))
-	await waitFor(() => expect(screen.getByText('Hidden & safe')).toBeTruthy())
+	const queue = screen.getByRole('button', {
+		name: 'Add Episode identity to player queue',
+	})
+	fireEvent.click(queue)
+	expect(
+		screen
+			.getByRole('button', {
+				name: 'Remove Episode identity from player queue',
+			})
+			.getAttribute('aria-pressed'),
+	).toBe('true')
+	fireEvent.click(queue)
+	expect(queue.getAttribute('aria-pressed')).toBe('false')
 })

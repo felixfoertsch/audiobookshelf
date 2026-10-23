@@ -5,6 +5,24 @@ const { xmlToJSON, timestampToSeconds } = require('./index')
 const htmlSanitizer = require('../utils/htmlSanitizer')
 const Fuse = require('../libs/fusejs')
 
+const FEED_CACHE_TTL = 60_000
+const FEED_CACHE_MAX_ENTRIES = 100
+const feedCache = new Map()
+
+async function getCachedPodcastFeed(feedUrl) {
+  const cached = feedCache.get(feedUrl)
+  if (cached && cached.expiresAt > Date.now()) return cached.promise
+  if (cached) feedCache.delete(feedUrl)
+
+  const promise = module.exports.getPodcastFeed(feedUrl).catch(() => null)
+  feedCache.set(feedUrl, { promise, expiresAt: Date.now() + FEED_CACHE_TTL })
+  while (feedCache.size > FEED_CACHE_MAX_ENTRIES) feedCache.delete(feedCache.keys().next().value)
+  return promise
+}
+
+module.exports.getCachedPodcastFeed = getCachedPodcastFeed
+module.exports.clearPodcastFeedCache = () => feedCache.clear()
+
 /**
  * @typedef RssPodcastChapter
  * @property {number} id

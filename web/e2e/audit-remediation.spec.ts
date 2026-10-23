@@ -288,10 +288,10 @@ for (const prefix of ['', '/abs']) {
 				has: page.getByRole('heading', { name: title, exact: true }),
 			})
 		await expect(
-			card('Counted show').getByText('489 episodes', { exact: true }),
+			card('Counted show').getByText('117 unplayed of 120', { exact: true }),
 		).toBeVisible()
 		await expect(
-			card('Empty show').getByText('0 episodes', { exact: true }),
+			card('Empty show').getByText('117 unplayed of 120', { exact: true }),
 		).toBeVisible()
 		await expect(
 			card('Unknown show').getByText('0 episodes', { exact: true }),
@@ -312,7 +312,7 @@ for (const prefix of ['', '/abs']) {
 		await page.goto(
 			`${prefix}/new/library/podcasts/bookshelf?filter=feed-open&sort=media.metadata.title`,
 		)
-		await expect(card('Counted show')).toContainText('489 episodes')
+		await expect(card('Counted show')).toContainText('117 unplayed of 120')
 		await page
 			.getByRole('button', { name: 'View options', exact: true })
 			.click()

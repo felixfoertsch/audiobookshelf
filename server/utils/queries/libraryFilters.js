@@ -395,7 +395,7 @@ module.exports = {
   },
 
   /**
-   * Get podcast episodes most recently added
+   * Get podcast episodes most recently published in the feed
    * @param {import('../../models/Library')} library
    * @param {import('../../models/User')} user
    * @param {number} limit
@@ -404,7 +404,7 @@ module.exports = {
   async getNewestPodcastEpisodes(library, user, limit) {
     if (library.mediaType !== 'podcast') return { libraryItems: [], count: 0 }
 
-    const { libraryItems, count } = await libraryItemsPodcastFilters.getFilteredPodcastEpisodes(library.id, user, 'recent', null, 'createdAt', true, limit, 0)
+    const { libraryItems, count } = await libraryItemsPodcastFilters.getFilteredPodcastEpisodes(library.id, user, 'recent', null, 'publishedAt', true, limit, 0)
     return {
       count,
       libraryItems: libraryItems.map((li) => {

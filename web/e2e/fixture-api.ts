@@ -520,6 +520,31 @@ export async function fixtureApi(
 					total: subset.length,
 				},
 			]
+			if (lib.mediaType === 'podcast') {
+				const newest = subset
+					.flatMap((item) =>
+						('episodes' in item.media ? item.media.episodes : []).map(
+							(episode) => ({
+								...item,
+								_type: 'episode',
+								recentEpisode: episode,
+							}),
+						),
+					)
+					.sort(
+						(a, b) =>
+							(b.recentEpisode.publishedAt || 0) -
+							(a.recentEpisode.publishedAt || 0),
+					)
+				shelves.push({
+					id: 'newest-episodes',
+					label: 'Newest Episodes',
+					labelStringKey: 'LabelNewestEpisodes',
+					type: 'episode',
+					entities: newest.slice(0, 8),
+					total: newest.length,
+				})
+			}
 			if (inProgress.length)
 				shelves.unshift({
 					id: 'continue-listening',
@@ -954,6 +979,35 @@ export async function fixtureApi(
 			return json(playlist)
 		}
 		return json({ error: 'Unsupported offline batch operation' }, 501)
+	}
+	const recentEpisodes = /^\/api\/libraries\/([^/]+)\/recent-episodes$/.exec(
+		path,
+	)
+	if (recentEpisodes && method === 'GET') {
+		const episodes = items
+			.filter(
+				(item) =>
+					item.libraryId === recentEpisodes[1] && item.mediaType === 'podcast',
+			)
+			.flatMap((item) =>
+				('episodes' in item.media ? item.media.episodes : []).map(
+					(episode) => ({
+						...episode,
+						libraryItemId: item.id,
+						podcast: { metadata: item.media.metadata },
+					}),
+				),
+			)
+			.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
+		return json({ episodes, limit: 50, page: 0 })
+	}
+	const episodeSummary = /^\/api\/podcasts\/([^/]+)\/episode-summary$/.exec(
+		path,
+	)
+	if (episodeSummary && method === 'GET') {
+		const item = items.find((entry) => entry.id === episodeSummary[1])
+		if (item?.mediaType !== 'podcast') return json({ error: 'Not found' }, 404)
+		return json({ total: 120, unplayed: 117, source: 'feed' })
 	}
 	if (path === '/api/podcasts/feed' && method === 'POST') {
 		if (!admin) return json({ error: 'Forbidden' }, 403)

@@ -47,8 +47,9 @@ it.each([undefined, 0, 489])(
 	async (count) => {
 		await show(<EntryCard library="lib" entry={podcast(count)} />)
 		if (count === undefined)
-			expect(screen.queryByText(/\d+ episodes?/)).toBeNull()
-		else expect(screen.getByText(`${count} episodes`)).toBeTruthy()
+			expect(screen.getByText(/Downloaded count unavailable/)).toBeTruthy()
+		else
+			expect(screen.getByText(new RegExp(`^${count} downloaded`))).toBeTruthy()
 		expect(screen.queryByText('Item actions')).toBeNull()
 	},
 )

@@ -82,26 +82,10 @@ it('bounds episode pages, reaches last page, and discloses descriptions', {
 	await screen.findByRole('heading', { name: /^Episode 1$/ })
 	expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(25)
 	expect(screen.getAllByText('Episode description')).toHaveLength(25)
-	expect(
-		screen
-			.getAllByRole('button', { name: 'Read description' })[0]
-			.getAttribute('aria-expanded'),
-	).toBe('false')
-	fireEvent.click(
-		screen.getAllByRole('button', { name: 'Read description' })[0],
-	)
-	expect(
-		screen
-			.getByRole('button', { name: 'Read less' })
-			.getAttribute('aria-expanded'),
-	).toBe('true')
-	fireEvent.click(screen.getByRole('button', { name: 'Read less' }))
+	// jsdom has no layout dimensions, so descriptions must not expose an
+	// expander unless overflow measurement confirms clipped content.
+	expect(screen.queryByRole('button', { name: 'Read description' })).toBeNull()
 	expect(screen.getAllByText('Episode description')).toHaveLength(25)
-	expect(
-		screen
-			.getAllByRole('button', { name: 'Read description' })[0]
-			.getAttribute('aria-expanded'),
-	).toBe('false')
 	const next = screen.getByRole('button', { name: 'Next episodes' })
 	fireEvent.click(next)
 	expect(screen.getByRole('heading', { name: 'Episode 26' })).toBeTruthy()
@@ -214,12 +198,8 @@ it('shows episode status and discloses server reset before marking unfinished', 
 	const row = screen.getByRole('heading', { name: 'Episode 1' }).closest('li')
 	if (!row) throw new Error('Missing episode row')
 	expect(within(row).getByText('Unplayed')).toBeTruthy()
-	fireEvent.keyDown(
-		within(row).getByRole('button', { name: 'More actions for Episode 1' }),
-		{ key: 'Enter' },
-	)
 	fireEvent.click(
-		await screen.findByRole('menuitem', { name: 'Mark finished' }),
+		within(row).getByRole('button', { name: 'Mark finished: Episode 1' }),
 	)
 	await waitFor(() =>
 		expect(mocks.updateProgress).toHaveBeenCalledWith(
@@ -240,12 +220,8 @@ it('shows episode status and discloses server reset before marking unfinished', 
 	})
 	view.rerender(<ItemView id="show" />)
 	expect(within(row).getByText('Finished')).toBeTruthy()
-	fireEvent.keyDown(
-		within(row).getByRole('button', { name: 'More actions for Episode 1' }),
-		{ key: 'Enter' },
-	)
 	fireEvent.click(
-		await screen.findByRole('menuitem', { name: 'Mark unfinished' }),
+		within(row).getByRole('button', { name: 'Mark unfinished: Episode 1' }),
 	)
 	await waitFor(() =>
 		expect(mocks.updateProgress).toHaveBeenCalledWith(
@@ -265,12 +241,8 @@ it('retains episode state and exposes failed completion', async () => {
 	await screen.findByRole('heading', { name: 'Episode 1' })
 	const row = screen.getByRole('heading', { name: 'Episode 1' }).closest('li')
 	if (!row) throw new Error('Missing episode row')
-	fireEvent.keyDown(
-		within(row).getByRole('button', { name: 'More actions for Episode 1' }),
-		{ key: 'Enter' },
-	)
 	fireEvent.click(
-		await screen.findByRole('menuitem', { name: 'Mark finished' }),
+		within(row).getByRole('button', { name: 'Mark finished: Episode 1' }),
 	)
 	expect((await screen.findByRole('alert')).textContent).toBe(
 		'Progress rejected',

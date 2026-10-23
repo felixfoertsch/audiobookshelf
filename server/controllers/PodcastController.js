@@ -7,7 +7,7 @@ const Database = require('../Database')
 const fs = require('../libs/fsExtra')
 const cron = require('../libs/nodeCron')
 
-const { getPodcastFeed, findMatchingEpisodes } = require('../utils/podcastUtils')
+const { getPodcastFeed, getCachedPodcastFeed, findMatchingEpisodes } = require('../utils/podcastUtils')
 const { getFileTimestampsWithIno, filePathToPOSIX, isSameOrSubPath } = require('../utils/fileUtils')
 const { validateUrl } = require('../utils/index')
 const htmlSanitizer = require('../utils/htmlSanitizer')
@@ -281,6 +281,34 @@ class PodcastController {
    * @param {RequestWithLibraryItem} req
    * @param {Response} res
    */
+  async getEpisodeSummary(req, res) {
+    const item = req.libraryItem
+    const episodes = item.media.podcastEpisodes || []
+    const feedUrl = item.media.feedURL
+    let feed = null
+    if (feedUrl) feed = await getCachedPodcastFeed(feedUrl)
+
+    if (feed?.episodes) {
+      const downloadedByGuid = new Map()
+      const downloadedByUrl = new Map()
+      for (const episode of episodes) {
+        const guid = episode.extraData?.guid
+        if (guid) downloadedByGuid.set(guid, episode)
+        if (episode.enclosureURL) downloadedByUrl.set(episode.enclosureURL, episode)
+      }
+      let unplayed = 0
+      for (const feedEpisode of feed.episodes) {
+        const downloaded = (feedEpisode.guid && downloadedByGuid.get(feedEpisode.guid)) || downloadedByUrl.get(feedEpisode.enclosure?.url)
+        const progress = downloaded && req.user.getMediaProgress(downloaded.id)
+        if (!progress?.isFinished) unplayed++
+      }
+      return res.json({ total: feed.episodes.length, unplayed, source: 'feed' })
+    }
+
+    const finishedIds = new Set((req.user.mediaProgresses || []).filter((progress) => progress.isFinished).map((progress) => progress.mediaItemId))
+    res.json({ total: episodes.length, unplayed: episodes.filter((episode) => !finishedIds.has(episode.id)).length, source: 'downloaded' })
+  }
+
   async checkNewEpisodes(req, res) {
     if (!req.user.isAdminOrUp) {
       Logger.error(`[PodcastController] Non-admin user "${req.user.username}" attempted to check/download episodes`)

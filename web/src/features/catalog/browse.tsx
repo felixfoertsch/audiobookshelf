@@ -28,6 +28,8 @@ import {
 import { episodeProgress, refreshProgress } from '../item/progress'
 import { getItem, writeProgress } from '../item/service'
 import { WorkflowSheet } from '../item/WorkflowSheet'
+import { EpisodeRow } from '../podcast/EpisodeRow'
+import { PodcastEpisodeCount } from '../podcast/PodcastEpisodeCount'
 import {
 	type BrowseSearch,
 	browseSearch,
@@ -548,36 +550,28 @@ export function EntryCard({
 								item.media.metadata.authorName ||
 								item.media.metadata.authors?.map((a) => a.name).join(', ')}
 					</p>
-					{episode
-						? recentDuration != null && (
-								<p className="truncate text-xs">{duration(recentDuration)}</p>
-							)
-						: item.mediaType === 'podcast'
-							? item.media.numEpisodes != null && (
-									<p className="truncate text-xs">
-										{item.media.numEpisodes.toLocaleString()}{' '}
-										{item.media.numEpisodes === 1 ? 'episode' : 'episodes'}
-									</p>
-								)
-							: item.media.duration != null && (
-									<p className="truncate text-xs">
-										{duration(item.media.duration)}
-									</p>
-								)}
+					{episode ? (
+						recentDuration != null && (
+							<p className="truncate text-xs">{duration(recentDuration)}</p>
+						)
+					) : item.mediaType === 'podcast' ? (
+						<PodcastEpisodeCount
+							itemId={item.id}
+							downloaded={item.media.numEpisodes}
+						/>
+					) : (
+						item.media.duration != null && (
+							<p className="truncate text-xs">
+								{duration(item.media.duration)}
+							</p>
+						)
+					)}
 
 					{item.isMissing && <p role="status">Missing media files</p>}
 					{item.isInvalid && <p role="status">Invalid media files</p>}
-					{(item.numEpisodesIncomplete != null ||
-						item.rssFeed ||
-						item.mediaItemShare) && (
+					{(item.rssFeed || item.mediaItemShare) && (
 						<details className="text-xs text-muted-foreground">
 							<summary className="cursor-pointer">Details</summary>
-							{item.numEpisodesIncomplete != null && (
-								<p>
-									{item.numEpisodesIncomplete} unfinished{' '}
-									{item.numEpisodesIncomplete === 1 ? 'episode' : 'episodes'}
-								</p>
-							)}
 							{item.rssFeed && (
 								<p>
 									RSS feed open
@@ -1898,29 +1892,36 @@ export function SearchPage({
 			))}
 			<section>
 				<h2 className="text-xl">Episodes</h2>
-				{data.episodes?.map((match) => (
-					<div key={`${match.libraryItem.id}-${match.episode?.id ?? ''}`}>
-						<EntryCard
-							library={library}
-							headingLevel={3}
-							view="list"
-							entry={{
-								...match.libraryItem,
-								_type: 'episode',
-								recentEpisode: match.episode,
-							}}
-						/>
-						{match.episode && (
-							<Button
-								onClick={() =>
-									void playEpisode(match.libraryItem.id, match.episode?.id)
-								}
-							>
-								Play episode
-							</Button>
-						)}
-					</div>
-				))}
+				<ol>
+					{data.episodes?.map((match) => (
+						<EpisodeRow
+							key={`${match.libraryItem.id}-${match.episode?.id ?? ''}`}
+						>
+							<EntryCard
+								library={library}
+								headingLevel={3}
+								view="list"
+								entry={{
+									...match.libraryItem,
+									_type: 'episode',
+									recentEpisode: match.episode,
+								}}
+							/>
+							{match.episode && (
+								<Button
+									className="min-h-11 min-w-11 rounded-full"
+									aria-label={`Play ${match.episode.title || 'episode'}`}
+									title="Play episode"
+									onClick={() =>
+										void playEpisode(match.libraryItem.id, match.episode?.id)
+									}
+								>
+									Play episode
+								</Button>
+							)}
+						</EpisodeRow>
+					))}
+				</ol>
 			</section>
 			{(['authors', 'series'] as const).map((type) => (
 				<section key={type}>

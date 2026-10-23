@@ -252,6 +252,7 @@ class ApiRouter {
     this.router.post('/podcasts/:id/ad-analysis', PodcastController.middleware.bind(this), PodcastController.setAdAnalysis.bind(this))
     this.router.post('/podcasts/:id/episode/:episodeId/ad-analysis', PodcastController.middleware.bind(this), PodcastController.analyzeAds.bind(this))
     this.router.get('/podcasts/:id/episode/:episodeId/ad-analysis/corpus', PodcastController.middleware.bind(this), PodcastController.getAdAnalysisCorpus.bind(this))
+    this.router.get('/podcasts/:id/episode-summary', PodcastController.middleware.bind(this), PodcastController.getEpisodeSummary.bind(this))
     this.router.get('/podcasts/:id/checknew', PodcastController.middleware.bind(this), PodcastController.checkNewEpisodes.bind(this))
     this.router.get('/podcasts/:id/downloads', PodcastController.middleware.bind(this), PodcastController.getEpisodeDownloads.bind(this))
     this.router.get('/podcasts/:id/clear-queue', PodcastController.middleware.bind(this), PodcastController.clearEpisodeDownloadQueue.bind(this))

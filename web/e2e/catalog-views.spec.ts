@@ -52,7 +52,7 @@ for (const prefix of ['', '/abs']) {
 					await expect(entry).toContainText(
 						library === 'books'
 							? /Rowan Vale|Amara Okafor|Jun Park/
-							: /episodes/,
+							: /unplayed of/,
 					)
 					await page
 						.getByRole('button', { name: 'Select', exact: true })

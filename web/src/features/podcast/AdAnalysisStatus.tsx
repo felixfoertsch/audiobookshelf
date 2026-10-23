@@ -206,7 +206,7 @@ export function AdAnalysisStatus({ itemId, episode, enabled }: Props) {
 							type="button"
 							variant="ghost"
 							size="icon"
-							className={color}
+							className={`min-h-6 min-w-6 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11 ${color}`}
 							aria-label={label}
 							disabled={busy}
 							onClick={() => void queue()}

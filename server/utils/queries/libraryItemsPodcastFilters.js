@@ -293,14 +293,14 @@ module.exports = {
         podcastEpisodeWhere['$mediaProgresses.isFinished$'] = true
       }
     } else if (filterGroup === 'recent') {
-      podcastEpisodeWhere['createdAt'] = {
+      podcastEpisodeWhere['publishedAt'] = {
         [Sequelize.Op.gte]: new Date(new Date() - 60 * 24 * 60 * 60 * 1000) // 60 days ago
       }
     }
 
     const podcastEpisodeOrder = []
-    if (sortBy === 'createdAt') {
-      podcastEpisodeOrder.push(['createdAt', sortDesc ? 'DESC' : 'ASC'])
+    if (sortBy === 'createdAt' || sortBy === 'publishedAt') {
+      podcastEpisodeOrder.push([sortBy, sortDesc ? 'DESC' : 'ASC'])
     } else if (sortBy === 'progress') {
       podcastEpisodeOrder.push([Sequelize.literal('mediaProgresses.updatedAt'), sortDesc ? 'DESC' : 'ASC'])
     }

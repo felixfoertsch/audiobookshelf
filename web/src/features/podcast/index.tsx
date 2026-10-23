@@ -1,22 +1,23 @@
 import { Link } from '@tanstack/react-router'
-import { Check, Circle, Ellipsis, Play } from 'lucide-react'
+import {
+	Circle,
+	CircleCheck,
+	Clock,
+	Download,
+	ListPlus,
+	Play,
+} from 'lucide-react'
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api, getAuthGeneration, useAuth } from '../../api'
-import { enqueueEpisode, playEpisode } from '../../player'
+import { enqueueEpisode, playEpisode, useQueue } from '../../player'
 import { IsoDateTimeField } from '../../shared/components/IsoDateTimeField'
-import { RichText } from '../../shared/components/RichText'
 import { Button } from '../../shared/components/ui/button'
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from '../../shared/components/ui/dropdown-menu'
 import { useT } from '../i18n'
 import { episodeProgress, refreshProgress } from '../item/progress'
 import { updateProgress } from '../item/service'
 import { AdAnalysisStatus } from './AdAnalysisStatus'
+import { EpisodeDescription, EpisodeRow } from './EpisodeRow'
 import { OpmlImport } from './opml'
 
 const searchSchema = z.array(
@@ -498,26 +499,8 @@ export function PodcastSearch({ libraryId }: { libraryId: string }) {
 	)
 }
 
-function EpisodeDescription({ text }: { text: string }) {
-	const [open, setOpen] = useState(false)
-	return (
-		<div className="mt-2">
-			<RichText
-				text={text}
-				className={
-					open ? 'text-sm' : 'line-clamp-2 text-sm text-muted-foreground'
-				}
-			/>
-			<details onToggle={(event) => setOpen(event.currentTarget.open)}>
-				<summary className="cursor-pointer text-sm text-primary">
-					Read description
-				</summary>
-			</details>
-		</div>
-	)
-}
-
 export function PodcastLatest({ libraryId }: { libraryId: string }) {
+	const queued = useQueue((state) => state.entries)
 	const user = useAuth((state) => state.user)
 	const [progressUnavailable, setProgressUnavailable] = useState(true)
 	const [progressBusy, setProgressBusy] = useState(false)
@@ -596,144 +579,172 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 			<ul className="divide-y">
 				{episodes.map((e) => {
 					const progress = episodeProgress(user, e.libraryItemId, e.id)
+					const remaining =
+						e.duration == null
+							? null
+							: Math.ceil(
+									Math.max(
+										0,
+										e.duration -
+											(!progress?.isFinished
+												? (progress?.currentTime ?? 0)
+												: 0),
+									) / 60,
+								)
+					const title = e.title || 'episode'
+					const queueIndex = queued.findIndex(
+						(entry) =>
+							entry.itemId === e.libraryItemId && entry.episodeId === e.id,
+					)
 					return (
-						<li
+						<EpisodeRow
 							key={e.id}
-							className="flex min-w-0 gap-4 py-5 [overflow-wrap:anywhere]"
+							image={
+								<img
+									className="size-16 shrink-0 rounded-lg object-cover sm:size-20"
+									src={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(e.libraryItemId)}/cover`}
+									alt={`${e.podcast.metadata.title || 'Podcast'} cover`}
+									loading="lazy"
+								/>
+							}
 						>
-							<img
-								className="size-16 shrink-0 rounded-lg object-cover sm:size-20"
-								src={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(e.libraryItemId)}/cover`}
-								alt={`${e.podcast.metadata.title || 'Podcast'} cover`}
-								loading="lazy"
-							/>
-							<div className="min-w-0 flex-1">
-								{e.publishedAt ? (
-									<p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
-										{new Date(e.publishedAt).toISOString().slice(0, 10)}
-									</p>
-								) : null}
-								<h2 className="font-semibold">
-									{e.title || 'Untitled episode'}
-								</h2>
-								<p className="text-sm text-muted-foreground">
-									<Link
-										to="/items/$itemId"
-										params={{ itemId: e.libraryItemId }}
-										className="underline"
-									>
-										{e.podcast.metadata.title}
-									</Link>
+							{e.publishedAt && (
+								<p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+									{new Date(e.publishedAt).toISOString().slice(0, 10)}
 								</p>
-								{(e.subtitle || e.description) && (
-									<EpisodeDescription
-										text={e.subtitle || e.description || ''}
-									/>
-								)}
-								<p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-									{progress?.isFinished ? (
-										<Check aria-hidden="true" className="size-3" />
-									) : (
-										<Circle
-											aria-hidden="true"
-											className="size-2 fill-current"
-										/>
-									)}
-									{progress?.isFinished
-										? 'Finished'
-										: progress?.currentTime || progress?.progress
-											? 'In progress'
-											: progressUnavailable || warning || user?.progressWarning
-												? 'Status unavailable'
-												: 'Unplayed'}
-								</p>
-								<div className="mt-2 flex flex-wrap gap-2">
-									<AdAnalysisStatus itemId={e.libraryItemId} episode={e} />
-									<Button
-										className="rounded-full"
-										aria-label={`Play ${e.title || 'episode'}`}
-										onClick={() =>
-											void playEpisode(e.libraryItemId, e.id).catch((error) =>
-												setError(
-													error instanceof Error
-														? error.message
-														: 'Playback failed',
-												),
+							)}
+							<h2 className="font-semibold">{e.title || 'Untitled episode'}</h2>
+							<p className="text-sm text-muted-foreground">
+								<Link
+									to="/items/$itemId"
+									params={{ itemId: e.libraryItemId }}
+									className="underline"
+								>
+									{e.podcast.metadata.title}
+								</Link>
+							</p>
+							{(e.subtitle || e.description) && (
+								<EpisodeDescription text={e.description || e.subtitle || ''} />
+							)}
+							<div className="mt-2 flex flex-wrap items-center gap-2">
+								<Button
+									className="min-h-11 min-w-11 rounded-full"
+									aria-label={`Play ${title}`}
+									title={
+										remaining == null ? 'Play' : `${remaining} min remaining`
+									}
+									onClick={() =>
+										void playEpisode(e.libraryItemId, e.id).catch((error) =>
+											setError(
+												error instanceof Error
+													? error.message
+													: 'Playback failed',
+											),
+										)
+									}
+								>
+									<Play aria-hidden="true" className="size-4" />
+									{remaining == null ? 'Play' : `${remaining} min`}
+								</Button>
+								<Button
+									variant="outline"
+									className="min-h-11"
+									aria-pressed={!!progress?.isFinished}
+									disabled={
+										progressBusy ||
+										progressUnavailable ||
+										!!warning ||
+										!!user?.progressWarning
+									}
+									aria-label={`${progress?.isFinished ? 'Mark unfinished' : 'Mark finished'}: ${title}`}
+									title={
+										progress?.isFinished ? 'Mark unfinished' : 'Mark finished'
+									}
+									onClick={() => {
+										if (
+											progress?.isFinished &&
+											(progress.currentTime || 0) > 0 &&
+											!window.confirm(
+												'Mark unfinished? This resets the saved listening position to the beginning.',
 											)
-										}
-									>
-										<Play aria-hidden="true" className="size-3" />
-										{e.duration == null
-											? 'Play'
-											: `${Math.ceil(Math.max(0, e.duration - (!progress?.isFinished ? (progress?.currentTime ?? 0) : 0)) / 60)} min${!progress?.isFinished && progress?.currentTime ? ' left' : ''}`}
-									</Button>
-									<DropdownMenu>
-										<DropdownMenuTrigger asChild>
-											<Button
-												variant="ghost"
-												size="icon"
-												aria-label={`More actions for ${e.title || 'episode'}`}
-											>
-												<Ellipsis aria-hidden="true" />
-											</Button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent align="end">
-											<DropdownMenuItem
-												disabled={progressBusy}
-												onSelect={() => {
-													if (
-														progress?.isFinished &&
-														(progress.currentTime || 0) > 0 &&
-														!window.confirm(
-															'Mark unfinished? This resets the saved listening position to the beginning.',
-														)
+										)
+											return
+										const userId = user?.id
+										setProgressBusy(true)
+										void updateProgress(
+											e.libraryItemId,
+											{ isFinished: !progress?.isFinished },
+											e.id,
+										)
+											.then((result) => {
+												if (useAuth.getState().user?.id === userId)
+													setWarning(result?.refreshWarning || '')
+											})
+											.catch((error: unknown) => {
+												if (useAuth.getState().user?.id === userId)
+													setError(
+														error instanceof Error
+															? error.message
+															: 'Progress update failed',
 													)
-														return
-													const userId = user?.id
-													setProgressBusy(true)
-													void updateProgress(
-														e.libraryItemId,
-														{ isFinished: !progress?.isFinished },
-														e.id,
-													)
-														.then((result) => {
-															if (useAuth.getState().user?.id === userId)
-																setWarning(result?.refreshWarning || '')
-														})
-														.catch((error: unknown) => {
-															if (useAuth.getState().user?.id === userId)
-																setError(
-																	error instanceof Error
-																		? error.message
-																		: 'Progress update failed',
-																)
-														})
-														.finally(() => {
-															if (useAuth.getState().user?.id === userId)
-																setProgressBusy(false)
-														})
-												}}
-											>
-												{progress?.isFinished
-													? 'Mark unfinished'
-													: 'Mark finished'}
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												onSelect={() =>
-													enqueueEpisode(
-														e.libraryItemId,
-														e.id,
-														e.title || 'Podcast episode',
-													)
-												}
-											>
-												Add to player queue
-											</DropdownMenuItem>
-										</DropdownMenuContent>
-									</DropdownMenu>
-								</div>
+											})
+											.finally(() => {
+												if (useAuth.getState().user?.id === userId)
+													setProgressBusy(false)
+											})
+									}}
+								>
+									{progress?.isFinished ? (
+										<CircleCheck aria-hidden="true" />
+									) : progress?.currentTime || progress?.progress ? (
+										<Clock aria-hidden="true" />
+									) : (
+										<Circle aria-hidden="true" />
+									)}
+									<span className="sr-only">
+										{progress?.isFinished
+											? 'Finished'
+											: progress?.currentTime || progress?.progress
+												? 'In progress'
+												: 'Unplayed'}
+									</span>
+								</Button>
+								<Button
+									variant="outline"
+									className="min-h-11"
+									aria-label={
+										queueIndex >= 0
+											? `Remove ${title} from player queue`
+											: `Add ${title} to player queue`
+									}
+									aria-pressed={queueIndex >= 0}
+									title={
+										queueIndex >= 0
+											? 'Remove from player queue'
+											: 'Add to player queue'
+									}
+									onClick={() =>
+										queueIndex >= 0
+											? useQueue.getState().remove(queueIndex)
+											: enqueueEpisode(
+													e.libraryItemId,
+													e.id,
+													e.title || 'Podcast episode',
+												)
+									}
+								>
+									<ListPlus aria-hidden="true" />
+								</Button>
+								<span
+									className="inline-flex min-h-11 items-center gap-1 text-xs text-muted-foreground"
+									title="Downloaded on server"
+								>
+									<Download aria-hidden="true" className="size-4" />
+									Downloaded
+								</span>
+								<AdAnalysisStatus itemId={e.libraryItemId} episode={e} />
 							</div>
-						</li>
+						</EpisodeRow>
 					)
 				})}
 			</ul>

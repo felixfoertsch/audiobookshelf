@@ -71,7 +71,7 @@ it('plays newest publication, discloses hero description, uses decimal size unit
 		screen.getByRole('button', { name: 'Play Missing' }).getAttribute('title'),
 	).toBe('Episode audio is not downloaded')
 	expect(screen.queryByText('Same text')).toBeNull()
-	expect(screen.getByRole('button', { name: 'Read description' })).toBeTruthy()
+	expect(screen.queryByRole('button', { name: 'Read description' })).toBeNull()
 	expect(screen.getByRole('heading', { name: 'Information' })).toBeTruthy()
 	expect(
 		screen.getByText(

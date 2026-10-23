@@ -1,12 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import {
-	Check,
-	Circle,
-	Ellipsis,
-	Play,
-	Settings2,
-	SlidersHorizontal,
-} from 'lucide-react'
+import { Check, Circle, Play, Settings2, SlidersHorizontal } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../api'
 import { duration } from '../../catalog'
@@ -19,12 +12,6 @@ import {
 import { RichText } from '../../shared/components/RichText'
 import { Button } from '../../shared/components/ui/button'
 import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from '../../shared/components/ui/dropdown-menu'
-import {
 	Sheet,
 	SheetContent,
 	SheetDescription,
@@ -34,6 +21,7 @@ import {
 } from '../../shared/components/ui/sheet'
 import { PodcastManagementSettings } from '../podcast'
 import { AdAnalysisStatus } from '../podcast/AdAnalysisStatus'
+import { EpisodeDescription, EpisodeRow } from '../podcast/EpisodeRow'
 import { Reader, readerItemSchema } from '../reader'
 import { BookFiles } from './BookFiles'
 import { EpisodeEdit } from './EpisodeEdit'
@@ -100,7 +88,6 @@ export function ItemView({ id }: { id: string }) {
 	const episodeDrafts = useRef(new Map<string, Record<string, string>>())
 	const [page, setPage] = useState(0)
 	const [descriptionOpen, setDescriptionOpen] = useState(false)
-	const [expanded, setExpanded] = useState<Set<string>>(new Set())
 	const request = useRef(0)
 	const owner = useRef(user?.id)
 	owner.current = user?.id
@@ -121,7 +108,6 @@ export function ItemView({ id }: { id: string }) {
 		setReader(null)
 		episodeDrafts.current.clear()
 		setPage(0)
-		setExpanded(new Set())
 		setDescriptionOpen(false)
 		setError('')
 		setWarning('')
@@ -544,20 +530,19 @@ export function ItemView({ id }: { id: string }) {
 										)
 									: 0
 								return (
-									<li key={ep.id} className="min-w-0 space-y-2 border-b py-3">
-										<div className="flex flex-col items-stretch gap-3">
-											<div className="min-w-0 flex-1">
-												{ep.publishedAt ? (
+									<EpisodeRow key={ep.id}>
+										<div className="flex min-w-0 flex-1 flex-col gap-3">
+											<div className="min-w-0 space-y-2">
+												{ep.publishedAt && (
 													<p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
 														{new Date(ep.publishedAt)
 															.toISOString()
 															.slice(0, 10)}
 													</p>
-												) : null}
+												)}
 												<h3 className="font-semibold">
 													{ep.title ?? 'Untitled episode'}
 												</h3>
-
 												{ep.subtitle &&
 													!ep.description
 														?.replace(/<[^>]*>/g, '')
@@ -566,32 +551,7 @@ export function ItemView({ id }: { id: string }) {
 														<p className="text-sm">{ep.subtitle}</p>
 													)}
 												{ep.description && (
-													<div>
-														<RichText
-															text={ep.description}
-															className={
-																expanded.has(ep.id)
-																	? 'text-sm'
-																	: 'line-clamp-2 text-sm text-muted-foreground'
-															}
-														/>
-														<Button
-															variant="link"
-															aria-expanded={expanded.has(ep.id)}
-															onClick={() =>
-																setExpanded((current) => {
-																	const next = new Set(current)
-																	if (next.has(ep.id)) next.delete(ep.id)
-																	else next.add(ep.id)
-																	return next
-																})
-															}
-														>
-															{expanded.has(ep.id)
-																? 'Read less'
-																: 'Read description'}
-														</Button>
-													</div>
+													<EpisodeDescription text={ep.description} />
 												)}
 												<p className="flex items-center gap-1 text-xs text-muted-foreground">
 													{progress?.isFinished ? (
@@ -614,13 +574,8 @@ export function ItemView({ id }: { id: string }) {
 												</p>
 											</div>
 											<div className="flex flex-wrap gap-2">
-												<AdAnalysisStatus
-													itemId={id}
-													episode={ep}
-													enabled={item.adAnalysisEnabled === true}
-												/>
 												<Button
-													className="rounded-full"
+													className="min-h-11 rounded-full"
 													aria-label={`Play ${ep.title ?? 'episode'}`}
 													disabled={busy || !ep.audioFile}
 													title={
@@ -628,44 +583,39 @@ export function ItemView({ id }: { id: string }) {
 															? 'Episode audio is not downloaded'
 															: busy
 																? 'Starting playback'
-																: undefined
+																: 'Play'
 													}
 													onClick={() => void play(ep.id)}
 												>
-													<Play aria-hidden="true" className="size-3" />
+													<Play aria-hidden="true" className="size-4" />
 													{seconds
 														? `${remaining < 60 ? '<1' : Math.ceil(remaining / 60)} min${!progress?.isFinished && progress?.currentTime ? ' left' : ''}`
 														: 'Play'}
 												</Button>
-												<DropdownMenu>
-													<DropdownMenuTrigger asChild>
-														<Button
-															variant="ghost"
-															className="order-last ml-auto"
-															size="icon"
-															aria-label={`More actions for ${ep.title ?? 'episode'}`}
-														>
-															<Ellipsis aria-hidden="true" />
-														</Button>
-													</DropdownMenuTrigger>
-													<DropdownMenuContent align="end">
-														<DropdownMenuItem
-															disabled={episodeBusy !== null}
-															onSelect={() =>
-																void (progress?.isFinished &&
-																(progress.currentTime || 0) > 0
-																	? window.confirm(
-																			'Mark unfinished? This resets the saved listening position to the beginning.',
-																		) && finishEpisode(ep.id, false)
-																	: finishEpisode(ep.id, !progress?.isFinished))
-															}
-														>
-															{progress?.isFinished
-																? 'Mark unfinished'
-																: 'Mark finished'}
-														</DropdownMenuItem>
-													</DropdownMenuContent>
-												</DropdownMenu>
+												<Button
+													variant="outline"
+													className="min-h-11"
+													aria-pressed={!!progress?.isFinished}
+													disabled={episodeBusy !== null}
+													aria-label={`${progress?.isFinished ? 'Mark unfinished' : 'Mark finished'}: ${ep.title ?? 'episode'}`}
+													title={
+														progress?.isFinished
+															? 'Mark unfinished'
+															: 'Mark finished'
+													}
+													onClick={() =>
+														void (progress?.isFinished &&
+														(progress.currentTime || 0) > 0
+															? window.confirm(
+																	'Mark unfinished? This resets the saved listening position to the beginning.',
+																) && finishEpisode(ep.id, false)
+															: finishEpisode(ep.id, !progress?.isFinished))
+													}
+												>
+													{progress?.isFinished
+														? 'Mark unfinished'
+														: 'Mark finished'}
+												</Button>
 												<DetailSheet
 													title="Episode controls"
 													description={ep.title ?? 'Untitled episode'}
@@ -674,6 +624,7 @@ export function ItemView({ id }: { id: string }) {
 														{error && <p role="alert">{error}</p>}
 														<Button
 															variant="outline"
+															className="min-h-11"
 															disabled={busy || !ep.audioFile}
 															onClick={() =>
 																enqueueEpisode(id, ep.id, ep.title ?? 'Episode')
@@ -681,9 +632,9 @@ export function ItemView({ id }: { id: string }) {
 														>
 															Queue
 														</Button>
-
 														<Button
 															variant="outline"
+															className="min-h-11"
 															disabled={busy}
 															onClick={() => {
 																if (
@@ -704,7 +655,7 @@ export function ItemView({ id }: { id: string }) {
 														</Button>
 														{canDownload && ep.audioFile?.ino && (
 															<a
-																className="inline-flex items-center underline"
+																className="inline-flex min-h-11 items-center underline"
 																href={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/api/items/${encodeURIComponent(id)}/file/${encodeURIComponent(ep.audioFile.ino)}/download${localStorage.getItem('token') ? `?token=${encodeURIComponent(localStorage.getItem('token') || '')}` : ''}`}
 																download
 															>
@@ -730,6 +681,7 @@ export function ItemView({ id }: { id: string }) {
 																</label>
 																<Button
 																	variant="destructive"
+																	className="min-h-11"
 																	disabled={busy}
 																	onClick={() => {
 																		if (
@@ -750,19 +702,24 @@ export function ItemView({ id }: { id: string }) {
 																</Button>
 															</>
 														)}
+														{canUpdate && (
+															<EpisodeEdit
+																itemId={id}
+																episode={ep}
+																drafts={episodeDrafts.current}
+																onSaved={() => void action(async () => {})}
+															/>
+														)}
 													</div>
-													{canUpdate && (
-														<EpisodeEdit
-															itemId={id}
-															episode={ep}
-															drafts={episodeDrafts.current}
-															onSaved={() => void action(async () => {})}
-														/>
-													)}
 												</DetailSheet>
+												<AdAnalysisStatus
+													itemId={id}
+													episode={ep}
+													enabled={item.adAnalysisEnabled === true}
+												/>
 											</div>
 										</div>
-									</li>
+									</EpisodeRow>
 								)
 							})}
 					</ol>
