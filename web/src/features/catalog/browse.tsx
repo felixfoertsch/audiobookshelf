@@ -703,7 +703,7 @@ export function EntryCard({
 			)}
 			{select && (
 				<Checkbox
-					className="absolute left-1 top-1 z-10 size-6 bg-background"
+					className="absolute left-1 top-1 z-10 size-6 border-foreground/50 bg-background dark:bg-background"
 					aria-label={`Select ${name}`}
 					checked={select.checked}
 					onCheckedChange={select.toggle}
