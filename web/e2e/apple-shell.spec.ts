@@ -26,6 +26,7 @@ for (const width of [390, 1280])
 			await expect(
 				page.getByRole('searchbox', { name: 'Search library', exact: true }),
 			).toBeVisible()
+			await page.mouse.move(389, 847)
 			await expect
 				.poll(() =>
 					page.getByRole('button', { name: /^Library:/ }).evaluate((node) => {

@@ -94,8 +94,11 @@ for (const prefix of ['', '/abs']) {
 						),
 					).toBe(true)
 					const itemLink = entry.getByRole('link').first()
-					await itemLink.focus()
-					await expect(itemLink).toBeFocused()
+					// Radix returns focus after the selection menu unmounts.
+					await expect(async () => {
+						await itemLink.focus()
+						await expect(itemLink).toBeFocused()
+					}).toPass()
 					await itemLink.press('Enter')
 					await expect(page).toHaveURL(/\/item\//)
 					await expect(
