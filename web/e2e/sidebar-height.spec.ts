@@ -20,11 +20,13 @@ for (const prefix of ['', '/abs']) {
 				await expect(
 					page.getByRole('heading', { level: 1 }).first(),
 				).toBeVisible()
-				await page.evaluate(() =>
-					window.scrollTo(0, document.documentElement.scrollHeight),
-				)
 				await expect
-					.poll(() => page.evaluate(() => window.scrollY))
+					.poll(() =>
+						page.evaluate(() => {
+							window.scrollTo(0, document.documentElement.scrollHeight)
+							return window.scrollY
+						}),
+					)
 					.toBeGreaterThan(0)
 				const bounds = await page
 					.locator('[data-slot="sidebar-inner"]')
