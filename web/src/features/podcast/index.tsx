@@ -658,7 +658,13 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 									}
 									aria-label={`${progress?.isFinished ? 'Mark unfinished' : 'Mark finished'}: ${title}`}
 									title={
-										progress?.isFinished ? 'Mark unfinished' : 'Mark finished'
+										progressUnavailable
+											? 'Listening status unavailable'
+											: progress?.isFinished
+												? 'Finished · Mark unfinished'
+												: progress?.currentTime || progress?.progress
+													? 'In progress · Mark finished'
+													: 'Unplayed · Mark finished'
 									}
 									onClick={() => {
 										if (
