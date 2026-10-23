@@ -83,7 +83,11 @@ for (const prefix of ['', '/abs']) {
 							page.getByText(/0 failed .* 0 remaining/),
 						).toBeVisible()
 					await page.keyboard.press('Escape')
-					await page.getByRole('button', { name: 'Done', exact: true }).click()
+					const done = page.getByRole('button', { name: 'Done', exact: true })
+					if (await done.isVisible()) await done.click()
+					await expect(
+						page.getByRole('button', { name: 'Select', exact: true }),
+					).toBeVisible()
 					expect(
 						await page.evaluate(
 							() => document.documentElement.scrollWidth <= innerWidth,

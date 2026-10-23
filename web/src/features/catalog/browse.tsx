@@ -6,6 +6,7 @@ import { api, getAuthGeneration, useAuth } from '../../api'
 import { duration, episodeSchema, itemSchema } from '../../catalog'
 import { playEpisode, playQueue } from '../../player'
 import { Button } from '../../shared/components/ui/button'
+import { Checkbox } from '../../shared/components/ui/checkbox'
 import { Input } from '../../shared/components/ui/input'
 import { NativeSelect } from '../../shared/components/ui/native-select'
 import {
@@ -43,6 +44,7 @@ import {
 	searchLibrary,
 } from './browse-api'
 import { persistSearch, useCoverSize, useShelfPosition } from './preferences'
+import { SelectionToolbar } from './selection-toolbar'
 import { SelectionTools } from './selection-tools'
 
 export async function updateSelectedProgress(
@@ -498,17 +500,19 @@ export function EntryCard({
 		entity?.title ||
 		'Untitled'
 	return (
-		<article className="min-w-0 space-y-1 text-sm [&_p]:text-muted-foreground [overflow-wrap:anywhere]">
-			{select && (
-				<label className="flex gap-2">
-					<input
-						type="checkbox"
-						checked={select.checked}
-						onChange={select.toggle}
-					/>
-					Select {name}
-				</label>
-			)}
+		<article
+			className={`relative flex min-w-0 flex-col gap-1 text-sm [&_p]:text-muted-foreground [overflow-wrap:anywhere] ${item && view !== 'grid' ? 'pl-8' : ''}`}
+			onKeyDown={(event) => {
+				if (
+					select &&
+					event.key === ' ' &&
+					!(event.target instanceof HTMLButtonElement)
+				) {
+					event.preventDefault()
+					select.toggle()
+				}
+			}}
+		>
 			{collapsed?.success ? (
 				<Link
 					to="/library/$library/series/$id"
@@ -696,6 +700,14 @@ export function EntryCard({
 						{entity?.description}
 					</p>
 				</>
+			)}
+			{select && (
+				<Checkbox
+					className="absolute left-1 top-1 z-10 size-6 bg-background"
+					aria-label={`Select ${name}`}
+					checked={select.checked}
+					onCheckedChange={select.toggle}
+				/>
 			)}
 		</article>
 	)
@@ -1023,12 +1035,37 @@ export function BrowsePage({
 	const router = useRouter()
 	const [selected, setSelected] = useState<string[]>([])
 	const [selectMode, setSelectMode] = useState(false)
+	const selectTrigger = useRef<HTMLButtonElement>(null)
 	const [actionsOpen, setActionsOpen] = useState(false)
+	const progressCancel = useRef<(() => void) | null>(null)
+	const exitSelection = () => {
+		progressCancel.current?.()
+		setActionsOpen(false)
+		setSelectMode(false)
+		setSelected([])
+		requestAnimationFrame(() => selectTrigger.current?.focus())
+	}
+	useEffect(() => {
+		if (!selectMode) return
+		const handleEscape = (event: KeyboardEvent) => {
+			if (
+				event.key === 'Escape' &&
+				!event.defaultPrevented &&
+				!actionsOpen &&
+				!(
+					event.target instanceof Element &&
+					event.target.closest('[role="dialog"], [role="menu"]')
+				)
+			)
+				exitSelection()
+		}
+		window.addEventListener('keydown', handleEscape)
+		return () => window.removeEventListener('keydown', handleEscape)
+	})
 	const [error, setError] = useState('')
 	const [pending, setPending] = useState(false)
 	const [collections, setCollections] = useState<Entry[]>([])
 	const [progressStatus, setProgressStatus] = useState('')
-	const progressCancel = useRef<(() => void) | null>(null)
 	useEffect(() => () => progressCancel.current?.(), [])
 	const runProgress = async (isFinished: boolean) => {
 		const owner = useAuth.getState().user?.id
@@ -1411,197 +1448,199 @@ export function BrowsePage({
 				)}
 				{!section && (
 					<div className="flex flex-wrap items-center gap-2">
-						{!selectMode ? (
-							<Button
-								size="sm"
-								variant="outline"
-								onClick={() => setSelectMode(true)}
+						<Button
+							className={selectMode ? 'invisible' : ''}
+							size="sm"
+							variant="outline"
+							ref={selectTrigger}
+							aria-pressed={selectMode}
+							onClick={() => setSelectMode(true)}
+						>
+							Select
+						</Button>
+						{selectMode && (
+							<SelectionToolbar
+								count={selected.length}
+								pending={pending}
+								podcast={podcast}
+								selectAll={() =>
+									setSelected(
+										data.results
+											.filter((entry) => 'media' in entry)
+											.map((entry) => entry.id),
+									)
+								}
+								clear={() => setSelected([])}
+								done={exitSelection}
+								mark={(finished) => void runProgress(finished)}
+								play={() =>
+									void run(() =>
+										playQueue(
+											selected.map((libraryItemId) => ({ libraryItemId })),
+										),
+									)
+								}
 							>
-								Select
-							</Button>
-						) : (
-							<>
-								<Button
-									variant="outline"
-									onClick={() => {
-										progressCancel.current?.()
-										setActionsOpen(false)
-										setSelectMode(false)
-										setSelected([])
-									}}
-								>
-									Done
-								</Button>
-								<Button
-									variant="outline"
-									onClick={() =>
-										setSelected(
-											data.results
-												.filter((entry) => 'media' in entry)
-												.map((entry) => entry.id),
-										)
-									}
-								>
-									Select page
-								</Button>
-								<Button variant="outline" onClick={() => setSelected([])}>
-									Clear selection ({selected.length})
-								</Button>
-								<span role="status" aria-live="polite">
-									{selected.length} selected
-								</span>
-							</>
-						)}
-						{selectMode && selected.length > 0 && (
-							<WorkflowSheet
-								title="More actions"
-								description={`${selected.length} selected items`}
-								open={actionsOpen}
-								onOpenChange={setActionsOpen}
-							>
-								<div className="space-y-3">
-									<Button
-										disabled={pending}
-										onClick={() => void runProgress(true)}
+								{selected.length > 0 && (
+									<WorkflowSheet
+										title="More actions"
+										description={`${selected.length} selected items`}
+										open={actionsOpen}
+										onOpenChange={setActionsOpen}
 									>
-										{podcast ? 'Mark all episodes finished' : 'Mark finished'}
-									</Button>
-									<Button
-										disabled={pending}
-										onClick={() => void runProgress(false)}
-									>
-										{podcast
-											? 'Mark all episodes unfinished'
-											: 'Mark unfinished'}
-									</Button>
-									{pending && (
-										<Button
-											variant="outline"
-											onClick={() => progressCancel.current?.()}
-										>
-											Cancel
-										</Button>
-									)}
-
-									{!podcast && (
-										<Button
-											disabled={pending}
-											onClick={() =>
-												void run(() =>
-													playQueue(
-														selected.map((libraryItemId) => ({
-															libraryItemId,
-														})),
-													),
-												)
-											}
-										>
-											Play selected
-										</Button>
-									)}
-									{allowed && (
-										<Link to="/batch" search={{ ids: selected.join(',') }}>
-											Batch edit
-										</Link>
-									)}
-									<SelectionTools
-										library={library}
-										ids={selected}
-										podcast={podcast}
-										pending={pending}
-										run={run}
-									/>
-								</div>
-
-								{admin &&
-									['scan'].map((action) => (
-										<Button
-											key={action}
-											disabled={pending}
-											onClick={() => {
-												if (
-													window.confirm(
-														`${action === 'scan' ? 'Rescan' : 'Quick match'} ${selected.length} selected items?`,
-													)
-												)
-													void run(() =>
-														api(`/api/items/batch/${action}`, z.unknown(), {
-															method: 'POST',
-															body: JSON.stringify({
-																libraryItemIds: selected,
-															}),
-														}),
-													)
-											}}
-										>
-											{action === 'scan' ? 'Rescan' : 'Quick match'}
-										</Button>
-									))}
-								{admin && !podcast && (
-									<Button
-										disabled={pending}
-										onClick={() => {
-											if (
-												window.confirm(
-													'Embed metadata in selected audio files? This changes media files.',
-												)
-											)
-												void run(() =>
-													api('/api/tools/batch/embed-metadata', z.unknown(), {
-														method: 'POST',
-														body: JSON.stringify({ libraryItemIds: selected }),
-													}),
-												)
-										}}
-									>
-										Embed metadata
-									</Button>
-								)}
-								{allowed && !podcast && (
-									<form
-										className="flex gap-2"
-										onSubmit={(event) => {
-											event.preventDefault()
-											const id = new FormData(event.currentTarget).get(
-												'collection',
-											)
-											if (typeof id === 'string' && id)
-												void run(() =>
-													api(
-														`/api/collections/${encodeURIComponent(id)}/batch/add`,
-														z.unknown(),
-														{
-															method: 'POST',
-															body: JSON.stringify({ books: selected }),
-														},
-													),
-												)
-										}}
-									>
-										<label htmlFor="catalog-collection">
-											Collection
-											<NativeSelect
-												id="catalog-collection"
-												name="collection"
-												required
-												className="block"
+										<div className="space-y-3">
+											<Button
+												disabled={pending}
+												onClick={() => void runProgress(true)}
 											>
-												<option value="">Choose collection</option>
-												{collections.map((entry) => (
-													<option key={entry.id} value={entry.id}>
-														{typeof entry.name === 'string'
-															? entry.name
-															: entry.id}
-													</option>
-												))}
-											</NativeSelect>
-										</label>
-										<Button type="submit" disabled={pending}>
-											Add selected to collection
-										</Button>
-									</form>
+												{podcast
+													? 'Mark all episodes finished'
+													: 'Mark finished'}
+											</Button>
+											<Button
+												disabled={pending}
+												onClick={() => void runProgress(false)}
+											>
+												{podcast
+													? 'Mark all episodes unfinished'
+													: 'Mark unfinished'}
+											</Button>
+											{pending && (
+												<Button
+													variant="outline"
+													onClick={() => progressCancel.current?.()}
+												>
+													Cancel
+												</Button>
+											)}
+
+											{!podcast && (
+												<Button
+													disabled={pending}
+													onClick={() =>
+														void run(() =>
+															playQueue(
+																selected.map((libraryItemId) => ({
+																	libraryItemId,
+																})),
+															),
+														)
+													}
+												>
+													Play selected
+												</Button>
+											)}
+											{allowed && (
+												<Link to="/batch" search={{ ids: selected.join(',') }}>
+													Batch edit
+												</Link>
+											)}
+											<SelectionTools
+												library={library}
+												ids={selected}
+												podcast={podcast}
+												pending={pending}
+												run={run}
+											/>
+										</div>
+
+										{admin &&
+											['scan'].map((action) => (
+												<Button
+													key={action}
+													disabled={pending}
+													onClick={() => {
+														if (
+															window.confirm(
+																`${action === 'scan' ? 'Rescan' : 'Quick match'} ${selected.length} selected items?`,
+															)
+														)
+															void run(() =>
+																api(`/api/items/batch/${action}`, z.unknown(), {
+																	method: 'POST',
+																	body: JSON.stringify({
+																		libraryItemIds: selected,
+																	}),
+																}),
+															)
+													}}
+												>
+													{action === 'scan' ? 'Rescan' : 'Quick match'}
+												</Button>
+											))}
+										{admin && !podcast && (
+											<Button
+												disabled={pending}
+												onClick={() => {
+													if (
+														window.confirm(
+															'Embed metadata in selected audio files? This changes media files.',
+														)
+													)
+														void run(() =>
+															api(
+																'/api/tools/batch/embed-metadata',
+																z.unknown(),
+																{
+																	method: 'POST',
+																	body: JSON.stringify({
+																		libraryItemIds: selected,
+																	}),
+																},
+															),
+														)
+												}}
+											>
+												Embed metadata
+											</Button>
+										)}
+										{allowed && !podcast && (
+											<form
+												className="flex gap-2"
+												onSubmit={(event) => {
+													event.preventDefault()
+													const id = new FormData(event.currentTarget).get(
+														'collection',
+													)
+													if (typeof id === 'string' && id)
+														void run(() =>
+															api(
+																`/api/collections/${encodeURIComponent(id)}/batch/add`,
+																z.unknown(),
+																{
+																	method: 'POST',
+																	body: JSON.stringify({ books: selected }),
+																},
+															),
+														)
+												}}
+											>
+												<label htmlFor="catalog-collection">
+													Collection
+													<NativeSelect
+														id="catalog-collection"
+														name="collection"
+														required
+														className="block"
+													>
+														<option value="">Choose collection</option>
+														{collections.map((entry) => (
+															<option key={entry.id} value={entry.id}>
+																{typeof entry.name === 'string'
+																	? entry.name
+																	: entry.id}
+															</option>
+														))}
+													</NativeSelect>
+												</label>
+												<Button type="submit" disabled={pending}>
+													Add selected to collection
+												</Button>
+											</form>
+										)}
+									</WorkflowSheet>
 								)}
-							</WorkflowSheet>
+							</SelectionToolbar>
 						)}
 					</div>
 				)}
