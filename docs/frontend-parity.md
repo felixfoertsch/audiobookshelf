@@ -79,13 +79,13 @@ Named additions (not blanket route-completion claims):
 | Surface | Exact tests / outcome | Remaining action assertions |
 | --- | --- | --- |
 | Narrators | `narrators.test.tsx`: save refreshes data; Cancel sends no mutation; cancelled/confirmed removal; permission denial and save failure | Filter-link destination |
-| Collection and playlist | `entity-actions.test.tsx`: mutation requests for reorder/remove/save/delete; owner/permission gates; collection queue order; feed open/close | Add member, individual play, reverse reorder, create playlist, copy URL, Back, exact payloads for all mutations |
+| Collection and playlist | `entity-actions.test.tsx`: collection/playlist queue contents, individual play, add, both reorder directions, remove/save/delete requests, creation/navigation, feed copy, Back and permission gates | Shared feed/Back controls tested through collection; playlist uses same implementation |
 | Series | `series-actions.test.tsx`: re-add invalidates data; mark-finished request | Nonempty books, unfinished, RSS open/close/copy, navigation |
 | Admin RSS | `rss-feeds.test.tsx`: confirmation rejection and accepted exact-ID close followed by reload | All current actions covered with existing details/Retry assertions |
-| Admin sessions/users/stats | `admin/actions.test.tsx`: selected session IDs in bulk-delete body; user-create request; recent-stat rendering | User edit/delete/link/unlink, session details/page/filter/sort mutations, stats year/navigation |
+| Admin sessions/users/stats | `admin/actions.test.tsx`: create/edit/delete exact requests and confirmations, OpenID unlink, absent OpenID link control, session filter/sort/direction/page query outcomes, year selection and refresh; `session-details.test.tsx`: exact play position, close/delete and confirmation | User detail provides unlink only; no dead link action exists |
 | Notifications | `notifications.test.tsx`: `opens edit form, saves selected identity, cancels without writing` | Create, delete, enable/disable, test delivery, valid settings save |
 
-Two real defects fixed: narrator Cancel implicitly submitted its form; notification Edit selected record but hid editing form behind `selected === null`. Regression tests exercise both. These findings reject previous broad “Works” labels as exhaustive acceptance evidence. Existing route table remains inventory, not proof that every action has outcome assertion. Redirects, collection/playlist branches, admin CRUD branches, upload submit/reset, reader settings and player bookmark/sleep branches still need explicit named outcome evidence before exhaustive gate passes. No deferral approved for these gaps.
+Two real defects fixed: narrator Cancel implicitly submitted its form; notification Edit selected record but hid editing form behind `selected === null`. Regression tests exercise both. These findings reject previous broad “Works” labels as exhaustive acceptance evidence. Existing route table remains inventory, not proof that every action has outcome assertion. Follow-up adds redirect alias/query/hash and safe Return outcomes in `e2e/redirects.spec.ts` (root and `/abs`), upload submit/reset in `features/upload/index.test.tsx` (`submits upload after path check and resets staged files`), and all EPUB settings apply/persist/restore in `features/reader/settings.test.tsx` (`applies settings, persists choices, and restores them on next render`). Audiobook-specific evidence follows below. Remaining action assertions must stay explicit; no silent deferral.
 
 ## Deferred and verification boundary
 
@@ -108,6 +108,25 @@ Safari/iOS installation behavior and physical Cast receiver/device compatibility
 | Theme group: System follows live OS change; manual Light/Dark persists through reload | `routes/__root.tsx` Layout | Authenticated shell | `web/e2e/theme.spec.ts` | Works |
 | Sidebar/menu and player/dialog at 200% desktop reflow; Escape returns focus | `routes/__root.tsx`, `player.tsx` | Authenticated shell | `web/e2e/shell.spec.ts` | Works; 640 × 450 CSS-pixel viewport represents 1280 × 900 at 200% |
 | Reader MOBI conversion/error handling | `features/reader/Mobi.tsx`, `Reader.tsx` | Accessible ebook file | `features/reader/engines.test.tsx`, `lifecycle.test.tsx` | Works within browser engine limits; load/conversion errors displayed |
+
+### Named remaining-gap outcomes
+
+- Redirects: `redirect routes preserve state and safe return root` and `/abs`.
+- Collections/playlists: `collection add, reverse reorder, playlist creation, copy, and back use exact outcomes`; `playlist owner adds individual item with exact request payload`; existing management tests now assert queue contents and exact mutations.
+- Admin: `edits and deletes user with exact requests and confirmation outcomes`; `unlinks OpenID only after confirmation with exact endpoint and method`; `session filter, sort direction, and paging load exact query outcomes`; `loads selected personal and server year statistics and refreshes both`; session detail `plays from exact position and closes open session with POST` and `does not delete on rejected confirmation; deletes closed session after acceptance`.
+- Upload: `submits upload after path check and resets staged files` checks path validation, native XHR endpoint, complete FormData, success and reset.
+- Reader: `applies settings, persists choices, and restores them on next render` covers theme, font, scale, line spacing, text stroke and spread.
+
+## Audiobook acceptance
+
+| Workflow | Outcome evidence | Status |
+| --- | --- | --- |
+| Persisted chapter timeline, title, relative elapsed/remaining, slider and numeric seek; half-open chapter boundaries | `features/player/timeline.test.ts`, `e2e/audiobook-player.spec.ts`; local and Cast chapter clipping within 1 px in `e2e/timeline-geometry.spec.ts` at 390/1280 and root/`/abs` | Implemented; final verification below |
+| Sleep timer at chapter end | `compact-player.test.tsx`: `chapter-end sleep pauses native player exactly at global chapter boundary`; browser portable flow pauses at 8 s global time | Implemented |
+| Native bookmark create/list/jump/edit/delete and reload persistence | `e2e/audiobook-player.spec.ts`: `portable multi-track chapters, sleep and native bookmark CRUD root` and `/abs` | Implemented |
+| Portable generated three-track, three-chapter book; chapter crosses file boundary | Same browser flows: decode/play, forward/backward seek, natural track transition, next/previous chapter, global sync/close time and authoritative session itemId/duration observations | Implemented; no copyrighted media |
+| Audiobook detail fields/actions | Pending evidence from parallel `book-detail` branch | Placeholder; not accepted here |
+| Audiobook manage/match/tools | Pending evidence from parallel `book-manage` branch | Placeholder; not accepted here |
 
 ## Presentation inventory and view contract
 

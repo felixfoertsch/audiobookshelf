@@ -528,3 +528,55 @@ export const playable: Record<
 		},
 	],
 ])
+
+// Portable generated book: chapter two crosses the 4 s track boundary.
+export const boundaryBook = item('book-boundaries', 'books', 'book', {
+	...books[0],
+	id: 'book-boundaries',
+	libraryItemId: 'book-boundaries',
+	metadata: {
+		...books[0].metadata,
+		title: 'Boundary Atlas',
+		titleIgnorePrefix: 'Boundary Atlas',
+	},
+	coverPath: cover('book-1'),
+	duration: 15,
+	numTracks: 3,
+	numAudioFiles: 3,
+	numChapters: 3,
+	chapters: [
+		{ id: 0, title: 'Departure', start: 0, end: 3 },
+		{ id: 1, title: 'Across the bridge', start: 3, end: 8 },
+		{ id: 2, title: 'Arrival', start: 8, end: 15 },
+	],
+	audioFiles: [],
+	tracks: [4, 5, 6].map((duration, index) => ({
+		...books[0].tracks[0],
+		index: index + 1,
+		ino: `boundary-${index + 1}`,
+		duration,
+		startOffset: [0, 4, 9][index],
+		title: `Part ${index + 1}`,
+		contentUrl: `/media/boundary-${index + 1}`,
+	})),
+	playableFallback: 'tones/boundary-book-1.wav',
+})
+items.push(boundaryBook)
+minifiedItems.push({
+	...boundaryBook,
+	media: {
+		...boundaryBook.media,
+		episodes: undefined,
+		audioFiles: undefined,
+		chapters: undefined,
+		tracks: undefined,
+	},
+})
+for (const [index, duration] of [4, 5, 6].entries())
+	playable[`boundary-${index + 1}`] = {
+		file: `tones/boundary-book-${index + 1}.wav`,
+		fallbackFile: `tones/boundary-book-${index + 1}.wav`,
+		duration,
+		mimeType: 'audio/wav',
+	}
+playable[boundaryBook.id] = playable['boundary-1']

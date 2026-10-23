@@ -40,7 +40,12 @@ import {
 	savePlayerSetting,
 } from './features/player/settings'
 import { skipTarget } from './features/player/skipping'
-import { originalTime, trackAt } from './features/player/timeline'
+import {
+	chapterAt,
+	chapterTime,
+	originalTime,
+	trackAt,
+} from './features/player/timeline'
 import { Button } from './shared/components/ui/button'
 import {
 	DropdownMenu,
@@ -393,9 +398,6 @@ export function Player() {
 	}
 	const [seekDraft, setSeekDraft] = useState('0')
 	const editingSeek = useRef(false)
-	useEffect(() => {
-		if (!editingSeek.current) setSeekDraft(String(Math.floor(position)))
-	}, [position])
 	const transferring = useRef(false)
 	const [transferBusy, setTransferBusy] = useState(false)
 	async function transfer(target: 'local' | 'cast') {
@@ -414,6 +416,20 @@ export function Player() {
 		}
 	}
 	const [settings, setSettings] = useState(readPlayerSettings)
+	const activeChapter = chapterAt(session?.chapters, position)
+	const timelineStart =
+		settings.chapterTimeline && activeChapter ? activeChapter.start : 0
+	const timelineEnd =
+		settings.chapterTimeline && activeChapter
+			? activeChapter.end
+			: session?.duration || 0
+	const timelinePosition =
+		settings.chapterTimeline && activeChapter
+			? chapterTime(activeChapter, position)
+			: position
+	useEffect(() => {
+		if (!editingSeek.current) setSeekDraft(String(Math.floor(timelinePosition)))
+	}, [timelinePosition])
 	function updateSetting(
 		key: 'playbackRate' | 'jumpForwardAmount' | 'jumpBackwardAmount',
 		value: number,
@@ -1088,12 +1104,21 @@ export function Player() {
 							</div>
 						</div>
 						<div className="col-span-full row-start-2 flex min-w-0 items-center gap-2 sm:col-span-1 sm:col-start-2">
+							{settings.chapterTimeline && activeChapter && (
+								<span
+									className="max-w-32 truncate text-xs"
+									role="status"
+									aria-label="Current chapter"
+								>
+									{activeChapter.title}
+								</span>
+							)}
 							<span
 								role="timer"
 								aria-label="Elapsed time"
 								className="text-[10px] tabular-nums text-muted-foreground"
 							>
-								{duration(position)}
+								{duration(timelinePosition)}
 							</span>
 							<div className="relative flex min-w-0 flex-1 items-center">
 								<Slider
@@ -1104,22 +1129,33 @@ export function Player() {
 											?.querySelector('[role="slider"]')
 											?.setAttribute('aria-describedby', markerDescription)
 									}}
-									aria-valuetext={`${duration(position)} of ${duration(session.duration)}`}
+									aria-valuetext={`${duration(timelinePosition)} of ${duration(timelineEnd - timelineStart)}`}
 									className="h-6 [&_[data-slot=slider-thumb]]:z-10"
 									min={0}
-									max={session.duration}
+									max={timelineEnd - timelineStart}
 									step={1}
-									value={[Math.min(position, session.duration)]}
-									onValueChange={([value]) => seekPlayback(value)}
+									value={[
+										Math.min(timelinePosition, timelineEnd - timelineStart),
+									]}
+									onValueChange={([value]) =>
+										seekPlayback(value + timelineStart)
+									}
 								/>
-								<SegmentMarkers segments={segments} total={session.duration} />
+								<SegmentMarkers
+									segments={segments}
+									total={timelineEnd - timelineStart}
+									offset={timelineStart}
+								/>
 							</div>
 							<span
 								role="timer"
 								aria-label="Remaining time"
 								className="text-[10px] tabular-nums text-muted-foreground"
 							>
-								-{duration(Math.max(0, session.duration - position))}
+								-
+								{duration(
+									Math.max(0, timelineEnd - timelineStart - timelinePosition),
+								)}
 							</span>
 						</div>
 						<Button
@@ -1278,7 +1314,7 @@ export function Player() {
 							onOpenChange={(open) => {
 								setOptionsOpen(open)
 								editingSeek.current = false
-								setSeekDraft(String(Math.floor(position)))
+								setSeekDraft(String(Math.floor(timelinePosition)))
 							}}
 						>
 							<SheetTrigger asChild>
@@ -1510,7 +1546,8 @@ export function Player() {
 											<span className="relative flex min-w-0 flex-1 items-center">
 												<SegmentMarkers
 													segments={segments}
-													total={session.duration}
+													total={timelineEnd - timelineStart}
+													offset={timelineStart}
 												/>
 												<Slider
 													className="h-6"
@@ -1524,21 +1561,25 @@ export function Player() {
 															)
 													}}
 													aria-describedby={markerDescription}
-													aria-valuetext={`${duration(position)} of ${duration(session.duration)}`}
+													aria-valuetext={`${duration(timelinePosition)} of ${duration(timelineEnd - timelineStart)}`}
 													min={0}
-													max={session.duration}
+													max={timelineEnd - timelineStart}
 													step={0.1}
-													value={[position]}
+													value={[timelinePosition]}
 													onValueChange={([value]) => {
-														seekPlayback(value)
-														setPosition(value)
+														seekPlayback(value + timelineStart)
+														setPosition(value + timelineStart)
 													}}
 												/>
 											</span>
 											<span className="text-xs tabular-nums">
-												{duration(position)} / {duration(session.duration)}
+												{duration(timelinePosition)} /{' '}
+												{duration(timelineEnd - timelineStart)}
 											</span>
 										</div>
+									)}
+									{settings.chapterTimeline && activeChapter && (
+										<p className="text-sm font-medium">{activeChapter.title}</p>
 									)}
 									{!remote && (
 										<form
@@ -1548,7 +1589,7 @@ export function Player() {
 													!event.currentTarget.contains(event.relatedTarget)
 												) {
 													editingSeek.current = false
-													setSeekDraft(String(Math.floor(position)))
+													setSeekDraft(String(Math.floor(timelinePosition)))
 												}
 											}}
 											onSubmit={(event) => {
@@ -1558,20 +1599,26 @@ export function Player() {
 													seekDraft.trim() &&
 													Number.isFinite(value) &&
 													value >= 0 &&
-													value <= session.duration
+													value <= timelineEnd - timelineStart
 												)
-													seekPlayback(value)
+													seekPlayback(value + timelineStart)
 											}}
 										>
 											<label htmlFor="player-original-position">
-												Original position (seconds)
+												{settings.chapterTimeline && activeChapter
+													? 'Chapter position (seconds)'
+													: 'Original position (seconds)'}
 											</label>
 											<input
-												aria-label="Original position (seconds)"
+												aria-label={
+													settings.chapterTimeline && activeChapter
+														? 'Chapter position (seconds)'
+														: 'Original position (seconds)'
+												}
 												className="w-28 rounded border bg-background p-2"
 												type="number"
 												min="0"
-												max={session.duration}
+												max={timelineEnd - timelineStart}
 												step="any"
 												id="player-original-position"
 												required
@@ -1582,7 +1629,8 @@ export function Player() {
 												onChange={(event) => setSeekDraft(event.target.value)}
 											/>
 											<span>
-												{duration(position)} / {duration(session.duration)}
+												{duration(timelinePosition)} /{' '}
+												{duration(timelineEnd - timelineStart)}
 											</span>
 											<Button
 												type="submit"
@@ -1817,6 +1865,25 @@ export function Player() {
 									<label className="flex items-center gap-2 text-sm">
 										<input
 											type="checkbox"
+											checked={settings.chapterTimeline === true}
+											onChange={(event) => {
+												try {
+													setSettings(
+														savePlayerSetting(
+															'chapterTimeline',
+															event.target.checked,
+														),
+													)
+												} catch (error) {
+													usePlayer.setState({ error: String(error) })
+												}
+											}}
+										/>
+										Chapter timeline
+									</label>
+									<label className="flex items-center gap-2 text-sm">
+										<input
+											type="checkbox"
 											checked={settings.autoSkip !== false}
 											onChange={(event) => {
 												try {
@@ -1864,16 +1931,24 @@ export function Player() {
 function SegmentMarkers({
 	segments,
 	total,
+	offset = 0,
 }: {
 	segments: { start: number; end: number }[]
 	total: number
+	offset?: number
 }) {
+	const visible = segments
+		.map((s) => ({
+			start: Math.max(s.start, offset) - offset,
+			end: Math.min(s.end, offset + total) - offset,
+		}))
+		.filter((s) => s.end > s.start)
 	return (
 		<span
 			aria-hidden="true"
 			className="pointer-events-none absolute inset-x-0 top-1/2 flex h-1 translate-y-1.5"
 		>
-			{segments.map((s) => (
+			{visible.map((s) => (
 				<span
 					key={`${s.start}-${s.end}`}
 					data-testid="segment-marker"

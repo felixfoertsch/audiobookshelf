@@ -513,7 +513,7 @@ async function handleRequest(request: Request) {
 			Bun.file(
 				new URL(
 					realRecords.find((record) => record.id === cover[1])?.cover ||
-						`covers/${cover[1].startsWith('read-') ? 'book-1' : cover[1]}.svg`,
+						`covers/${cover[1].startsWith('read-') || cover[1] === 'book-boundaries' ? 'book-1' : cover[1]}.svg`,
 					mediaRoot,
 				),
 			),
@@ -532,12 +532,18 @@ async function handleRequest(request: Request) {
 				},
 				404,
 			)
+		const syntheticTracks =
+			item.id === 'book-boundaries' && 'tracks' in item.media
+				? item.media.tracks
+				: null
 		const bookRecord = realRecords.find(
 			(record) => record.id === item.id && record.kind === 'book',
 		)
-		const duration = bookRecord
-			? bookRecord.tracks.reduce((n, track) => n + track.duration, 0)
-			: audio.duration
+		const duration = syntheticTracks
+			? syntheticTracks.reduce((n, track) => n + track.duration, 0)
+			: bookRecord
+				? bookRecord.tracks.reduce((n, track) => n + track.duration, 0)
+				: audio.duration
 		const id = `fixture-session-${++nextSession}`
 		if (!user) return json({}, 401)
 		sessions.set(id, {
@@ -545,12 +551,17 @@ async function handleRequest(request: Request) {
 			itemId: item.id,
 			episodeId,
 			duration,
-			audioTracks: bookRecord
-				? bookRecord.tracks.map((track, index) => ({
-						index: index + 1,
-						key: index === 0 ? item.id : track.id,
+			audioTracks: syntheticTracks
+				? syntheticTracks.map((track, index) => ({
+						index: track.index,
+						key: `boundary-${index + 1}`,
 					}))
-				: [{ index: 1, key }],
+				: bookRecord
+					? bookRecord.tracks.map((track, index) => ({
+							index: index + 1,
+							key: index === 0 ? item.id : track.id,
+						}))
+					: [{ index: 1, key }],
 		})
 		// Fresh session is authoritative, not cached page candidates.
 		return json({
@@ -570,25 +581,33 @@ async function handleRequest(request: Request) {
 			chapters: 'chapters' in item.media ? item.media.chapters : [],
 			currentTime: 0,
 			duration,
-			audioTracks: bookRecord
-				? bookRecord.tracks.map((track, index, tracks) => ({
-						index: index + 1,
-						contentUrl: `${prefix}/media/${encodeURIComponent(index === 0 ? item.id : track.id)}`,
-						mimeType: 'audio/mpeg',
+			audioTracks: syntheticTracks
+				? syntheticTracks.map((track, index) => ({
+						index: track.index,
+						contentUrl: `${prefix}/media/boundary-${index + 1}`,
+						mimeType: 'audio/wav',
 						duration: track.duration,
-						startOffset: tracks
-							.slice(0, index)
-							.reduce((n, t) => n + t.duration, 0),
+						startOffset: track.startOffset,
 					}))
-				: [
-						{
-							index: 1,
-							contentUrl: `${prefix}/media/${encodeURIComponent(key)}`,
-							mimeType: audio.mimeType,
-							duration,
-							startOffset: 0,
-						},
-					],
+				: bookRecord
+					? bookRecord.tracks.map((track, index, tracks) => ({
+							index: index + 1,
+							contentUrl: `${prefix}/media/${encodeURIComponent(index === 0 ? item.id : track.id)}`,
+							mimeType: 'audio/mpeg',
+							duration: track.duration,
+							startOffset: tracks
+								.slice(0, index)
+								.reduce((n, t) => n + t.duration, 0),
+						}))
+					: [
+							{
+								index: 1,
+								contentUrl: `${prefix}/media/${encodeURIComponent(key)}`,
+								mimeType: audio.mimeType,
+								duration,
+								startOffset: 0,
+							},
+						],
 			libraryItem: item,
 			playMethod: 0,
 		})

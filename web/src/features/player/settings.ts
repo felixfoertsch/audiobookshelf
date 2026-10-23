@@ -3,6 +3,7 @@ import { z } from 'zod'
 const schema = z
 	.object({
 		autoSkip: z.boolean().optional(),
+		chapterTimeline: z.boolean().optional(),
 		playbackRate: z.number().min(0.25).max(4).optional(),
 		jumpForwardAmount: z.number().min(1).max(600).optional(),
 		jumpBackwardAmount: z.number().min(1).max(600).optional(),
@@ -19,7 +20,7 @@ export function readPlayerSettings() {
 }
 export function savePlayerSetting(
 	...[key, value]:
-		| ['autoSkip', boolean]
+		| ['autoSkip' | 'chapterTimeline', boolean]
 		| ['playbackRate' | 'jumpForwardAmount' | 'jumpBackwardAmount', number]
 ) {
 	const current = JSON.parse(localStorage.getItem('userSettings') || '{}')

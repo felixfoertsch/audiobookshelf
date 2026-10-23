@@ -61,6 +61,70 @@ for (const prefix of ['', '/abs']) {
 				).toBeLessThanOrEqual(1)
 			}
 		}
+		await page.route('**/api/items/podcast-1/play/*', async (route) => {
+			const response = await route.fetch()
+			const body = await response.json()
+			body.chapters = [
+				{ id: 0, title: 'Before', start: 0, end: 2.5 },
+				{ id: 1, title: 'Clip both edges', start: 2.5, end: 3.5 },
+				{ id: 2, title: 'After', start: 4, end: body.duration },
+			]
+			await route.fulfill({ response, json: body })
+		})
+		await page
+			.getByRole('button', { name: 'Close player', exact: true })
+			.click()
+		await expect(page.getByLabel('Audio playback')).toHaveCount(0)
+		await page
+			.getByRole('button', { name: 'Play The Quiet Observatory', exact: true })
+			.click()
+		await page
+			.getByLabel('Audio playback')
+			.evaluate((a: HTMLAudioElement) => a.pause())
+		if (
+			!(await page.getByRole('dialog', { name: 'Player options' }).isVisible())
+		)
+			await openPlayerOptions(page)
+		await page.getByLabel('Audio playback').evaluate((a: HTMLAudioElement) => {
+			a.currentTime = 3
+			a.dispatchEvent(new Event('timeupdate'))
+		})
+		await page
+			.getByText('Chapters, bookmarks, queue and settings', { exact: true })
+			.click()
+		await page.getByLabel('Chapter timeline', { exact: true }).check()
+		for (const width of [390, 1280]) {
+			await page.setViewportSize({ width, height: 900 })
+			await page
+				.getByRole('button', { name: '00:00:02 Clip both edges', exact: true })
+				.click()
+			await expect(
+				page.locator('[role="slider"][aria-label="Playback progress"]'),
+			).toHaveAttribute('aria-valuemax', '1')
+			const rect = await page
+				.locator('[role="slider"][aria-label="Playback progress"]')
+				.evaluate((slider) => {
+					const root = slider.closest('[data-slot="slider"]')
+					const track = root?.querySelector('[data-slot="slider-track"]')
+					const marker = root?.parentElement?.querySelector(
+						'[data-testid="segment-marker"]',
+					)
+					if (!track || !marker)
+						throw new Error('Missing clipped marker geometry')
+					const a = track.getBoundingClientRect(),
+						b = marker.getBoundingClientRect()
+					return {
+						left: Math.abs(a.left - b.left),
+						right: Math.abs(a.right - b.right),
+					}
+				})
+			expect(rect.left).toBeLessThanOrEqual(1)
+			expect(rect.right).toBeLessThanOrEqual(1)
+		}
+		await page
+			.getByRole('button', { name: '00:00:04 After', exact: true })
+			.click()
+		await expect(page.getByTestId('segment-marker')).toHaveCount(0)
 	})
 	test(`Cast compact and expanded timeline pixel geometry ${prefix || 'root'}`, async ({
 		page,
@@ -93,6 +157,10 @@ for (const prefix of ['', '/abs']) {
 		await page.route('**/api/items/podcast-1/play/*', async (route) => {
 			const response = await route.fetch()
 			const body = await response.json()
+			body.chapters = [
+				{ id: 0, title: 'Clipped Cast chapter', start: 0, end: 3 },
+				{ id: 1, title: 'Rest', start: 3, end: body.duration },
+			]
 			body.playMethod = 0
 			body.mediaType = 'podcast'
 			body.audioTracks = body.audioTracks.map(
@@ -115,10 +183,10 @@ for (const prefix of ['', '/abs']) {
 		await page
 			.getByLabel('Audio playback')
 			.evaluate((audio: HTMLAudioElement) => audio.pause())
-		const measure = async (name: string) => {
+		const measure = async (name: string, chapter = false) => {
 			const result = await page
 				.locator(`[role="slider"][aria-label="${name}"]`)
-				.evaluate((slider) => {
+				.evaluate((slider, chapter) => {
 					const root = slider.closest('[data-slot="slider"]')
 					const track = root?.querySelector('[data-slot="slider-track"]')
 					const marker = root?.parentElement?.querySelector(
@@ -132,9 +200,9 @@ for (const prefix of ['', '/abs']) {
 						start: b.left - a.left,
 						end: b.right - a.left,
 						expectedStart: (2.1 / total) * a.width,
-						expectedEnd: (3.8 / total) * a.width,
+						expectedEnd: ((chapter ? 3 : 3.8) / total) * a.width,
 					}
-				})
+				}, chapter)
 			expect(Math.abs(result.start - result.expectedStart)).toBeLessThanOrEqual(
 				1,
 			)
@@ -155,6 +223,18 @@ for (const prefix of ['', '/abs']) {
 				page.getByRole('slider', { name: 'Seek position', exact: true }),
 			).toHaveAttribute('aria-describedby', /.+/)
 			await measure('Playback progress')
+		}
+		await page
+			.getByText('Chapters, bookmarks, queue and settings', { exact: true })
+			.click()
+		await page.getByLabel('Chapter timeline', { exact: true }).check()
+		for (const width of [390, 1280]) {
+			await page.setViewportSize({ width, height: 900 })
+			await expect(
+				page.locator('[role="slider"][aria-label="Seek position"]'),
+			).toHaveAttribute('aria-valuemax', '3')
+			await measure('Playback progress', true)
+			await measure('Seek position', true)
 		}
 	})
 }

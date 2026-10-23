@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { originalTime, trackAt } from './timeline'
+import { chapterAt, chapterTime, originalTime, trackAt } from './timeline'
+
+describe('chapter timeline', () => {
+	const chapters = [
+		{ start: 0, end: 10, title: 'First' },
+		{ start: 10, end: 20, title: 'Second' },
+	]
+	it('uses half-open boundaries and chapter-relative time', () => {
+		expect(chapterAt(chapters, 10)).toEqual(chapters[1])
+		expect(chapterAt(chapters, 20)).toBeUndefined()
+		expect(chapterTime(chapters[1], 15)).toBe(5)
+	})
+})
 
 describe('three-track original timeline', () => {
 	const tracks = [

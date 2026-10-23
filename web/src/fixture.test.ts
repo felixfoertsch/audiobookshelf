@@ -46,7 +46,7 @@ describe('synthetic media contract', () => {
 					!i.id.startsWith('real-') &&
 					!i.id.startsWith('read-'),
 			),
-		).toHaveLength(6)
+		).toHaveLength(7)
 		expect(
 			parsed.filter(
 				(i) =>

@@ -30,6 +30,39 @@ function start() {
 	)
 	return render(<Player />)
 }
+test('chapter-end sleep pauses native player exactly at global chapter boundary', () => {
+	start()
+	act(() =>
+		usePlayer.setState({
+			session: sessionSchema.parse({
+				id: 'chapter-sleep',
+				episodeId: null,
+				currentTime: 0,
+				duration: 60,
+				audioTracks: [{ contentUrl: '/audio.wav', duration: 60 }],
+				chapters: [
+					{ id: 0, start: 0, end: 10, title: 'One' },
+					{ id: 1, start: 10, end: 60, title: 'Two' },
+				],
+				libraryItem: null,
+			}),
+		}),
+	)
+	const audio = screen.getByLabelText('Audio playback') as HTMLAudioElement
+	fireEvent.loadedMetadata(audio)
+	fireEvent.click(screen.getByRole('button', { name: 'Player options' }))
+	fireEvent.change(screen.getByLabelText('Sleep timer'), {
+		target: { value: 'chapter' },
+	})
+	vi.mocked(HTMLMediaElement.prototype.pause).mockClear()
+	audio.currentTime = 9.9
+	fireEvent.timeUpdate(audio)
+	expect(HTMLMediaElement.prototype.pause).not.toHaveBeenCalled()
+	audio.currentTime = 10
+	fireEvent.timeUpdate(audio)
+	expect(HTMLMediaElement.prototype.pause).toHaveBeenCalledTimes(1)
+})
+
 test('custom controls drive single hidden audio engine; settings preserve audio', () => {
 	const { container } = start()
 	const audio = screen.getByLabelText('Audio playback')

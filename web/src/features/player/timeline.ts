@@ -1,3 +1,15 @@
+export type ChapterRange = { start: number; end: number; title: string }
+export function chapterAt(chapters: ChapterRange[] | undefined, time: number) {
+	return chapters?.find(
+		(chapter) => chapter.start <= time && time < chapter.end,
+	)
+}
+export function chapterTime(chapter: ChapterRange, time: number) {
+	return Math.max(
+		0,
+		Math.min(time - chapter.start, chapter.end - chapter.start),
+	)
+}
 export type AudioTrack = {
 	contentUrl: string
 	duration?: number
