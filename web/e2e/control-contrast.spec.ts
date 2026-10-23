@@ -43,7 +43,7 @@ for (const theme of ['light', 'dark']) {
 			[
 				'episode progress',
 				page.getByRole('button', {
-					name: 'Mark finished: The Quiet Observatory',
+					name: /^Mark (?:finished|unfinished): The Quiet Observatory$/,
 					exact: true,
 				}),
 				4.5,

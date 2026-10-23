@@ -78,10 +78,10 @@ for (const prefix of ['', '/abs']) {
 				})
 				await expect(row.getByText('Unplayed', { exact: true })).toBeVisible()
 				await row
-					.getByRole('button', { name: 'More actions for Progress episode 26' })
-					.click()
-				await page
-					.getByRole('menuitem', { name: 'Mark finished', exact: true })
+					.getByRole('button', {
+						name: 'Mark finished: Progress episode 26',
+						exact: true,
+					})
 					.click()
 				await expect(row.getByText('Finished', { exact: true })).toBeVisible()
 				await page.goto(`${prefix}/new/`)
@@ -91,10 +91,10 @@ for (const prefix of ['', '/abs']) {
 					.click()
 				await expect(row.getByText('Finished', { exact: true })).toBeVisible()
 				await row
-					.getByRole('button', { name: 'More actions for Progress episode 26' })
-					.click()
-				await page
-					.getByRole('menuitem', { name: 'Mark unfinished', exact: true })
+					.getByRole('button', {
+						name: 'Mark unfinished: Progress episode 26',
+						exact: true,
+					})
 					.click()
 				await expect(row.getByText('Unplayed', { exact: true })).toBeVisible()
 				await expect(
