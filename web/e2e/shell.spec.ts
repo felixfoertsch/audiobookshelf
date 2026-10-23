@@ -146,7 +146,8 @@ for (const prefix of ['', '/abs']) {
 						.evaluate((sidebar) => {
 							const root = getComputedStyle(document.documentElement)
 							const probe = document.createElement('div')
-							probe.style.backgroundColor = `color-mix(in oklab, ${root.getPropertyValue('--sidebar')} 70%, transparent)`
+							probe.style.backgroundColor =
+								root.getPropertyValue('--glass-tint')
 							document.body.append(probe)
 							const expected = getComputedStyle(probe).backgroundColor
 							probe.remove()

@@ -9,6 +9,42 @@ for (const prefix of ['', '/abs']) {
 			}) => {
 				await page.setViewportSize({ width, height: 900 })
 				await page.emulateMedia({ colorScheme })
+				await page.route('**/api/search/providers', (route) =>
+					route.fulfill({
+						json: {
+							providers: { booksCovers: [{ text: 'Google', value: 'google' }] },
+						},
+					}),
+				)
+				await page.route('**/api/authorize', async (route) => {
+					const response = await route.fetch()
+					const body = await response.json()
+					await route.fulfill({
+						json: {
+							...body,
+							serverSettings: {
+								storeCoverWithItem: false,
+								storeMetadataWithItem: false,
+								sortingIgnorePrefix: true,
+								sortingPrefixes: ['the'],
+								scannerParseSubtitle: false,
+								scannerFindCovers: false,
+								scannerCoverProvider: 'google',
+								scannerPreferMatchedMetadata: false,
+								scannerDisableWatcher: false,
+								chromecastEnabled: false,
+								allowIframe: false,
+								homeBookshelfView: 0,
+								bookshelfView: 0,
+								dateFormat: 'yyyy-MM-dd',
+								timeFormat: 'HH:mm',
+								language: 'en-us',
+								allowedOrigins: [],
+								...body.serverSettings,
+							},
+						},
+					})
+				})
 				await page.goto(`${prefix}/new/`)
 				await page.getByLabel('Username', { exact: true }).fill('admin')
 				await page.getByLabel('Password', { exact: true }).fill('password')
@@ -26,6 +62,13 @@ for (const prefix of ['', '/abs']) {
 					await expect(
 						page.getByRole('heading', { level: 1 }).first(),
 					).toBeVisible()
+					if (name === 'settings')
+						await expect(
+							page.getByRole('checkbox', {
+								name: 'Store covers with item',
+								exact: true,
+							}),
+						).toBeVisible()
 					await page.screenshot({
 						path: `${directory}/${name}.png`,
 						fullPage: true,
