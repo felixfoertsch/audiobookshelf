@@ -2,7 +2,7 @@ import type { Locator } from '@playwright/test'
 
 export async function contrast(
 	control: Locator,
-	property: 'color' | 'backgroundColor' = 'color',
+	property: 'color' | 'backgroundColor' | 'borderTopColor' = 'color',
 	against?: string,
 ) {
 	return control.evaluate(
@@ -15,7 +15,7 @@ export async function contrast(
 			for (
 				let element: Element | null = against
 					? document.querySelector(against)
-					: property === 'backgroundColor'
+					: property === 'backgroundColor' || property === 'borderTopColor'
 						? node.parentElement
 						: node;
 				element;

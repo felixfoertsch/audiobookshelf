@@ -6,7 +6,7 @@ import {
 	disableDebug,
 	useDebugEnabled,
 } from 'debug-overlay/client'
-import { useEffect } from 'react'
+import { useEffect, useId } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../api'
 import { usePlayer } from '../player'
@@ -48,16 +48,22 @@ const renderLink = (mapped: string, label: string) => (
 )
 
 export function DebugMenu() {
+	const id = useId()
 	const enabled = useDebugEnabled()
 	return (
-		<Switch
-			aria-label="Debug"
-			title={enabled ? 'Debug on' : 'Debug off'}
-			checked={enabled}
-			onCheckedChange={(checked) =>
-				checked ? configure(!!identity()) : disableDebug()
-			}
-		/>
+		<label htmlFor={id} className="flex items-center gap-2 text-xs font-medium">
+			Debug
+			<Switch
+				id={id}
+				className="border-muted-foreground data-[state=unchecked]:bg-muted-foreground dark:data-[state=unchecked]:bg-muted-foreground"
+				aria-label="Debug"
+				title={enabled ? 'Debug on' : 'Debug off'}
+				checked={enabled}
+				onCheckedChange={(checked) =>
+					checked ? configure(!!identity()) : disableDebug()
+				}
+			/>
+		</label>
 	)
 }
 export function RouteDebugOverlay({ path }: { path: string }) {

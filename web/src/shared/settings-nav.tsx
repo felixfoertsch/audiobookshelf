@@ -1,5 +1,7 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
+import { useEffect, useRef } from 'react'
 import { navigationMenuTriggerStyle } from './components/ui/navigation-menu'
+import { cn } from './lib/utils'
 
 export function UserSettingsNav() {
 	return (
@@ -25,10 +27,21 @@ export function SettingsNav({
 	label: string
 	groups: readonly (readonly [string, readonly (readonly [string, string])[]])[]
 }) {
+	const nav = useRef<HTMLElement>(null)
+	const path = useRouterState({ select: (state) => state.location.pathname })
+	useEffect(() => {
+		if (!path || !window.matchMedia('(max-width: 767px)').matches) return
+		const current = nav.current?.querySelector<HTMLElement>(
+			'[aria-current="page"]',
+		)
+		if (current && nav.current)
+			nav.current.scrollLeft = current.offsetLeft - nav.current.offsetLeft
+	}, [path])
 	return (
 		<nav
+			ref={nav}
 			aria-label={label}
-			className="flex gap-4 overflow-x-auto border-b pb-2"
+			className="relative flex gap-4 overflow-x-auto border-b pb-2 md:flex-wrap md:overflow-visible"
 			onKeyDown={(event) => {
 				if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key))
 					return
@@ -59,9 +72,11 @@ export function SettingsNav({
 								key={to}
 								to={to}
 								activeOptions={{ exact: to === '/config' || to === '/account' }}
-								className={navigationMenuTriggerStyle()}
+								className={cn(
+									navigationMenuTriggerStyle(),
+									'focus:bg-transparent focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-accent-foreground aria-[current=page]:font-semibold',
+								)}
 								activeProps={{
-									className: 'bg-accent text-accent-foreground',
 									'aria-current': 'page',
 								}}
 							>

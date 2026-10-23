@@ -6,11 +6,15 @@ import {
 	RouterProvider,
 } from '@tanstack/react-router'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { UserSettingsNav } from './settings-nav'
 
-afterEach(cleanup)
+afterEach(() => {
+	cleanup()
+	vi.unstubAllGlobals()
+})
 it('user settings links retain URLs, current page and horizontal keyboard navigation', async () => {
+	vi.stubGlobal('matchMedia', () => ({ matches: true }))
 	const root = createRootRoute({ component: UserSettingsNav })
 	const route = createRoute({ getParentRoute: () => root, path: '/account' })
 	const router = createRouter({
