@@ -580,7 +580,7 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 				{episodes.map((e) => {
 					const progress = episodeProgress(user, e.libraryItemId, e.id)
 					const remaining =
-						e.duration == null
+						e.duration == null || e.duration <= 0
 							? null
 							: Math.ceil(
 									Math.max(

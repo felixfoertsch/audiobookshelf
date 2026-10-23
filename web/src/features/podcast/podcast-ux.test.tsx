@@ -57,6 +57,47 @@ it('queue translates failed downloads with an interpolated English fallback', as
 		)
 	}
 })
+it('latest shows Play for zero or unknown duration and remaining time for real duration', async () => {
+	vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+		new Response(
+			JSON.stringify({
+				episodes: [
+					{
+						id: 'zero',
+						libraryItemId: 'p',
+						title: 'Zero duration',
+						duration: 0,
+						podcast: { metadata: { title: 'Show' } },
+					},
+					{
+						id: 'unknown',
+						libraryItemId: 'p',
+						title: 'Unknown duration',
+						podcast: { metadata: { title: 'Show' } },
+					},
+					{
+						id: 'real',
+						libraryItemId: 'p',
+						title: 'Real duration',
+						duration: 120,
+						podcast: { metadata: { title: 'Show' } },
+					},
+				],
+			}),
+		),
+	)
+	render(<PodcastLatest libraryId="lib" />)
+	await screen.findByRole('heading', { name: 'Real duration' })
+	expect(
+		screen.getByRole('button', { name: 'Play Zero duration' }).textContent,
+	).toContain('Play')
+	expect(
+		screen.getByRole('button', { name: 'Play Unknown duration' }).textContent,
+	).toContain('Play')
+	expect(
+		screen.getByRole('button', { name: 'Play Real duration' }).textContent,
+	).toContain('2 min')
+})
 it('latest previews safe short descriptions without empty disclosure', async () => {
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(
 		new Response(
