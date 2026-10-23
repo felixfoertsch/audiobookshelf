@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, type Page, test } from '@playwright/test'
-import { appMenu, chooseTheme } from './shell-controls'
+import { appMenu, chooseTheme, settleAnimations } from './shell-controls'
 
 async function login(page: Page, prefix: string) {
 	await page.goto(`${prefix}/new/login`)
@@ -212,17 +212,7 @@ for (const prefix of ['', '/abs']) {
 			await audio.evaluate((node: HTMLAudioElement) => node.pause())
 			for (const theme of ['light', 'dark']) {
 				await chooseTheme(page, theme)
-				await page.evaluate(async () => {
-					await Promise.all(
-						document
-							.getAnimations()
-							.filter(
-								(animation) =>
-									animation.effect?.getTiming().iterations !== Infinity,
-							)
-							.map((animation) => animation.finished.catch(() => {})),
-					)
-				})
+				await settleAnimations(page)
 				const contrast = await page
 					.getByTestId('segment-marker')
 					.evaluate((marker) => {

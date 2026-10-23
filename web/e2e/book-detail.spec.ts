@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { chooseTheme } from './shell-controls'
+import { chooseTheme, settleAnimations } from './shell-controls'
 
 for (const prefix of ['', '/abs']) {
 	for (const role of ['listener', 'admin']) {
@@ -80,6 +80,7 @@ for (const prefix of ['', '/abs']) {
 					await page.setViewportSize({ width, height: 900 })
 					for (const theme of ['light', 'dark'] as const) {
 						await chooseTheme(page, theme)
+						await settleAnimations(page)
 						await page.screenshot({
 							path: `/private/tmp/opencode/book-detail/${width}-${theme}.png`,
 							fullPage: false,

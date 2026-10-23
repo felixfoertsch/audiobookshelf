@@ -39,6 +39,19 @@ export async function signOut(page: Page) {
 	await appMenu(page).click()
 	await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click()
 }
+// Finish finite transitions from the real theme switch before capture or measurement.
+export async function settleAnimations(page: Page) {
+	await page.evaluate(async () => {
+		await Promise.all(
+			document
+				.getAnimations()
+				.filter(
+					(animation) => animation.effect?.getTiming().iterations !== Infinity,
+				)
+				.map((animation) => animation.finished.catch(() => {})),
+		)
+	})
+}
 export async function chooseTheme(page: Page, theme: string) {
 	await openSidebar(page)
 	await appMenu(page).click()
