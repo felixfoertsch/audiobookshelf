@@ -7,7 +7,7 @@ import {
 } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { useAuth } from '../../api'
-import { playEpisode, playQueue } from '../../player'
+import { enqueue, playEpisode, playQueue } from '../../player'
 import { CollectionDetail, PlaylistDetail } from './entities'
 import { collectionSchema, playlistSchema } from './entities-api'
 
@@ -28,7 +28,11 @@ vi.mock('../../catalog', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../../catalog')>()
 	return { ...actual, getItems: getItemsMock }
 })
-vi.mock('../../player', () => ({ playEpisode: vi.fn(), playQueue: vi.fn() }))
+vi.mock('../../player', () => ({
+	enqueue: vi.fn(),
+	playEpisode: vi.fn(),
+	playQueue: vi.fn(),
+}))
 afterEach(() => {
 	cleanup()
 	Object.defineProperty(window, 'history', {
@@ -49,7 +53,12 @@ const book = {
 	id: 'book',
 	libraryId: 'library',
 	mediaType: 'book',
-	media: { metadata: { title: 'Book' }, coverPath: null, episodes: [] },
+	media: {
+		metadata: { title: 'Book' },
+		coverPath: null,
+		episodes: [],
+		numAudioFiles: 1,
+	},
 	mediaProgress: null,
 	addedAt: '',
 	updatedAt: '',
@@ -71,8 +80,20 @@ const playlist = playlistSchema.parse({
 	userId: 'owner',
 	name: 'Playlist',
 	items: [
-		{ libraryItemId: 'book', libraryItem: book },
-		{ libraryItemId: 'book2', libraryItem: book2 },
+		{
+			libraryItemId: 'book',
+			libraryItem: {
+				...book,
+				media: { ...book.media, duration: 40, numAudioFiles: 1 },
+			},
+		},
+		{
+			libraryItemId: 'book2',
+			libraryItem: {
+				...book2,
+				media: { ...book2.media, duration: 80, numAudioFiles: 1 },
+			},
+		},
 	],
 })
 function user(
@@ -310,6 +331,18 @@ test('playlist owner can play, reorder, remove, save and delete; other user cann
 	const fetcher = fetchApi()
 	vi.spyOn(window, 'confirm').mockReturnValue(true)
 	const { rerender } = render(<PlaylistDetail playlist={playlist} />)
+	expect(screen.getByText('2 items · 00:02:00')).toBeTruthy()
+	fireEvent.click(screen.getByRole('button', { name: 'Add to queue' }))
+	expect(enqueue).toHaveBeenCalledWith([
+		{ libraryItemId: 'book', episodeId: undefined, title: 'Book' },
+		{ libraryItemId: 'book2', episodeId: undefined, title: 'Book 2' },
+	])
+	await waitFor(() => expect(router.invalidate).toHaveBeenCalledTimes(1))
+	fireEvent.click(screen.getByRole('button', { name: 'Shuffle playlist' }))
+	await waitFor(() => expect(router.invalidate).toHaveBeenCalledTimes(2))
+	expect(playQueue).toHaveBeenCalledTimes(1)
+	vi.mocked(playQueue).mockClear()
+	router.invalidate.mockClear()
 	fireEvent.click(screen.getByRole('button', { name: 'Play playlist' }))
 	await waitFor(() => expect(router.invalidate).toHaveBeenCalledTimes(1))
 	expect(playQueue).toHaveBeenCalledWith([

@@ -57,6 +57,9 @@ const playlistItemSchema = z.object({
 			id: z.string(),
 			title: nullableText,
 			duration: z.number().nullable().optional(),
+			audioFile: z
+				.object({ duration: z.number().nullable().optional() })
+				.optional(),
 		})
 		.optional(),
 })

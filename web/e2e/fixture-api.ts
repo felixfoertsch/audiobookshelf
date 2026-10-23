@@ -796,6 +796,41 @@ export async function fixtureApi(
 		const { userId: _userId, ...response } = bookmark
 		return json(response)
 	}
+	const playlistDetail = /^\/api\/playlists\/([^/]+)$/.exec(path)
+	if (playlistDetail) {
+		const playlist = playlists.find(
+			(candidate) =>
+				candidate.id === playlistDetail[1] && candidate.userId === user.id,
+		)
+		if (!playlist) return json({ error: 'Not found' }, 404)
+		if (method === 'PATCH') {
+			const input = z
+				.object({
+					name: z.string().optional(),
+					description: z.string().nullable().optional(),
+					items: z.array(playlistInput).optional(),
+				})
+				.safeParse(await body())
+			if (!input.success) return json({ error: 'Invalid update' }, 400)
+			if (input.data.items) {
+				const expanded = input.data.items.map(expandPlaylist)
+				if (expanded.some((item) => !item))
+					return json({ error: 'Invalid playlist items' }, 400)
+				playlist.items = expanded.filter((item) => item !== undefined)
+			}
+			Object.assign(playlist, {
+				...(input.data.name === undefined ? {} : { name: input.data.name }),
+				...(input.data.description === undefined
+					? {}
+					: { description: input.data.description }),
+			})
+		}
+		if (method === 'DELETE') {
+			playlists.splice(playlists.indexOf(playlist), 1)
+			return ok()
+		}
+		return json(playlist)
+	}
 	const entity =
 		/^\/api\/(collections|playlists)(?:\/([^/]+))?(?:\/(book|item|batch\/add|batch\/remove)(?:\/([^/]+)(?:\/([^/]+))?)?)?$/.exec(
 			path,

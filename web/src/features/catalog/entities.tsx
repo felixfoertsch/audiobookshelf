@@ -1,9 +1,10 @@
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
-import { getItem, getItems } from '../../catalog'
-import { playEpisode, playQueue } from '../../player'
+import { duration, getItem, getItems } from '../../catalog'
+import { enqueue, playEpisode, playQueue } from '../../player'
 import { Button } from '../../shared/components/ui/button'
 import { useCatalogRefresh } from './browse'
 import { CollectionFeed } from './collection-feed'
@@ -24,6 +25,31 @@ import {
 	updatePlaylist,
 } from './entities-api'
 
+function shuffled<T>(items: T[]) {
+	const result = [...items]
+	for (let index = result.length - 1; index > 0; index--) {
+		const target = Math.floor(Math.random() * (index + 1))
+		const current = result[index]
+		result[index] = result[target]
+		result[target] = current
+	}
+	return result
+}
+function playlistItems(playlist: Playlist) {
+	return playlist.items.map((item) => ({
+		libraryItemId: item.libraryItemId,
+		episodeId: item.episodeId,
+		title:
+			item.episode?.title ||
+			item.libraryItem.media.metadata.title ||
+			'Untitled',
+	}))
+}
+function canPlayPlaylistItem(item: Playlist['items'][number]) {
+	if (item.libraryItem.isMissing || item.libraryItem.isInvalid) return false
+	if (item.episodeId) return !!item.episode?.audioFile
+	return (item.libraryItem.media.numAudioFiles ?? 0) > 0
+}
 function moved<T>(items: T[], from: number, to: number) {
 	const result = [...items]
 	const [item] = result.splice(from, 1)
@@ -37,6 +63,7 @@ function EntityPage({
 	description,
 	imagePath,
 	imageUrl,
+	headerContent,
 	canUpdate = false,
 	canDelete = false,
 	children,
@@ -48,6 +75,7 @@ function EntityPage({
 	description?: string | null
 	imagePath?: string | null
 	imageUrl?: string
+	headerContent?: React.ReactNode
 	canUpdate?: boolean
 	canDelete?: boolean
 	children?: React.ReactNode | ((tools: MutationTools) => React.ReactNode)
@@ -108,13 +136,14 @@ function EntityPage({
 						alt={`${title} cover`}
 					/>
 				)}
-				<div>
+				<div className="min-w-0 flex-1">
 					<h1 className="text-3xl font-semibold">{title || 'Untitled'}</h1>
 					{description && (
 						<p className="mt-3 max-w-3xl whitespace-pre-wrap text-muted-foreground">
 							{description}
 						</p>
 					)}
+					{headerContent}
 				</div>
 			</header>
 			{typeof children === 'function' ? children({ act, pending }) : children}
@@ -199,15 +228,17 @@ function PlayButton({
 	episodeId,
 	act,
 	pending,
+	disabled = false,
 }: {
 	id: string
 	episodeId?: string
 	act: Action
 	pending: boolean
+	disabled?: boolean
 }) {
 	return (
 		<Button
-			disabled={pending}
+			disabled={pending || disabled}
 			onClick={() => void act(() => playEpisode(id, episodeId))}
 		>
 			Play
@@ -706,10 +737,33 @@ export function PlaylistDetail({ playlist }: { playlist: Playlist }) {
 	const owner = user?.id === playlist.userId
 	const canUpdate = owner
 	const canDelete = owner
+	const playableItems = playlist.items.filter(canPlayPlaylistItem)
+	const totalDuration = playlist.items.reduce(
+		(total, item) =>
+			total +
+			(item.episodeId
+				? (item.episode?.duration ?? item.episode?.audioFile?.duration ?? 0)
+				: (item.libraryItem.media.duration ?? 0)),
+		0,
+	)
+	const coverItem = playlist.items.find(
+		(item) => item.libraryItem.media.coverPath,
+	)
 	return (
 		<EntityPage
 			title={playlist.name ?? ''}
 			description={playlist.description}
+			imagePath={coverItem?.libraryItem.media.coverPath}
+			headerContent={
+				<p className="text-muted-foreground">
+					{playlist.items.length} items · {duration(totalDuration)}
+				</p>
+			}
+			imageUrl={
+				coverItem
+					? `${window.__ABS_WEB_CONFIG__?.apiBasePath ?? ''}/api/items/${encodeURIComponent(coverItem.libraryItemId)}/cover?token=${encodeURIComponent(localStorage.getItem('token') || '')}`
+					: undefined
+			}
 			canUpdate={canUpdate}
 			canDelete={canDelete}
 			onSave={async (name, description) =>
@@ -726,35 +780,55 @@ export function PlaylistDetail({ playlist }: { playlist: Playlist }) {
 		>
 			{({ act, pending }) => (
 				<>
-					<h2 className="text-xl font-semibold">
-						Items ({playlist.items.length})
-					</h2>
-					<Button
-						disabled={pending || !playlist.items.length}
-						onClick={() =>
-							void act(() =>
-								playQueue(
-									playlist.items.map((item) => ({
-										libraryItemId: item.libraryItemId,
-										episodeId: item.episodeId,
-										title:
-											item.episode?.title ||
-											item.libraryItem.media.metadata.title ||
-											'Untitled',
-									})),
-								),
-							)
-						}
-					>
-						Play playlist
-					</Button>
+					<div className="flex flex-wrap gap-2">
+						<Button
+							disabled={pending || !playableItems.length}
+							onClick={() =>
+								void act(() =>
+									playQueue(
+										playlistItems({ ...playlist, items: playableItems }),
+									),
+								)
+							}
+						>
+							Play playlist
+						</Button>
+						<Button
+							variant="outline"
+							disabled={pending || !playableItems.length}
+							onClick={() =>
+								void act(async () =>
+									enqueue(playlistItems({ ...playlist, items: playableItems })),
+								)
+							}
+						>
+							Add to queue
+						</Button>
+						<Button
+							variant="outline"
+							disabled={pending || !playableItems.length}
+							onClick={() =>
+								void act(() =>
+									playQueue(
+										playlistItems({
+											...playlist,
+											items: shuffled(playableItems),
+										}),
+									),
+								)
+							}
+						>
+							Shuffle playlist
+						</Button>
+					</div>
+					{playlist.items.length === 0 && <p>No items in this playlist.</p>}
 					<ol className="space-y-2">
 						{playlist.items.map((item, index) => (
 							<li
 								key={`${item.libraryItemId}:${item.episodeId ?? ''}`}
-								className="flex items-center gap-3 rounded border p-3"
+								className="flex min-w-0 flex-wrap items-center gap-2 rounded border p-3 sm:gap-3"
 							>
-								<span className="flex-1">
+								<span className="min-w-0 flex-1 basis-full sm:basis-auto">
 									<ItemLink
 										id={item.libraryItemId}
 										title={
@@ -769,6 +843,7 @@ export function PlaylistDetail({ playlist }: { playlist: Playlist }) {
 									episodeId={item.episodeId}
 									act={act}
 									pending={pending}
+									disabled={!canPlayPlaylistItem(item)}
 								/>
 								{canUpdate && (
 									<>
@@ -789,7 +864,7 @@ export function PlaylistDetail({ playlist }: { playlist: Playlist }) {
 												)
 											}
 										>
-											↑
+											<ArrowUp aria-hidden="true" />
 										</Button>
 										<Button
 											variant="outline"
@@ -808,7 +883,7 @@ export function PlaylistDetail({ playlist }: { playlist: Playlist }) {
 												)
 											}
 										>
-											↓
+											<ArrowDown aria-hidden="true" />
 										</Button>
 										<Button
 											variant="outline"
