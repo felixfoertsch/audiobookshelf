@@ -2,6 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { type AuthUser, api, logout, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Input } from '../../shared/components/ui/input'
+import { Label } from '../../shared/components/ui/label'
+import { NativeSelect } from '../../shared/components/ui/native-select'
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '../../shared/components/ui/table'
 import { dateTime } from '../../shared/date-time'
 import { setLanguage as changeLanguage, getLanguage, useT } from '../i18n'
 
@@ -318,29 +329,21 @@ function AccountSession() {
 	}
 	return (
 		<section className="mx-auto max-w-2xl space-y-6">
-			<h1 className="text-2xl font-semibold">{t('HeaderAccount')}</h1>
+			<h2 className="text-xl font-semibold">{t('HeaderAccount')}</h2>
 			<div className="grid grid-cols-3 gap-3">
-				<label className="col-span-2">
+				<Label className="col-span-2 block">
 					{t('LabelUsername')}
-					<input
-						disabled
-						value={user?.username ?? ''}
-						className="mt-1 w-full rounded-md border bg-background p-2"
-					/>
-				</label>
-				<label>
+					<Input disabled value={user?.username ?? ''} className="mt-1" />
+				</Label>
+				<Label className="block">
 					{t('LabelAccountType')}
-					<input
-						disabled
-						value={user?.type ?? ''}
-						className="mt-1 w-full rounded-md border bg-background p-2"
-					/>
-				</label>
+					<Input disabled value={user?.type ?? ''} className="mt-1" />
+				</Label>
 			</div>
-			<label className="block">
+			<Label className="block">
 				{t('LabelLanguage')}
-				<select
-					className="mt-1 rounded-md border bg-background p-2"
+				<NativeSelect
+					className="mt-1"
 					value={language}
 					onChange={(e) => {
 						void changeLanguage(e.target.value)
@@ -353,8 +356,8 @@ function AccountSession() {
 							{label}
 						</option>
 					))}
-				</select>
-			</label>
+				</NativeSelect>
+			</Label>
 			{!guest && methods.includes('local') && (
 				<form onSubmit={submitPassword} className="space-y-3 border-t pt-5">
 					<h2 className="text-lg font-medium">Change password</h2>
@@ -363,19 +366,19 @@ function AccountSession() {
 						['New password', newPassword, setNewPassword],
 						['Confirm password', confirm, setConfirm],
 					].map(([label, value, setter]) => (
-						<label key={label as string} className="block">
+						<Label key={label as string} className="block">
 							{label as string}
-							<input
+							<Input
 								disabled={!!busy}
 								type="password"
 								autoComplete="current-password"
-								className="mt-1 w-full rounded-md border bg-background p-2"
+								className="mt-1"
 								value={value as string}
 								onChange={(e) =>
 									(setter as (v: string) => void)(e.target.value)
 								}
 							/>
-						</label>
+						</Label>
 					))}
 					{root && (
 						<p className="text-sm text-destructive">
@@ -436,25 +439,25 @@ function AccountSession() {
 							onSubmit={submitDevice}
 						>
 							<h3>{editing ? 'Update device' : 'Create device'}</h3>
-							<label className="block">
+							<Label className="block">
 								Name
-								<input
+								<Input
 									required
-									className="mt-1 w-full rounded-md border bg-background p-2"
+									className="mt-1"
 									value={deviceName}
 									onChange={(e) => setDeviceName(e.target.value)}
 								/>
-							</label>
-							<label className="block">
+							</Label>
+							<Label className="block">
 								Email
-								<input
+								<Input
 									required
 									type="email"
 									className="mt-1 w-full rounded-md border bg-background p-2"
 									value={deviceEmail}
 									onChange={(e) => setDeviceEmail(e.target.value)}
 								/>
-							</label>
+							</Label>
 							<Button disabled={!!busy}>Save device</Button>
 							<Button
 								type="button"
@@ -474,33 +477,35 @@ function AccountSession() {
 					{sessionError && <p role="alert">{sessionError}</p>}
 					{sessions.length > 0 && (
 						<div className="overflow-x-auto">
-							<table className="w-full text-left">
-								<thead>
-									<tr>
-										<th>Device</th>
-										<th className="hidden sm:table-cell">IP address</th>
-										<th>Last update</th>
-										<th />
-									</tr>
-								</thead>
-								<tbody>
+							<Table className="w-full text-left">
+								<TableHeader>
+									<TableRow>
+										<TableHead>Device</TableHead>
+										<TableHead className="hidden sm:table-cell">
+											IP address
+										</TableHead>
+										<TableHead>Last update</TableHead>
+										<TableHead />
+									</TableRow>
+								</TableHeader>
+								<TableBody>
 									{sessions.map((s) => (
-										<tr key={s.id} className="border-t">
-											<td>
+										<TableRow key={s.id} className="border-t">
+											<TableCell>
 												{sessionName(s)}{' '}
 												{s.current && (
 													<span className="text-green-600">Current</span>
 												)}
-											</td>
-											<td className="hidden sm:table-cell">
+											</TableCell>
+											<TableCell className="hidden sm:table-cell">
 												{s.ipAddress || '-'}
-											</td>
-											<td>
+											</TableCell>
+											<TableCell>
 												{s.updatedAt
 													? dateTime(s.updatedAt).replace('T', ' ').slice(0, 16)
 													: '-'}
-											</td>
-											<td>
+											</TableCell>
+											<TableCell>
 												<Button
 													variant="outline"
 													disabled={busy === s.id || busy === 'sessions'}
@@ -508,11 +513,11 @@ function AccountSession() {
 												>
 													Sign out
 												</Button>
-											</td>
-										</tr>
+											</TableCell>
+										</TableRow>
 									))}
-								</tbody>
-							</table>
+								</TableBody>
+							</Table>
 						</div>
 					)}
 					{!sessions.length && busy !== 'sessions' && !sessionError && (

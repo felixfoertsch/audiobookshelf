@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { api, useAuth } from '../api'
 import { usePlayer } from '../player'
 import { Button } from '../shared/components/ui/button'
-import { DropdownMenuCheckboxItem } from '../shared/components/ui/dropdown-menu'
+import { Switch } from '../shared/components/ui/switch'
 import 'debug-overlay/styles.css'
 
 const transport = (
@@ -50,14 +50,14 @@ const renderLink = (mapped: string, label: string) => (
 export function DebugMenu() {
 	const enabled = useDebugEnabled()
 	return (
-		<DropdownMenuCheckboxItem
+		<Switch
+			aria-label="Debug"
+			title={enabled ? 'Debug on' : 'Debug off'}
 			checked={enabled}
 			onCheckedChange={(checked) =>
 				checked ? configure(!!identity()) : disableDebug()
 			}
-		>
-			Debug
-		</DropdownMenuCheckboxItem>
+		/>
 	)
 }
 export function RouteDebugOverlay({ path }: { path: string }) {

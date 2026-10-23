@@ -1,5 +1,12 @@
 @import "tailwindcss";
 @custom-variant dark (&:is(.dark *));
+/* Hide only the document scrollbar; wheel, touch and keyboard still scroll. */
+html {
+	scrollbar-width: none;
+}
+html::-webkit-scrollbar {
+	display: none;
+}
 :root {
 	--font-sans:
 		-apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;

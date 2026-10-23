@@ -2,6 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Checkbox } from '../../shared/components/ui/checkbox'
+import {
+	Dialog,
+	DialogContent,
+	DialogTitle,
+} from '../../shared/components/ui/dialog'
+import { Input } from '../../shared/components/ui/input'
+import { Label } from '../../shared/components/ui/label'
+import { NativeSelect } from '../../shared/components/ui/native-select'
 
 const folderSchema = z
 	.object({ id: z.string().optional(), fullPath: z.string() })
@@ -349,9 +358,9 @@ function CronSchedule({
 	}
 	return (
 		<div className="space-y-2">
-			<label className="block">
+			<Label className="block">
 				Interval
-				<select
+				<NativeSelect
 					className="ml-2 border bg-transparent p-1"
 					value={mode}
 					onChange={(e) => update(e.target.value)}
@@ -361,8 +370,8 @@ function CronSchedule({
 							{t}
 						</option>
 					))}
-				</select>
-			</label>
+				</NativeSelect>
+			</Label>
 			{mode === 'custom' && (
 				<>
 					<div className="flex flex-wrap gap-3">
@@ -375,12 +384,11 @@ function CronSchedule({
 							'Saturday',
 							'Sunday',
 						].map((d, i) => (
-							<label key={d}>
-								<input
-									type="checkbox"
+							<Label key={d}>
+								<Checkbox
 									checked={days.includes((i + 1) % 7)}
-									onChange={(e) => {
-										const next = e.target.checked
+									onCheckedChange={(checked) => {
+										const next = checked
 											? [...days, (i + 1) % 7]
 											: days.filter((x) => x !== (i + 1) % 7)
 										setDays(next)
@@ -390,12 +398,12 @@ function CronSchedule({
 									}}
 								/>{' '}
 								{d}
-							</label>
+							</Label>
 						))}
 					</div>
-					<label>
+					<Label>
 						Hour (0–23)
-						<input
+						<Input
 							className="ml-2 w-20 border bg-transparent p-1"
 							type="number"
 							min="0"
@@ -408,10 +416,10 @@ function CronSchedule({
 								)
 							}}
 						/>
-					</label>
-					<label className="ml-3">
+					</Label>
+					<Label className="ml-3">
 						Minute (0–59)
-						<input
+						<Input
 							className="ml-2 w-20 border bg-transparent p-1"
 							type="number"
 							min="0"
@@ -424,12 +432,12 @@ function CronSchedule({
 								)
 							}}
 						/>
-					</label>
+					</Label>
 				</>
 			)}
-			<label className="block">
+			<Label className="block">
 				Advanced custom cron expression
-				<input
+				<Input
 					className="ml-2 border bg-transparent p-1 font-mono"
 					aria-label="Advanced custom cron expression"
 					value={value}
@@ -438,7 +446,7 @@ function CronSchedule({
 						onChange(e.target.value)
 					}}
 				/>
-			</label>
+			</Label>
 		</div>
 	)
 }
@@ -452,20 +460,7 @@ function LibraryEditor({
 	close: () => void
 	done: () => void
 }) {
-	const dialog = useRef<HTMLDialogElement>(null)
-	useEffect(() => {
-		const el = dialog.current
-		if (!el) return
-		el.showModal()
-		const first = el.querySelector<HTMLElement>('button,input,select')
-		first?.focus()
-		const onClose = () => close()
-		el.addEventListener('close', onClose)
-		return () => {
-			el.removeEventListener('close', onClose)
-			if (el.open) el.close()
-		}
-	}, [close])
+	const returnFocus = useRef(document.activeElement as HTMLElement | null)
 	const [name, setName] = useState(library?.name ?? ''),
 		[mediaType, setMedia] = useState<'book' | 'podcast'>(
 			library?.mediaType ?? 'book',
@@ -617,391 +612,406 @@ function LibraryEditor({
 		}
 	}
 	return (
-		<dialog
-			ref={dialog}
-			aria-label={library ? 'Edit library' : 'Create library'}
-			className="fixed inset-0 z-50 h-full w-full max-h-full max-w-none overflow-auto bg-black/70 p-4 text-foreground backdrop:bg-black/70"
+		<Dialog
+			open
+			onOpenChange={(open) => {
+				if (!open) close()
+			}}
 		>
-			<section className="mx-auto max-w-3xl space-y-3 bg-background p-5">
-				<h2 className="text-xl">{library ? 'Edit' : 'Create'} library</h2>
-				<nav className="flex flex-wrap gap-2">
-					{[
-						'Details',
-						'Settings',
-						...(mediaType === 'book' ? ['Scanner'] : []),
-						'Schedule',
-						...(library ? ['Tools'] : []),
-					].map((t) => (
-						<Button key={t} aria-pressed={tab === t} onClick={() => setTab(t)}>
-							{t}
-						</Button>
-					))}
-				</nav>
-				{tab === 'Details' && (
-					<div className="space-y-3">
-						<label className="block">
-							Media type
-							<select
-								disabled={!!library}
-								value={mediaType}
-								onChange={(e) => setMedia(e.target.value as 'book' | 'podcast')}
-								className="ml-2"
+			<DialogContent
+				onCloseAutoFocus={(event) => {
+					event.preventDefault()
+					returnFocus.current?.focus()
+				}}
+				className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl"
+				aria-describedby={undefined}
+			>
+				<section className="mx-auto max-w-3xl space-y-3 bg-background p-5">
+					<DialogTitle>{library ? 'Edit' : 'Create'} library</DialogTitle>
+					<nav className="flex flex-wrap gap-2">
+						{[
+							'Details',
+							'Settings',
+							...(mediaType === 'book' ? ['Scanner'] : []),
+							'Schedule',
+							...(library ? ['Tools'] : []),
+						].map((t) => (
+							<Button
+								key={t}
+								aria-pressed={tab === t}
+								onClick={() => setTab(t)}
 							>
-								<option value="book">Books</option>
-								<option value="podcast">Podcasts</option>
-							</select>
-						</label>
-						<label className="block">
-							Name
-							<input
-								className="ml-2 border bg-transparent p-1"
-								value={name}
-								onChange={(e) => setName(e.target.value)}
-							/>
-						</label>
-						<label className="block">
-							Metadata provider
-							<select
-								className="ml-2 border bg-transparent p-1"
-								value={provider}
-								onChange={(e) => setProvider(e.target.value)}
-							>
-								{providers.map((p) => (
-									<option key={p.value} value={p.value}>
-										{p.text}
-									</option>
-								))}
-							</select>
-						</label>
-						<label className="block">
-							Icon
-							<input
-								className="ml-2 border bg-transparent p-1"
-								value={icon}
-								onChange={(e) => setIcon(e.target.value)}
-							/>
-						</label>
-						<h3>Folders</h3>
-						{folders.map((f, i) => (
-							<p key={f.id ?? `${f.fullPath}-${i}`} className="flex gap-2">
-								<code className="grow">{f.fullPath}</code>
-								<Button
-									disabled={busy || folders.length < 2}
-									aria-label={`Remove folder ${f.fullPath}`}
-									onClick={() => setFolders((x) => x.filter((_, j) => i !== j))}
-								>
-									Remove
-								</Button>
-							</p>
+								{t}
+							</Button>
 						))}
-						<label>
-							Add folder path
-							<input
-								className="ml-2 border bg-transparent p-1"
-								value={path}
-								onChange={(e) => setPath(e.target.value)}
-							/>
-						</label>
-						<Button
-							onClick={() => setFolders((x) => [...x, { fullPath: path }])}
-							disabled={
-								!path.trim() || folders.some((f) => f.fullPath === path)
-							}
-						>
-							Add path
-						</Button>
-						<Button onClick={() => void listDirs()}>Browse folders</Button>
-						{(dirs.length > 0 || path) && (
-							<fieldset
-								aria-label="Folder chooser"
-								className="max-h-48 space-y-1 overflow-auto"
-							>
-								<p>
-									Current path: <code>{path || '/'}</code>
-								</p>
-								{path && (
-									<Button
-										onClick={() => {
-											const bits = posix
-												? path.split('/').filter(Boolean)
-												: path.split(/[\\/]/).filter(Boolean)
-											bits.pop()
-											const parent = posix
-												? `/${bits.join('/')}`
-												: bits.join('\\')
-											void listDirs(parent, bits.length)
-										}}
-									>
-										Back to parent
-									</Button>
-								)}
-								{dirs.map((d) => (
-									<Button
-										key={d.path}
-										onClick={() => {
-											setPath(d.path)
-											void listDirs(d.path, d.level + 1)
-										}}
-									>
-										{d.dirname} ({d.path})
-									</Button>
-								))}
-								<Button
-									onClick={() => {
-										if (path && !folders.some((f) => f.fullPath === path))
-											setFolders((x) => [...x, { fullPath: path }])
-										setDirs([])
-									}}
-								>
-									Select current folder: {path || '/'}
-								</Button>
-							</fieldset>
-						)}
-					</div>
-				)}
-				{tab === 'Settings' && (
-					<div className="grid gap-3 sm:grid-cols-2">
-						{(
-							[
-								'disableWatcher',
-								'audiobooksOnly',
-								'skipMatchingMediaWithAsin',
-								'skipMatchingMediaWithIsbn',
-								'hideSingleBookSeries',
-								'onlyShowLaterBooksInContinueSeries',
-								'epubsAllowScriptedContent',
-							] as const
-						)
-							.filter((k) => mediaType === 'book' || k === 'disableWatcher')
-							.map((k) => (
-								<label key={k} className="block">
-									<input
-										type="checkbox"
-										disabled={k === 'disableWatcher' && globalWatcherDisabled}
-										checked={
-											k === 'disableWatcher' && globalWatcherDisabled
-												? true
-												: Boolean(settings[k])
-										}
-										onChange={(e) => update(k, e.target.checked)}
-									/>{' '}
-									{k === 'disableWatcher'
-										? 'Enable filesystem watcher'
-										: k === 'audiobooksOnly'
-											? 'Audio files only (ignore ebook files)'
-											: k === 'skipMatchingMediaWithAsin'
-												? 'Skip matching books that already have ASIN'
-												: k === 'skipMatchingMediaWithIsbn'
-													? 'Skip matching books that already have ISBN'
-													: k === 'hideSingleBookSeries'
-														? 'Hide single-book series'
-														: k === 'onlyShowLaterBooksInContinueSeries'
-															? 'Show only later books in continue-series shelves'
-															: 'Allow scripted EPUB content'}
-									{k === 'disableWatcher' && globalWatcherDisabled && (
-										<span className="block text-amber-500">
-											Disabled globally in server settings; per-library watcher
-											cannot override this.
-										</span>
-									)}
-								</label>
-							))}
-						<p className="text-sm text-muted-foreground">
-							Cover shape affects book cover display. Matching skip options
-							prevent replacing existing identifiers. Series options affect
-							series shelves.
-						</p>
-						{mediaType === 'podcast' && (
-							<label>
-								Podcast search region
-								<select
-									value={String(settings.podcastSearchRegion ?? 'us')}
+					</nav>
+					{tab === 'Details' && (
+						<div className="space-y-3">
+							<Label className="block">
+								Media type
+								<NativeSelect
+									disabled={!!library}
+									value={mediaType}
 									onChange={(e) =>
-										update('podcastSearchRegion', e.target.value)
+										setMedia(e.target.value as 'book' | 'podcast')
 									}
+									className="ml-2"
 								>
-									{Object.entries(podcastRegions).map(([code, label]) => (
-										<option key={code} value={code}>
-											{label}
+									<option value="book">Books</option>
+									<option value="podcast">Podcasts</option>
+								</NativeSelect>
+							</Label>
+							<Label className="block">
+								Name
+								<Input
+									className="ml-2 border bg-transparent p-1"
+									value={name}
+									onChange={(e) => setName(e.target.value)}
+								/>
+							</Label>
+							<Label className="block">
+								Metadata provider
+								<NativeSelect
+									className="ml-2 border bg-transparent p-1"
+									value={provider}
+									onChange={(e) => setProvider(e.target.value)}
+								>
+									{providers.map((p) => (
+										<option key={p.value} value={p.value}>
+											{p.text}
 										</option>
 									))}
-								</select>
-							</label>
-						)}
-						<label>
-							Cover aspect ratio
-							<select
-								value={String(settings.coverAspectRatio ?? '1')}
-								onChange={(e) =>
-									update('coverAspectRatio', Number(e.target.value))
+								</NativeSelect>
+							</Label>
+							<Label className="block">
+								Icon
+								<Input
+									className="ml-2 border bg-transparent p-1"
+									value={icon}
+									onChange={(e) => setIcon(e.target.value)}
+								/>
+							</Label>
+							<h3>Folders</h3>
+							{folders.map((f, i) => (
+								<p key={f.id ?? `${f.fullPath}-${i}`} className="flex gap-2">
+									<code className="grow">{f.fullPath}</code>
+									<Button
+										disabled={busy || folders.length < 2}
+										aria-label={`Remove folder ${f.fullPath}`}
+										onClick={() =>
+											setFolders((x) => x.filter((_, j) => i !== j))
+										}
+									>
+										Remove
+									</Button>
+								</p>
+							))}
+							<Label>
+								Add folder path
+								<Input
+									className="ml-2 border bg-transparent p-1"
+									value={path}
+									onChange={(e) => setPath(e.target.value)}
+								/>
+							</Label>
+							<Button
+								onClick={() => setFolders((x) => [...x, { fullPath: path }])}
+								disabled={
+									!path.trim() || folders.some((f) => f.fullPath === path)
 								}
 							>
-								<option value="1">Square</option>
-								<option value="0">Standard</option>
-							</select>
-						</label>
-						<label>
-							Mark finished by
-							<select
-								value={
-									settings.markAsFinishedTimeRemaining !== null
-										? 'time'
-										: 'percent'
-								}
-								onChange={(e) => {
-									update(
-										'markAsFinishedTimeRemaining',
-										e.target.value === 'time' ? 10 : null,
-									)
-									update(
-										'markAsFinishedPercentComplete',
-										e.target.value === 'percent' ? 90 : null,
-									)
-								}}
-							>
-								<option value="time">Time remaining (minutes)</option>
-								<option value="percent">Percent complete</option>
-							</select>
-						</label>
-						<label>
-							Threshold
-							<input
-								type="number"
-								min="0"
-								max={
-									settings.markAsFinishedTimeRemaining !== null
-										? undefined
-										: 100
-								}
-								value={String(
-									settings.markAsFinishedTimeRemaining ??
-										settings.markAsFinishedPercentComplete ??
-										10,
-								)}
-								onChange={(e) =>
-									update(
-										settings.markAsFinishedTimeRemaining !== null
-											? 'markAsFinishedTimeRemaining'
-											: 'markAsFinishedPercentComplete',
-										Number(e.target.value),
-									)
-								}
-							/>
-						</label>
-					</div>
-				)}
-				{tab === 'Scanner' && (
-					<div className="space-y-2">
-						<p>Metadata precedence (highest priority first)</p>
-						<Button onClick={() => update('metadataPrecedence', defaults)}>
-							Reset to default
-						</Button>
-						{sources.map((s) => {
-							const precedence =
-									(settings.metadataPrecedence as string[] | undefined) ??
-									defaults,
-								index = precedence.indexOf(s),
-								enabled = index >= 0
-							return (
-								<div key={s} className="flex items-center gap-2">
-									<label className="grow">
-										<input
-											type="checkbox"
-											checked={enabled}
-											onChange={(e) =>
-												update(
-													'metadataPrecedence',
-													e.target.checked
-														? [...precedence, s]
-														: precedence.filter((x) => x !== s),
-												)
-											}
-										/>{' '}
-										{s} {enabled && `— priority ${index + 1}`}
-									</label>
-									{enabled && (
-										<>
-											<Button
-												aria-label={`Move ${s} up`}
-												disabled={index === 0}
-												onClick={() => {
-													const a = [...precedence]
-													a.splice(index, 1)
-													a.splice(index - 1, 0, s)
-													update('metadataPrecedence', a)
-												}}
-											>
-												↑
-											</Button>
-											<Button
-												aria-label={`Move ${s} down`}
-												disabled={index === precedence.length - 1}
-												onClick={() => {
-													const a = [...precedence]
-													a.splice(index, 1)
-													a.splice(index + 1, 0, s)
-													update('metadataPrecedence', a)
-												}}
-											>
-												↓
-											</Button>
-										</>
+								Add path
+							</Button>
+							<Button onClick={() => void listDirs()}>Browse folders</Button>
+							{(dirs.length > 0 || path) && (
+								<fieldset
+									aria-label="Folder chooser"
+									className="max-h-48 space-y-1 overflow-auto"
+								>
+									<p>
+										Current path: <code>{path || '/'}</code>
+									</p>
+									{path && (
+										<Button
+											onClick={() => {
+												const bits = posix
+													? path.split('/').filter(Boolean)
+													: path.split(/[\\/]/).filter(Boolean)
+												bits.pop()
+												const parent = posix
+													? `/${bits.join('/')}`
+													: bits.join('\\')
+												void listDirs(parent, bits.length)
+											}}
+										>
+											Back to parent
+										</Button>
 									)}
-								</div>
-							)
-						})}
-					</div>
-				)}
-				{tab === 'Schedule' && (
-					<div className="space-y-2">
-						<label>
-							<input
-								type="checkbox"
-								checked={Boolean(settings.autoScanCronExpression)}
-								onChange={(e) =>
-									update(
-										'autoScanCronExpression',
-										e.target.checked ? '0 0 * * 1' : null,
-									)
-								}
-							/>{' '}
-							Enable automatic scan
-						</label>
-						{Boolean(settings.autoScanCronExpression) && (
-							<CronSchedule
-								value={String(settings.autoScanCronExpression)}
-								onChange={(v) => update('autoScanCronExpression', v)}
-							/>
-						)}
-						<p>
-							Scans new and changed media on schedule. Times use server local
-							time; cron uses five fields (minute hour day-of-month month
-							day-of-week). Default schedule: 0 0 * * 1.
-						</p>
-					</div>
-				)}
-				{tab === 'Tools' && (
-					<div className="flex gap-3">
-						<Button disabled={busy} onClick={() => void removeMeta('json')}>
-							Remove all JSON metadata
-						</Button>
-						<Button disabled={busy} onClick={() => void removeMeta('abs')}>
-							Remove all ABS metadata
-						</Button>
-					</div>
-				)}
-				{error && <p role="alert">{error}</p>}
-				<footer className="flex justify-end gap-2">
-					<Button disabled={busy} onClick={close}>
-						Cancel
-					</Button>
-					{tab !== 'Tools' && (
-						<Button disabled={busy} onClick={() => void save()}>
-							{busy ? 'Saving…' : library ? 'Save' : 'Create'}
-						</Button>
+									{dirs.map((d) => (
+										<Button
+											key={d.path}
+											onClick={() => {
+												setPath(d.path)
+												void listDirs(d.path, d.level + 1)
+											}}
+										>
+											{d.dirname} ({d.path})
+										</Button>
+									))}
+									<Button
+										onClick={() => {
+											if (path && !folders.some((f) => f.fullPath === path))
+												setFolders((x) => [...x, { fullPath: path }])
+											setDirs([])
+										}}
+									>
+										Select current folder: {path || '/'}
+									</Button>
+								</fieldset>
+							)}
+						</div>
 					)}
-				</footer>
-			</section>
-		</dialog>
+					{tab === 'Settings' && (
+						<div className="grid gap-3 sm:grid-cols-2">
+							{(
+								[
+									'disableWatcher',
+									'audiobooksOnly',
+									'skipMatchingMediaWithAsin',
+									'skipMatchingMediaWithIsbn',
+									'hideSingleBookSeries',
+									'onlyShowLaterBooksInContinueSeries',
+									'epubsAllowScriptedContent',
+								] as const
+							)
+								.filter((k) => mediaType === 'book' || k === 'disableWatcher')
+								.map((k) => (
+									<Label key={k} className="block">
+										<Checkbox
+											disabled={k === 'disableWatcher' && globalWatcherDisabled}
+											checked={
+												k === 'disableWatcher' && globalWatcherDisabled
+													? true
+													: Boolean(settings[k])
+											}
+											onCheckedChange={(checked) => update(k, checked)}
+										/>{' '}
+										{k === 'disableWatcher'
+											? 'Enable filesystem watcher'
+											: k === 'audiobooksOnly'
+												? 'Audio files only (ignore ebook files)'
+												: k === 'skipMatchingMediaWithAsin'
+													? 'Skip matching books that already have ASIN'
+													: k === 'skipMatchingMediaWithIsbn'
+														? 'Skip matching books that already have ISBN'
+														: k === 'hideSingleBookSeries'
+															? 'Hide single-book series'
+															: k === 'onlyShowLaterBooksInContinueSeries'
+																? 'Show only later books in continue-series shelves'
+																: 'Allow scripted EPUB content'}
+										{k === 'disableWatcher' && globalWatcherDisabled && (
+											<span className="block text-amber-500">
+												Disabled globally in server settings; per-library
+												watcher cannot override this.
+											</span>
+										)}
+									</Label>
+								))}
+							<p className="text-sm text-muted-foreground">
+								Cover shape affects book cover display. Matching skip options
+								prevent replacing existing identifiers. Series options affect
+								series shelves.
+							</p>
+							{mediaType === 'podcast' && (
+								<Label>
+									Podcast search region
+									<NativeSelect
+										value={String(settings.podcastSearchRegion ?? 'us')}
+										onChange={(e) =>
+											update('podcastSearchRegion', e.target.value)
+										}
+									>
+										{Object.entries(podcastRegions).map(([code, label]) => (
+											<option key={code} value={code}>
+												{label}
+											</option>
+										))}
+									</NativeSelect>
+								</Label>
+							)}
+							<Label>
+								Cover aspect ratio
+								<NativeSelect
+									value={String(settings.coverAspectRatio ?? '1')}
+									onChange={(e) =>
+										update('coverAspectRatio', Number(e.target.value))
+									}
+								>
+									<option value="1">Square</option>
+									<option value="0">Standard</option>
+								</NativeSelect>
+							</Label>
+							<Label>
+								Mark finished by
+								<NativeSelect
+									value={
+										settings.markAsFinishedTimeRemaining !== null
+											? 'time'
+											: 'percent'
+									}
+									onChange={(e) => {
+										update(
+											'markAsFinishedTimeRemaining',
+											e.target.value === 'time' ? 10 : null,
+										)
+										update(
+											'markAsFinishedPercentComplete',
+											e.target.value === 'percent' ? 90 : null,
+										)
+									}}
+								>
+									<option value="time">Time remaining (minutes)</option>
+									<option value="percent">Percent complete</option>
+								</NativeSelect>
+							</Label>
+							<Label>
+								Threshold
+								<Input
+									type="number"
+									min="0"
+									max={
+										settings.markAsFinishedTimeRemaining !== null
+											? undefined
+											: 100
+									}
+									value={String(
+										settings.markAsFinishedTimeRemaining ??
+											settings.markAsFinishedPercentComplete ??
+											10,
+									)}
+									onChange={(e) =>
+										update(
+											settings.markAsFinishedTimeRemaining !== null
+												? 'markAsFinishedTimeRemaining'
+												: 'markAsFinishedPercentComplete',
+											Number(e.target.value),
+										)
+									}
+								/>
+							</Label>
+						</div>
+					)}
+					{tab === 'Scanner' && (
+						<div className="space-y-2">
+							<p>Metadata precedence (highest priority first)</p>
+							<Button onClick={() => update('metadataPrecedence', defaults)}>
+								Reset to default
+							</Button>
+							{sources.map((s) => {
+								const precedence =
+										(settings.metadataPrecedence as string[] | undefined) ??
+										defaults,
+									index = precedence.indexOf(s),
+									enabled = index >= 0
+								return (
+									<div key={s} className="flex items-center gap-2">
+										<Label className="grow">
+											<Checkbox
+												checked={enabled}
+												onCheckedChange={(checked) =>
+													update(
+														'metadataPrecedence',
+														checked
+															? [...precedence, s]
+															: precedence.filter((x) => x !== s),
+													)
+												}
+											/>{' '}
+											{s} {enabled && `— priority ${index + 1}`}
+										</Label>
+										{enabled && (
+											<>
+												<Button
+													aria-label={`Move ${s} up`}
+													disabled={index === 0}
+													onClick={() => {
+														const a = [...precedence]
+														a.splice(index, 1)
+														a.splice(index - 1, 0, s)
+														update('metadataPrecedence', a)
+													}}
+												>
+													↑
+												</Button>
+												<Button
+													aria-label={`Move ${s} down`}
+													disabled={index === precedence.length - 1}
+													onClick={() => {
+														const a = [...precedence]
+														a.splice(index, 1)
+														a.splice(index + 1, 0, s)
+														update('metadataPrecedence', a)
+													}}
+												>
+													↓
+												</Button>
+											</>
+										)}
+									</div>
+								)
+							})}
+						</div>
+					)}
+					{tab === 'Schedule' && (
+						<div className="space-y-2">
+							<Label>
+								<Checkbox
+									checked={Boolean(settings.autoScanCronExpression)}
+									onCheckedChange={(checked) =>
+										update(
+											'autoScanCronExpression',
+											checked ? '0 0 * * 1' : null,
+										)
+									}
+								/>{' '}
+								Enable automatic scan
+							</Label>
+							{Boolean(settings.autoScanCronExpression) && (
+								<CronSchedule
+									value={String(settings.autoScanCronExpression)}
+									onChange={(v) => update('autoScanCronExpression', v)}
+								/>
+							)}
+							<p>
+								Scans new and changed media on schedule. Times use server local
+								time; cron uses five fields (minute hour day-of-month month
+								day-of-week). Default schedule: 0 0 * * 1.
+							</p>
+						</div>
+					)}
+					{tab === 'Tools' && (
+						<div className="flex gap-3">
+							<Button disabled={busy} onClick={() => void removeMeta('json')}>
+								Remove all JSON metadata
+							</Button>
+							<Button disabled={busy} onClick={() => void removeMeta('abs')}>
+								Remove all ABS metadata
+							</Button>
+						</div>
+					)}
+					{error && <p role="alert">{error}</p>}
+					<footer className="flex justify-end gap-2">
+						<Button disabled={busy} onClick={close}>
+							Cancel
+						</Button>
+						{tab !== 'Tools' && (
+							<Button disabled={busy} onClick={() => void save()}>
+								{busy ? 'Saving…' : library ? 'Save' : 'Create'}
+							</Button>
+						)}
+					</footer>
+				</section>
+			</DialogContent>
+		</Dialog>
 	)
 }

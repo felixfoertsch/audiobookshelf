@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 
 export const appMenu = (page: Page) =>
-	page.getByRole('button', { name: / · Menu$/ })
+	page.getByRole('button', { name: / · Account$/ })
 export async function openSidebar(page: Page) {
 	const trigger = page.getByRole('button', {
 		name: 'Toggle Sidebar',
@@ -37,7 +37,7 @@ export async function chooseLibrary(page: Page, name: 'books' | 'podcasts') {
 export async function signOut(page: Page) {
 	await openSidebar(page)
 	await appMenu(page).click()
-	await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click()
+	await page.getByRole('menuitem', { name: 'Log out', exact: true }).click()
 }
 // Finish finite transitions from the real theme switch before capture or measurement.
 export async function settleAnimations(page: Page) {

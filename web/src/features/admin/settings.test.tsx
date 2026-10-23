@@ -200,7 +200,7 @@ describe('server settings', () => {
 		})
 		finish({ serverSettings: { ...settings, scannerDisableWatcher: true } })
 		await screen.findByText('Settings saved.')
-		expect((watcher as HTMLInputElement).checked).toBe(false)
+		expect(watcher.getAttribute('aria-checked')).toBe('false')
 	})
 	it('does not submit normalized prefixes when set unchanged', async () => {
 		const api = await setup()

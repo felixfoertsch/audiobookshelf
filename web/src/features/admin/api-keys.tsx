@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Checkbox } from '../../shared/components/ui/checkbox'
 import { Input } from '../../shared/components/ui/input'
+import { Label } from '../../shared/components/ui/label'
 import {
 	NativeSelect,
 	NativeSelectOption,
@@ -64,7 +66,7 @@ export function ApiKeysPage() {
 			{secret && (
 				<div className="border p-3">
 					<p>Copy this API key now. It will not be shown again.</p>
-					<label htmlFor="new-api-key">
+					<Label htmlFor="new-api-key">
 						API key
 						<Input
 							id="new-api-key"
@@ -72,7 +74,7 @@ export function ApiKeysPage() {
 							readOnly
 							value={secret}
 						/>
-					</label>
+					</Label>
 					<Button
 						onClick={() =>
 							void navigator.clipboard
@@ -207,7 +209,7 @@ function KeyForm({
 			}}
 		>
 			<fieldset className="min-w-0 space-y-3" disabled={saving || disabled}>
-				<label className="block" htmlFor="api-key-name">
+				<Label className="block" htmlFor="api-key-name">
 					Name
 					<Input
 						id="api-key-name"
@@ -216,9 +218,9 @@ function KeyForm({
 						value={name}
 						onChange={(e) => setName(e.target.value)}
 					/>
-				</label>
+				</Label>
 				{!initial && (
-					<label className="block" htmlFor="api-key-expires">
+					<Label className="block" htmlFor="api-key-expires">
 						Expires in seconds (blank means never)
 						<Input
 							id="api-key-expires"
@@ -227,11 +229,11 @@ function KeyForm({
 							value={expires}
 							onChange={(e) => setExpires(e.target.value)}
 						/>
-					</label>
+					</Label>
 				)}
-				<label className="block" htmlFor="api-key-user">
+				<Label className="block" htmlFor="api-key-user">
 					User
-				</label>
+				</Label>
 				<NativeSelect
 					id="api-key-user"
 					required
@@ -246,15 +248,14 @@ function KeyForm({
 						</NativeSelectOption>
 					))}
 				</NativeSelect>
-				<label>
-					<input
-						type="checkbox"
+				<Label>
+					<Checkbox
 						checked={active}
 						disabled={disabled}
-						onChange={(e) => setActive(e.target.checked)}
+						onCheckedChange={(checked) => setActive(checked === true)}
 					/>{' '}
 					Active
-				</label>
+				</Label>
 				{initial?.expiresAt && Date.parse(initial.expiresAt) < Date.now() && (
 					<p>Expired</p>
 				)}

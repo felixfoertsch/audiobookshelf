@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Checkbox } from '../../shared/components/ui/checkbox'
+import { Input } from '../../shared/components/ui/input'
+import { Label } from '../../shared/components/ui/label'
+import { NativeSelect } from '../../shared/components/ui/native-select'
 
 const deviceSchema = z
 	.object({
@@ -96,28 +100,33 @@ export function Email() {
 	function field(key: keyof Settings, label: string, type = 'text') {
 		const value = settings[key]
 		return (
-			<label className="block">
+			<Label className="block">
 				{label}
-				<input
-					className="block rounded border bg-background p-2"
-					type={typeof value === 'boolean' ? 'checkbox' : type}
-					value={
-						typeof value === 'string' || typeof value === 'number' ? value : ''
-					}
-					checked={typeof value === 'boolean' ? value : undefined}
-					onChange={(e) =>
-						setSettings({
-							...settings,
-							[key]:
-								typeof value === 'boolean'
-									? e.target.checked
-									: type === 'number'
-										? Number(e.target.value)
-										: e.target.value,
-						})
-					}
-				/>
-			</label>
+				{typeof value === 'boolean' ? (
+					<Checkbox
+						checked={value}
+						onCheckedChange={(checked) =>
+							setSettings({ ...settings, [key]: checked === true })
+						}
+					/>
+				) : (
+					<Input
+						type={type}
+						value={
+							typeof value === 'string' || typeof value === 'number'
+								? value
+								: ''
+						}
+						onChange={(e) =>
+							setSettings({
+								...settings,
+								[key]:
+									type === 'number' ? Number(e.target.value) : e.target.value,
+							})
+						}
+					/>
+				)}
+			</Label>
 		)
 	}
 	async function save() {
@@ -256,26 +265,26 @@ export function Email() {
 					void deviceWrite(next)
 				}}
 			>
-				<label>
+				<Label>
 					Device name
-					<input
+					<Input
 						value={name}
 						disabled={busy}
 						onChange={(e) => setName(e.target.value)}
 					/>
-				</label>
-				<label>
+				</Label>
+				<Label>
 					Email
-					<input
+					<Input
 						type="email"
 						value={email}
 						disabled={busy}
 						onChange={(e) => setEmail(e.target.value)}
 					/>
-				</label>
-				<label>
+				</Label>
+				<Label>
 					Available to
-					<select
+					<NativeSelect
 						value={availability}
 						disabled={busy}
 						onChange={(e) => {
@@ -287,26 +296,25 @@ export function Email() {
 						<option value="userOrUp">Users excluding guests</option>
 						<option value="guestOrUp">Users including guests</option>
 						<option value="specificUsers">Specific users</option>
-					</select>
-				</label>
+					</NativeSelect>
+				</Label>
 				{availability === 'specificUsers' && (
 					<fieldset>
 						<legend>Accessible users</legend>
 						{users.map((user) => (
-							<label className="block" key={user.id}>
-								<input
-									type="checkbox"
+							<Label className="block" key={user.id}>
+								<Checkbox
 									checked={deviceUsers.includes(user.id)}
-									onChange={(e) =>
+									onCheckedChange={(checked) =>
 										setDeviceUsers(
-											e.target.checked
+											checked
 												? [...deviceUsers, user.id]
 												: deviceUsers.filter((id) => id !== user.id),
 										)
 									}
 								/>
 								{user.username}
-							</label>
+							</Label>
 						))}
 					</fieldset>
 				)}

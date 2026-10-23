@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Input } from '../../shared/components/ui/input'
+import { Label } from '../../shared/components/ui/label'
 import {
 	Sheet,
 	SheetClose,
@@ -11,6 +13,14 @@ import {
 	SheetTitle,
 	SheetTrigger,
 } from '../../shared/components/ui/sheet'
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '../../shared/components/ui/table'
 import { dateTime } from '../../shared/date-time'
 
 const feed = z
@@ -84,22 +94,22 @@ export function RssFeeds() {
 				<p>No RSS feeds.</p>
 			) : (
 				<div className="overflow-x-auto">
-					<table className="w-full text-left">
-						<thead>
-							<tr>
-								<th>Title</th>
-								<th>Slug</th>
-								<th>Type</th>
-								<th>Episodes</th>
-								<th>Prevent indexing</th>
-								<th>Updated</th>
-								<th>Actions</th>
-							</tr>
-						</thead>
-						<tbody>
+					<Table className="w-full text-left">
+						<TableHeader>
+							<TableRow>
+								<TableHead>Title</TableHead>
+								<TableHead>Slug</TableHead>
+								<TableHead>Type</TableHead>
+								<TableHead>Episodes</TableHead>
+								<TableHead>Prevent indexing</TableHead>
+								<TableHead>Updated</TableHead>
+								<TableHead>Actions</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
 							{feeds.map((f) => (
-								<tr className="border-t" key={f.id}>
-									<td>
+								<TableRow className="border-t" key={f.id}>
+									<TableCell>
 										<Sheet>
 											<SheetTrigger asChild>
 												<button type="button" className="underline">
@@ -113,14 +123,14 @@ export function RssFeeds() {
 														RSS feed details and episodes
 													</SheetDescription>
 												</SheetHeader>
-												<label className="block">
+												<Label className="block">
 													Feed URL
-													<input
+													<Input
 														className="w-full"
 														readOnly
 														value={`${window.location.origin}${window.__ABS_WEB_CONFIG__?.basePath || ''}${f.feedUrl}`}
 													/>
-												</label>
+												</Label>
 												<p>
 													Prevent indexing:{' '}
 													{f.meta.preventIndexing ? 'Yes' : 'No'}
@@ -140,13 +150,15 @@ export function RssFeeds() {
 												</SheetClose>
 											</SheetContent>
 										</Sheet>
-									</td>
-									<td>{f.slug}</td>
-									<td>{f.entityType}</td>
-									<td>{f.episodes.length}</td>
-									<td>{f.meta.preventIndexing ? 'Yes' : 'No'}</td>
-									<td>{f.updatedAt ? dateTime(f.updatedAt) : ''}</td>
-									<td>
+									</TableCell>
+									<TableCell>{f.slug}</TableCell>
+									<TableCell>{f.entityType}</TableCell>
+									<TableCell>{f.episodes.length}</TableCell>
+									<TableCell>{f.meta.preventIndexing ? 'Yes' : 'No'}</TableCell>
+									<TableCell>
+										{f.updatedAt ? dateTime(f.updatedAt) : ''}
+									</TableCell>
+									<TableCell>
 										<Button
 											variant="destructive"
 											disabled={!admin}
@@ -163,11 +175,11 @@ export function RssFeeds() {
 										>
 											Close
 										</Button>
-									</td>
-								</tr>
+									</TableCell>
+								</TableRow>
 							))}
-						</tbody>
-					</table>
+						</TableBody>
+					</Table>
 				</div>
 			)}
 		</section>

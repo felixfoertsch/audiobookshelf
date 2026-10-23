@@ -36,7 +36,7 @@ it('gates ordinary users and resets immediately on identity, role and logout cha
 		}),
 	)
 	render(<Probe />)
-	fireEvent.click(screen.getByRole('menuitemcheckbox'))
+	fireEvent.click(screen.getByRole('switch'))
 	expect(screen.getByText('false')).toBeTruthy()
 	act(() =>
 		useAuth.getState().set({
@@ -46,7 +46,7 @@ it('gates ordinary users and resets immediately on identity, role and logout cha
 			type: 'admin',
 		}),
 	)
-	fireEvent.click(screen.getByRole('menuitemcheckbox'))
+	fireEvent.click(screen.getByRole('switch'))
 	expect(screen.getByText('true')).toBeTruthy()
 	act(() =>
 		useAuth.getState().set({
@@ -59,14 +59,14 @@ it('gates ordinary users and resets immediately on identity, role and logout cha
 	expect(screen.getByText('true')).toBeTruthy()
 	act(() => window.dispatchEvent(new Event('abs:logout-start')))
 	expect(screen.getByText('false')).toBeTruthy()
-	fireEvent.click(screen.getByRole('menuitemcheckbox'))
+	fireEvent.click(screen.getByRole('switch'))
 	act(() =>
 		useAuth
 			.getState()
 			.set({ id: 'root', username: 'Root', accessToken: 'test', type: 'root' }),
 	)
 	expect(screen.getByText('false')).toBeTruthy()
-	fireEvent.click(screen.getByRole('menuitemcheckbox'))
+	fireEvent.click(screen.getByRole('switch'))
 	act(() =>
 		useAuth
 			.getState()
@@ -91,7 +91,7 @@ it('fresh dashboard explains disabled state and direct logout disables before ne
 		</>,
 	)
 	expect(screen.getByText('Debug is disabled.')).toBeTruthy()
-	fireEvent.click(screen.getByRole('menuitemcheckbox'))
+	fireEvent.click(screen.getByRole('switch'))
 	let finish!: (response: Response) => void
 	vi.stubGlobal(
 		'fetch',

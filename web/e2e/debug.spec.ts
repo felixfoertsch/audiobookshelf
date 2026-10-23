@@ -26,20 +26,22 @@ for (const prefix of ['', '/abs'])
 						'Failed to load resource: the server responded with a status of 401 (Unauthorized)'
 				)
 			)
-				errors.push(message.text())
+				errors.push(`${message.text()} ${message.location().url}`)
 		})
 		await page.goto(`${prefix}/new/debug/issues`)
 		await page.getByLabel('Username', { exact: true }).fill('admin')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 		await expect(
-			page.getByRole('button', { name: /admin · Menu/ }),
+			page.getByRole('button', { name: /admin · Account/ }),
 		).toBeVisible()
 		anonymous = false
 		await page.goto(`${prefix}/new/debug/issues`)
 		await expect(page.getByText('Debug is disabled.')).toBeVisible()
-		await page.getByRole('button', { name: /admin · Menu/ }).click()
-		await page.getByRole('menuitem', { name: 'Debug issues' }).click()
+		await page
+			.getByRole('link', { name: 'Admin settings', exact: true })
+			.click()
+		await page.getByRole('link', { name: 'Debug issues', exact: true }).click()
 		await expect(
 			page.getByRole('button', { name: 'Enable debug', exact: true }),
 		).toBeVisible()
@@ -126,9 +128,9 @@ test('ordinary listener has no debug menu or debug requests on denied deep link'
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-	await page.getByRole('button', { name: /listener · Menu/ }).click()
+	await page.getByRole('button', { name: /listener · Account/ }).click()
 	await expect(
-		page.getByRole('menuitemcheckbox', { name: 'Debug', exact: true }),
+		page.getByRole('switch', { name: 'Debug', exact: true }),
 	).toHaveCount(0)
 	await expect(
 		page.getByRole('menuitem', { name: 'Debug issues' }),

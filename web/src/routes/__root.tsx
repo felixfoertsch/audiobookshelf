@@ -18,6 +18,7 @@ import {
 	Mic,
 	Plus,
 	Search,
+	Settings,
 	UserRound,
 	Users,
 } from 'lucide-react'
@@ -252,7 +253,7 @@ export function Layout({
 								<Button
 									variant="ghost"
 									size="sm"
-									className="w-full min-w-0 justify-between text-sidebar-foreground"
+									className="w-full min-w-0 justify-between border border-muted-foreground bg-[var(--glass-tint)] text-sidebar-foreground shadow-sm backdrop-blur-xl"
 								>
 									<span className="truncate">
 										Library: {currentLibrary?.name || 'Choose library'}
@@ -322,6 +323,32 @@ export function Layout({
 								}}
 							/>
 						)}
+						<nav
+							aria-label="Settings and tools"
+							className="mt-auto space-y-1 px-3 py-2 text-sm"
+						>
+							{(admin || permissions?.upload) && (
+								<Link
+									to="/upload"
+									className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-accent"
+								>
+									<Plus aria-hidden="true" className="size-4" />
+									Upload
+								</Link>
+							)}
+							{admin && (
+								<div className="flex items-center gap-2">
+									<Link
+										to="/config"
+										className="flex flex-1 items-center gap-2 rounded-md px-3 py-2 hover:bg-accent"
+									>
+										<Settings aria-hidden="true" className="size-4" />
+										Admin settings
+									</Link>
+									<DebugMenu />
+								</div>
+							)}
+						</nav>
 					</SidebarContent>
 					<SidebarFooter className="border-t p-3">
 						<DropdownMenu>
@@ -331,7 +358,7 @@ export function Layout({
 									className="w-full min-w-0 justify-start text-sidebar-foreground"
 								>
 									<UserRound aria-hidden="true" className="size-4 shrink-0" />
-									<span className="truncate">{user.username} · Menu</span>
+									<span className="truncate">{user.username} · Account</span>
 									<ChevronDown
 										aria-hidden="true"
 										className="ml-auto size-4 shrink-0"
@@ -344,30 +371,7 @@ export function Layout({
 								className="max-w-[calc(100vw-2rem)]"
 							>
 								<DropdownMenuItem asChild>
-									<Link to="/config/stats">Your statistics</Link>
-								</DropdownMenuItem>
-								{(admin || permissions?.upload) && (
-									<DropdownMenuItem asChild>
-										<Link to="/upload">Upload</Link>
-									</DropdownMenuItem>
-								)}
-								{admin && (
-									<DropdownMenuItem asChild>
-										<Link to="/config">Settings</Link>
-									</DropdownMenuItem>
-								)}
-								{admin && (
-									<>
-										<DebugMenu />
-										<DropdownMenuItem asChild>
-											<Link to="/debug/issues">Debug issues</Link>
-										</DropdownMenuItem>
-									</>
-								)}
-								<DropdownMenuItem asChild>
-									<Link to="/account" className="min-w-0">
-										<span className="truncate">{user.username} · Account</span>
-									</Link>
+									<Link to="/account">User settings</Link>
 								</DropdownMenuItem>
 								<DropdownMenuSeparator />
 								<DropdownMenuLabel>Theme</DropdownMenuLabel>
@@ -398,7 +402,7 @@ export function Layout({
 										)
 									}
 								>
-									Sign out
+									Log out
 								</DropdownMenuItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
@@ -415,7 +419,7 @@ export function Layout({
 					</header>
 					<div
 						id="content"
-						className="mx-auto w-full min-w-0 min-h-[60vh] max-w-6xl px-4 py-8 pb-80 [--shelf-sidebar:0px] md:[--shelf-sidebar:var(--sidebar-width)] [--shelf-gutter:max(1rem,calc((100vw-var(--shelf-sidebar)-72rem)/2+1rem))]"
+						className="w-full min-w-0 min-h-[60vh] px-4 py-8 pb-80 [--shelf-sidebar:0px] md:[--shelf-sidebar:var(--sidebar-width)] [--shelf-gutter:1rem]"
 					>
 						{error && (
 							<p role="alert" className="text-destructive">

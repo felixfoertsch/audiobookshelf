@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Input } from '../../shared/components/ui/input'
+import { Label } from '../../shared/components/ui/label'
+import { NativeSelect } from '../../shared/components/ui/native-select'
 
 const entry = z
 	.object({
@@ -111,16 +114,16 @@ export function Logs() {
 			{error && <p role="alert">{error}</p>}
 			<p role="status">{socketStatus}</p>
 			<div className="flex flex-wrap gap-3">
-				<label>
+				<Label>
 					Search logs
-					<input
+					<Input
 						value={term}
 						onChange={(event) => setTerm(event.target.value)}
 					/>
-				</label>
-				<label>
+				</Label>
+				<Label>
 					Minimum level
-					<select
+					<NativeSelect
 						value={level}
 						disabled={!admin}
 						onChange={(event) => {
@@ -136,8 +139,8 @@ export function Logs() {
 						<option value="1">Debug</option>
 						<option value="2">Info</option>
 						<option value="3">Warn</option>
-					</select>
-				</label>
+					</NativeSelect>
+				</Label>
 				<Button
 					variant="outline"
 					disabled={!admin}

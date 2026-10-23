@@ -27,9 +27,7 @@ describe('ApiKeysPage', () => {
 		expect(screen.getByLabelText('User').getAttribute('data-slot')).toBe(
 			'native-select',
 		)
-		expect(screen.getByLabelText('Active').getAttribute('type')).toBe(
-			'checkbox',
-		)
+		expect(screen.getByRole('checkbox', { name: 'Active' })).toBeTruthy()
 		expect(screen.getByRole('button', { name: 'Save API key' })).toBeTruthy()
 	})
 })

@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Checkbox } from '../../shared/components/ui/checkbox'
+import { Input } from '../../shared/components/ui/input'
+import { Label } from '../../shared/components/ui/label'
+import { NativeSelect } from '../../shared/components/ui/native-select'
+import { Textarea } from '../../shared/components/ui/textarea'
 import { dateTime } from '../../shared/date-time'
 
 const eventSchema = z
@@ -154,32 +159,32 @@ export function Notifications() {
 			{error && <p role="alert">{error}</p>}
 			<fieldset className="space-y-2">
 				<legend>Apprise settings</legend>
-				<label className="block">
+				<Label className="block">
 					Apprise API URL
-					<input
+					<Input
 						className="block rounded border bg-background p-2"
 						value={url}
 						onChange={(e) => setUrl(e.target.value)}
 					/>
-				</label>
-				<label>
+				</Label>
+				<Label>
 					Maximum queue size
-					<input
+					<Input
 						type="number"
 						min="1"
 						value={queue}
 						onChange={(e) => setQueue(e.target.value)}
 					/>
-				</label>
-				<label>
+				</Label>
+				<Label>
 					Maximum failed attempts
-					<input
+					<Input
 						type="number"
 						min="1"
 						value={attempts}
 						onChange={(e) => setAttempts(e.target.value)}
 					/>
-				</label>
+				</Label>
 				<Button type="button" disabled={!admin} onClick={() => void update()}>
 					Save settings
 				</Button>
@@ -208,9 +213,9 @@ export function Notifications() {
 						void save()
 					}}
 				>
-					<label>
+					<Label>
 						Event
-						<select
+						<NativeSelect
 							value={eventName}
 							onChange={(e) => {
 								setEvent(e.target.value)
@@ -226,43 +231,43 @@ export function Notifications() {
 									{x.name}
 								</option>
 							))}
-						</select>
-					</label>
-					<label className="block">
+						</NativeSelect>
+					</Label>
+					<Label className="block">
 						Apprise URLs (comma-separated)
-						<input
+						<Input
 							className="block w-full rounded border bg-background p-2"
 							value={urls}
 							onChange={(e) => setUrls(e.target.value)}
 						/>
-					</label>
-					<label className="block">
+					</Label>
+					<Label className="block">
 						Title template
-						<input
+						<Input
 							className="block w-full rounded border bg-background p-2"
 							value={title}
 							onChange={(e) => setTitle(e.target.value)}
 						/>
-					</label>
-					<label className="block">
+					</Label>
+					<Label className="block">
 						Body template
-						<textarea
+						<Textarea
 							className="block w-full rounded border bg-background p-2"
 							rows={4}
 							value={body}
 							onChange={(e) => setBody(e.target.value)}
 						/>
-					</label>
+					</Label>
 					{data?.data.events.find((x) => x.name === eventName)
 						?.requiresLibrary && (
-						<label>
+						<Label>
 							Library ID
-							<input
+							<Input
 								value={libraryId}
 								onChange={(event) => setLibraryId(event.target.value)}
 								required
 							/>
-						</label>
+						</Label>
 					)}
 					<p>
 						Available variables:{' '}
@@ -270,14 +275,13 @@ export function Notifications() {
 							.find((x) => x.name === eventName)
 							?.variables?.join(', ') || 'None'}
 					</p>
-					<label>
-						<input
-							type="checkbox"
+					<Label>
+						<Checkbox
 							checked={enabled}
-							onChange={(e) => setEnabled(e.target.checked)}
+							onCheckedChange={(checked) => setEnabled(checked === true)}
 						/>{' '}
 						Enabled
-					</label>
+					</Label>
 					<Button disabled={!admin}>Save notification</Button>
 					<Button type="button" variant="outline" onClick={() => setEvent('')}>
 						Cancel
@@ -309,14 +313,13 @@ export function Notifications() {
 					</Button>
 					{n.eventName === 'onTest' ? (
 						<>
-							<label>
-								<input
-									type="checkbox"
+							<Label>
+								<Checkbox
 									checked={failMode}
-									onChange={(e) => setFailMode(e.target.checked)}
+									onCheckedChange={(checked) => setFailMode(checked === true)}
 								/>{' '}
 								Intentionally fail test
-							</label>
+							</Label>
 							<Button
 								disabled={!admin}
 								onClick={() =>

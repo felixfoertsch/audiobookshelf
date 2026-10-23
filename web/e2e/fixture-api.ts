@@ -88,6 +88,20 @@ export const loginPayload = (user: FixtureUser) => ({
 		chromecastEnabled: false,
 		sortingIgnorePrefix: true,
 		version: '2.29.0',
+		storeCoverWithItem: false,
+		storeMetadataWithItem: false,
+		sortingPrefixes: ['the', 'a'],
+		scannerParseSubtitle: false,
+		scannerFindCovers: true,
+		scannerCoverProvider: 'openlibrary',
+		scannerPreferMatchedMetadata: false,
+		scannerDisableWatcher: false,
+		allowIframe: false,
+		homeBookshelfView: 0,
+		bookshelfView: 0,
+		dateFormat: 'yyyy-MM-dd',
+		timeFormat: 'HH:mm',
+		allowedOrigins: [],
 	},
 	ereaderDevices: ereaderDevices.get(user.id) || [],
 	Source: 'local-fixture',
@@ -216,6 +230,12 @@ export async function fixtureApi(
 	}
 	if (path === '/api/authorize' && method === 'POST')
 		return json(loginPayload(user))
+	if (path === '/api/search/providers' && method === 'GET')
+		return json({
+			providers: {
+				booksCovers: [{ text: 'Open Library', value: 'openlibrary' }],
+			},
+		})
 	if (path === '/api/me') return json(browserUser(user))
 	if (path === '/api/me/password') {
 		if (method !== 'PATCH')

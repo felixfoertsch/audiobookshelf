@@ -34,7 +34,7 @@ for (const theme of ['light', 'dark']) {
 			['more', page.getByRole('button', { name: 'More player actions' }), 3],
 			['volume', page.getByRole('button', { name: 'Volume', exact: true }), 3],
 			['library', page.getByRole('button', { name: /^Library:/ }), 4.5],
-			['user', page.getByRole('button', { name: /listener · Menu/ }), 4.5],
+			['user', page.getByRole('button', { name: /listener · Account/ }), 4.5],
 			[
 				'More link',
 				page.getByRole('button', { name: 'More', exact: true }),

@@ -18,19 +18,21 @@ for (const prefix of ['', '/abs'])
 			await expect(
 				nav.getByRole('link', { name: 'Download queue', exact: true }),
 			).toHaveCount(admin ? 1 : 0)
+			await expect(
+				page.getByRole('link', { name: 'Upload', exact: true }),
+			).toHaveCount(admin ? 1 : 0)
+			await expect(
+				page.getByRole('link', { name: 'Admin settings', exact: true }),
+			).toHaveCount(admin ? 1 : 0)
+			await expect(
+				page.getByRole('switch', { name: 'Debug', exact: true }),
+			).toHaveCount(admin ? 1 : 0)
 			await appMenu(page).click()
 			await expect(
-				page.getByRole('menuitem', { name: 'Your statistics', exact: true }),
+				page.getByRole('menuitem', { name: 'User settings', exact: true }),
 			).toBeVisible()
-			await expect(
-				page.getByRole('menuitem', { name: / · Account$/ }),
-			).toBeVisible()
-			await expect(
-				page.getByRole('menuitem', { name: 'Upload', exact: true }),
-			).toHaveCount(admin ? 1 : 0)
-			await expect(
-				page.getByRole('menuitem', { name: 'Settings', exact: true }),
-			).toHaveCount(admin ? 1 : 0)
+			await expect(page.getByRole('menuitem')).toHaveCount(2)
+			await expect(page.getByRole('menuitemradio')).toHaveCount(3)
 			await page.keyboard.press('Escape')
 			await page.goto(`${prefix}/new/account`)
 			await expect(appMenu(page)).toBeVisible()

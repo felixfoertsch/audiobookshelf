@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Input } from '../../shared/components/ui/input'
+import { Label } from '../../shared/components/ui/label'
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '../../shared/components/ui/table'
 
 const tagsSchema = z.object({ tags: z.array(z.string()) })
 const genresSchema = z.object({ genres: z.array(z.string()) })
@@ -151,7 +161,7 @@ export function MetadataList({ kind }: { kind: 'tags' | 'genres' }) {
 					<li key={value} className="flex items-center gap-2 p-2">
 						{editing === value ? (
 							<>
-								<input
+								<Input
 									aria-label={`Rename ${value}`}
 									value={replacement}
 									onChange={(event) => setReplacement(event.target.value)}
@@ -322,35 +332,35 @@ export function Providers() {
 			{error && <p role="status">{error}</p>}
 			{adding && (
 				<form className="grid gap-3" onSubmit={(event) => void add(event)}>
-					<label>
+					<Label>
 						Name
-						<input
+						<Input
 							required
 							value={name}
 							onChange={(event) => setName(event.target.value)}
 						/>
-					</label>
-					<label>
+					</Label>
+					<Label>
 						Media type
-						<input readOnly value="Book" />
-					</label>
-					<label>
+						<Input readOnly value="Book" />
+					</Label>
+					<Label>
 						URL
-						<input
+						<Input
 							required
 							type="url"
 							value={url}
 							onChange={(event) => setUrl(event.target.value)}
 						/>
-					</label>
-					<label>
+					</Label>
+					<Label>
 						Authorization header value
-						<input
+						<Input
 							type="password"
 							value={authHeaderValue}
 							onChange={(event) => setAuth(event.target.value)}
 						/>
-					</label>
+					</Label>
 					<Button disabled={loading} type="submit">
 						Save provider
 					</Button>
@@ -360,21 +370,21 @@ export function Providers() {
 				<p>No custom metadata providers.</p>
 			)}
 			<div className="overflow-x-auto">
-				<table className="w-full text-left">
-					<thead>
-						<tr>
-							<th>Name</th>
-							<th>URL</th>
-							<th>Authorization Header Value</th>
-							<th />
-						</tr>
-					</thead>
-					<tbody>
+				<Table className="w-full text-left">
+					<TableHeader>
+						<TableRow>
+							<TableHead>Name</TableHead>
+							<TableHead>URL</TableHead>
+							<TableHead>Authorization Header Value</TableHead>
+							<TableHead />
+						</TableRow>
+					</TableHeader>
+					<TableBody>
 						{providers.map((provider) => (
-							<tr key={provider.id}>
-								<td>{provider.name}</td>
-								<td>{provider.url}</td>
-								<td>
+							<TableRow key={provider.id}>
+								<TableCell>{provider.name}</TableCell>
+								<TableCell>{provider.url}</TableCell>
+								<TableCell>
 									<span
 										role="status"
 										aria-label={
@@ -385,8 +395,8 @@ export function Providers() {
 									>
 										{provider.authHeaderValue ? 'Configured' : '—'}
 									</span>
-								</td>
-								<td>
+								</TableCell>
+								<TableCell>
 									<Button
 										variant="destructive"
 										disabled={loading}
@@ -394,11 +404,11 @@ export function Providers() {
 									>
 										Delete
 									</Button>
-								</td>
-							</tr>
+								</TableCell>
+							</TableRow>
 						))}
-					</tbody>
-				</table>
+					</TableBody>
+				</Table>
 			</div>
 		</section>
 	)

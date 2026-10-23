@@ -62,7 +62,7 @@ for (const prefix of ['', '/abs'])
 		})
 		await openSidebar(page)
 		await appMenu(page).click()
-		await page.getByRole('menuitem', { name: /Account$/ }).click()
+		await page.getByRole('menuitem', { name: 'User settings' }).click()
 		await started
 		const requests: string[] = []
 		page.on('request', (req) => {

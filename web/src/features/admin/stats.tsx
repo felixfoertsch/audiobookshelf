@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Label } from '../../shared/components/ui/label'
+import { NativeSelect } from '../../shared/components/ui/native-select'
 import { dateTime } from '../../shared/date-time'
 
 const sessionSchema = z.object({
@@ -376,9 +378,9 @@ export function Stats() {
 				</Button>
 				{showYear && (
 					<>
-						<label>
+						<Label>
 							Year{' '}
-							<select
+							<NativeSelect
 								value={personalQuery.year}
 								onChange={(event) => {
 									const selectedYear = Number(event.target.value)
@@ -407,8 +409,8 @@ export function Stats() {
 								).map((value) => (
 									<option key={value}>{value}</option>
 								))}
-							</select>
-						</label>
+							</NativeSelect>
+						</Label>
 						{yearStatus && <p role="status">{yearStatus}</p>}
 						{yearData && (
 							<div className="rounded border p-4">

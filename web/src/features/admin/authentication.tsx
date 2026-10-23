@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Checkbox } from '../../shared/components/ui/checkbox'
 import { Input } from '../../shared/components/ui/input'
+import { Label } from '../../shared/components/ui/label'
 import { NativeSelect } from '../../shared/components/ui/native-select'
+import { Textarea } from '../../shared/components/ui/textarea'
 import { useT } from '../i18n'
 
 const textFields = [
@@ -336,18 +339,19 @@ function AuthenticationForm() {
 					}}
 				>
 					<fieldset disabled={pending} className="space-y-4">
-						<label className="flex gap-2">
-							<input
-								type="checkbox"
+						<Label className="flex gap-2">
+							<Checkbox
 								checked={customMessage}
-								onChange={(event) => setCustomMessage(event.target.checked)}
+								onCheckedChange={(checked) =>
+									setCustomMessage(checked === true)
+								}
 							/>
 							{t('HeaderCustomMessageOnLogin')}
-						</label>
+						</Label>
 						{customMessage && (
-							<label className="block">
+							<Label className="block">
 								Login message (HTML)
-								<textarea
+								<Textarea
 									className="block w-full rounded border bg-background p-2"
 									value={settings.authLoginCustomMessage ?? ''}
 									onChange={(event) =>
@@ -357,20 +361,19 @@ function AuthenticationForm() {
 										})
 									}
 								/>
-							</label>
+							</Label>
 						)}
 						{[
 							['local', t('HeaderPasswordAuthentication')],
 							['openid', t('HeaderOpenIDConnectAuthentication')],
 						].map(([method, label]) => (
-							<label key={method} className="flex gap-2">
-								<input
-									type="checkbox"
+							<Label key={method} className="flex gap-2">
+								<Checkbox
 									checked={settings.authActiveAuthMethods.includes(method)}
-									onChange={(event) =>
+									onCheckedChange={(checked) =>
 										setSettings({
 											...settings,
-											authActiveAuthMethods: event.target.checked
+											authActiveAuthMethods: checked
 												? [...settings.authActiveAuthMethods, method]
 												: settings.authActiveAuthMethods.filter(
 														(value) => value !== method,
@@ -379,7 +382,7 @@ function AuthenticationForm() {
 									}
 								/>
 								{label}
-							</label>
+							</Label>
 						))}
 						{settings.authActiveAuthMethods.includes('openid') && (
 							<div className="space-y-3">
@@ -391,7 +394,7 @@ function AuthenticationForm() {
 									OIDC documentation
 								</a>
 								{textFields.map(([key, label]) => (
-									<label className="block" key={key} htmlFor={key}>
+									<Label className="block" key={key} htmlFor={key}>
 										{label}
 										{key === 'authOpenIDTokenSigningAlgorithm' &&
 										algorithms.length ? (
@@ -442,7 +445,7 @@ function AuthenticationForm() {
 												{help(fieldHelp[key])}
 											</span>
 										)}
-									</label>
+									</Label>
 								))}
 								<Button
 									type="button"
@@ -454,9 +457,9 @@ function AuthenticationForm() {
 								<Button type="button" onClick={() => void discover()}>
 									Auto-populate
 								</Button>
-								<label className="block">
+								<Label className="block">
 									Mobile redirect URIs (one per line)
-									<textarea
+									<Textarea
 										className="block w-full rounded border bg-background p-2"
 										value={settings.authOpenIDMobileRedirectURIs.join('\n')}
 										onChange={(event) =>
@@ -468,9 +471,9 @@ function AuthenticationForm() {
 											})
 										}
 									/>
-								</label>
+								</Label>
 								<p>{help('LabelMobileRedirectURIsDescription')}</p>
-								<label
+								<Label
 									className="block"
 									htmlFor="authOpenIDSubfolderForRedirectURLs"
 								>
@@ -493,7 +496,7 @@ function AuthenticationForm() {
 											</option>
 										)}
 									</NativeSelect>
-								</label>
+								</Label>
 								<p>
 									Web callback:{' '}
 									<code>{`https://<your.server.com>${settings.authOpenIDSubfolderForRedirectURLs ?? ''}/auth/openid/callback`}</code>
@@ -502,7 +505,7 @@ function AuthenticationForm() {
 									Mobile callback:{' '}
 									<code>{`https://<your.server.com>${settings.authOpenIDSubfolderForRedirectURLs ?? ''}/auth/openid/mobile-redirect`}</code>
 								</p>
-								<label className="block" htmlFor="authOpenIDMatchExistingBy">
+								<Label className="block" htmlFor="authOpenIDMatchExistingBy">
 									{t('LabelMatchExistingUsersBy')}
 									<NativeSelect
 										id="authOpenIDMatchExistingBy"
@@ -524,26 +527,25 @@ function AuthenticationForm() {
 										<option value="email">Email</option>
 										<option value="username">Username</option>
 									</NativeSelect>
-								</label>
+								</Label>
 								<p>{help('LabelMatchExistingUsersByDescription')}</p>
 								{(
 									['authOpenIDAutoLaunch', 'authOpenIDAutoRegister'] as const
 								).map((key) => (
-									<label key={key} className="flex gap-2">
-										<input
-											type="checkbox"
+									<Label key={key} className="flex gap-2">
+										<Checkbox
 											checked={settings[key]}
-											onChange={(event) =>
+											onCheckedChange={(checked) =>
 												setSettings({
 													...settings,
-													[key]: event.target.checked,
+													[key]: checked,
 												})
 											}
 										/>
 										{key === 'authOpenIDAutoLaunch'
 											? t('LabelAutoLaunch')
 											: t('LabelAutoRegister')}
-									</label>
+									</Label>
 								))}
 								<p>{help('LabelAutoLaunchDescription')}</p>
 								<p>{help('LabelAutoRegisterDescription')}</p>

@@ -3,6 +3,18 @@ import { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Checkbox } from '../../shared/components/ui/checkbox'
+import { Input } from '../../shared/components/ui/input'
+import { Label } from '../../shared/components/ui/label'
+import { NativeSelect } from '../../shared/components/ui/native-select'
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '../../shared/components/ui/table'
 import { SessionDetails } from './session-details'
 
 const admin = (type: string | undefined) => type === 'admin' || type === 'root'
@@ -128,34 +140,34 @@ function UserForm({
 			}}
 		>
 			<h2>{initial ? 'Edit user' : 'Add user'}</h2>
-			<label className="block">
+			<Label className="block">
 				Username
-				<input
+				<Input
 					required
 					value={username}
 					onChange={(e) => setUsername(e.target.value)}
 				/>
-			</label>
-			<label className="block">
+			</Label>
+			<Label className="block">
 				{initial ? 'Change password' : 'Password'}
-				<input
+				<Input
 					type="password"
 					required={!initial}
 					value={password}
 					onChange={(e) => setPassword(e.target.value)}
 				/>
-			</label>
-			<label className="block">
+			</Label>
+			<Label className="block">
 				Email
-				<input
+				<Input
 					type="email"
 					value={email}
 					onChange={(e) => setEmail(e.target.value)}
 				/>
-			</label>
-			<label className="block">
+			</Label>
+			<Label className="block">
 				Account type
-				<select
+				<NativeSelect
 					disabled={root}
 					value={type}
 					onChange={(e) => {
@@ -185,48 +197,47 @@ function UserForm({
 					<option value="guest">Guest</option>
 					<option value="user">User</option>
 					<option value="admin">Admin</option>
-				</select>
-			</label>
-			<label>
-				<input
-					type="checkbox"
+				</NativeSelect>
+			</Label>
+			<Label>
+				<Checkbox
 					disabled={root}
 					checked={active}
-					onChange={(e) => setActive(e.target.checked)}
+					onCheckedChange={(checked) => setActive(checked === true)}
 				/>{' '}
 				Enabled
-			</label>
+			</Label>
 			{!root && (
 				<fieldset>
 					<legend>Permissions</legend>
 					{permissions.map((k) => (
-						<label className="block" key={k}>
-							<input
-								type="checkbox"
+						<Label className="block" key={k}>
+							<Checkbox
 								checked={perm[k] || false}
-								onChange={(e) => setPerm({ ...perm, [k]: e.target.checked })}
+								onCheckedChange={(checked) =>
+									setPerm({ ...perm, [k]: checked === true })
+								}
 							/>{' '}
 							{k}
-						</label>
+						</Label>
 					))}
 					{!perm.accessAllLibraries && (
 						<fieldset>
 							<legend>Accessible libraries</legend>
 							{libraries.map((x) => (
-								<label key={x.id} className="block">
-									<input
-										type="checkbox"
+								<Label key={x.id} className="block">
+									<Checkbox
 										checked={libs.includes(x.id)}
-										onChange={(e) =>
+										onCheckedChange={(checked) =>
 											setLibs(
-												e.target.checked
+												checked
 													? [...libs, x.id]
 													: libs.filter((i) => i !== x.id),
 											)
 										}
 									/>
 									{x.name}
-								</label>
+								</Label>
 							))}
 						</fieldset>
 					)}
@@ -238,20 +249,17 @@ function UserForm({
 									: 'Accessible tags'}
 							</legend>
 							{allTags.map((x) => (
-								<label key={x} className="block">
-									<input
-										type="checkbox"
+								<Label key={x} className="block">
+									<Checkbox
 										checked={tags.includes(x)}
-										onChange={(e) =>
+										onCheckedChange={(checked) =>
 											setTags(
-												e.target.checked
-													? [...tags, x]
-													: tags.filter((t) => t !== x),
+												checked ? [...tags, x] : tags.filter((t) => t !== x),
 											)
 										}
 									/>
 									{x}
-								</label>
+								</Label>
 							))}
 						</fieldset>
 					)}
@@ -578,9 +586,9 @@ function Sessions({ user = false }: { user?: boolean }) {
 			<h1 className="text-2xl">Listening sessions</h1>
 			{error && <p role="alert">{error}</p>}
 			{!user && (
-				<label>
+				<Label>
 					User filter
-					<select
+					<NativeSelect
 						value={filter}
 						onChange={(e) => {
 							setPage(0)
@@ -593,12 +601,12 @@ function Sessions({ user = false }: { user?: boolean }) {
 								{u.username}
 							</option>
 						))}
-					</select>
-				</label>
+					</NativeSelect>
+				</Label>
 			)}
-			<label>
+			<Label>
 				Sort
-				<select
+				<NativeSelect
 					value={sort}
 					onChange={(e) => {
 						setSort(e.target.value)
@@ -609,8 +617,8 @@ function Sessions({ user = false }: { user?: boolean }) {
 					<option value="displayTitle">Item</option>
 					<option value="playMethod">Play method</option>
 					<option value="timeListening">Time listened</option>
-				</select>
-			</label>
+				</NativeSelect>
+			</Label>
 			<Button onClick={() => setDesc(!desc)}>
 				{desc ? 'Descending' : 'Ascending'}
 			</Button>
@@ -622,50 +630,46 @@ function Sessions({ user = false }: { user?: boolean }) {
 				Delete selected ({selected.length})
 			</Button>
 			<div className="overflow-x-auto">
-				<table>
-					<thead>
-						<tr>
-							<th>
-								<input
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>
+								<Checkbox
 									aria-label="Select all sessions"
-									type="checkbox"
 									checked={
 										!!data?.sessions.length &&
 										selected.length === data.sessions.length
 									}
-									onChange={(e) =>
+									onCheckedChange={(checked) =>
 										setSelected(
-											e.target.checked
-												? data?.sessions.map((s) => s.id) || []
-												: [],
+											checked ? data?.sessions.map((s) => s.id) || [] : [],
 										)
 									}
 								/>
-							</th>
-							<th>Item</th>
-							<th>User</th>
-							<th>Time listened</th>
-							<th>Last time</th>
-						</tr>
-					</thead>
-					<tbody>
+							</TableHead>
+							<TableHead>Item</TableHead>
+							<TableHead>User</TableHead>
+							<TableHead>Time listened</TableHead>
+							<TableHead>Last time</TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
 						{data?.sessions.map((s) => (
-							<tr key={s.id}>
-								<td>
-									<input
+							<TableRow key={s.id}>
+								<TableCell>
+									<Checkbox
 										aria-label={`Select ${s.displayTitle || s.id}`}
-										type="checkbox"
 										checked={selected.includes(s.id)}
-										onChange={(e) =>
+										onCheckedChange={(checked) =>
 											setSelected(
-												e.target.checked
+												checked
 													? [...selected, s.id]
 													: selected.filter((x) => x !== s.id),
 											)
 										}
 									/>
-								</td>
-								<td>
+								</TableCell>
+								<TableCell>
 									<button
 										type="button"
 										className="underline"
@@ -675,14 +679,14 @@ function Sessions({ user = false }: { user?: boolean }) {
 									>
 										{s.displayTitle}
 									</button>
-								</td>
-								<td>{s.user?.username}</td>
-								<td>{s.timeListening || 0}s</td>
-								<td>{s.currentTime || 0}s</td>
-							</tr>
+								</TableCell>
+								<TableCell>{s.user?.username}</TableCell>
+								<TableCell>{s.timeListening || 0}s</TableCell>
+								<TableCell>{s.currentTime || 0}s</TableCell>
+							</TableRow>
 						))}
-					</tbody>
-				</table>
+					</TableBody>
+				</Table>
 			</div>
 			<Button disabled={!data || page <= 0} onClick={() => setPage(page - 1)}>
 				Previous

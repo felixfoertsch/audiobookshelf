@@ -21,7 +21,7 @@ for (const width of [390, 1280])
 			await expect(
 				page
 					.locator('[data-slot="sidebar-footer"]')
-					.getByRole('button', { name: / · Menu$/ }),
+					.getByRole('button', { name: / · Account$/ }),
 			).toBeVisible()
 			await expect(
 				page.getByRole('searchbox', { name: 'Search library', exact: true }),

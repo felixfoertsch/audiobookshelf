@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api, apiBinary, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Checkbox } from '../../shared/components/ui/checkbox'
+import { Input } from '../../shared/components/ui/input'
+import { Label } from '../../shared/components/ui/label'
 import { dateTime } from '../../shared/date-time'
 
 const backup = z
@@ -95,15 +98,15 @@ export function Backups() {
 				<p role="status">Loading backup settings…</p>
 			) : (
 				<>
-					<label className="block">
+					<Label className="block">
 						Backup location
-						<input
+						<Input
 							className="block w-full rounded border bg-background p-2"
 							value={path}
 							disabled={busy || data.backupPathEnvSet}
 							onChange={(e) => setPath(e.target.value)}
 						/>
-					</label>
+					</Label>
 					<Button
 						disabled={busy || !path.trim() || data.backupPathEnvSet}
 						onClick={() =>
@@ -119,27 +122,26 @@ export function Backups() {
 					</Button>
 					<fieldset className="space-y-2">
 						<legend>Automatic backups</legend>
-						<label>
-							<input
-								type="checkbox"
+						<Label>
+							<Checkbox
 								checked={enabled}
 								disabled={busy}
-								onChange={(e) => setEnabled(e.target.checked)}
+								onCheckedChange={(checked) => setEnabled(checked === true)}
 							/>{' '}
 							Enable schedule
-						</label>
-						<label className="block">
+						</Label>
+						<Label className="block">
 							Cron schedule
-							<input
+							<Input
 								className="block rounded border bg-background p-2"
 								value={cron}
 								disabled={busy}
 								onChange={(e) => setCron(e.target.value)}
 							/>
-						</label>
-						<label className="block">
+						</Label>
+						<Label className="block">
 							Backups to keep
-							<input
+							<Input
 								type="number"
 								min="1"
 								max="99"
@@ -147,17 +149,17 @@ export function Backups() {
 								disabled={busy}
 								onChange={(e) => setKeep(e.target.value)}
 							/>
-						</label>
-						<label className="block">
+						</Label>
+						<Label className="block">
 							Maximum backup size (GB)
-							<input
+							<Input
 								type="number"
 								min="0"
 								value={size}
 								disabled={busy}
 								onChange={(e) => setSize(e.target.value)}
 							/>
-						</label>
+						</Label>
 						<Button
 							disabled={
 								busy ||
@@ -192,9 +194,9 @@ export function Backups() {
 						>
 							Create backup
 						</Button>
-						<label className="cursor-pointer">
+						<Label className="cursor-pointer">
 							Upload backup
-							<input
+							<Input
 								aria-label="Upload backup"
 								className="sr-only"
 								type="file"
@@ -217,7 +219,7 @@ export function Backups() {
 									)
 								}}
 							/>
-						</label>
+						</Label>
 					</div>
 					<ul className="divide-y">
 						{data.backups.map((b) => (
@@ -283,9 +285,9 @@ export function Backups() {
 									</Button>
 									{b.serverVersion && b.key && (
 										<>
-											<label>
+											<Label>
 												Type full backup path to confirm restore
-												<input
+												<Input
 													aria-label={`Confirm restore ${b.id}`}
 													disabled={busy}
 													value={confirmation[b.id] || ''}
@@ -296,7 +298,7 @@ export function Backups() {
 														})
 													}
 												/>
-											</label>
+											</Label>
 											<Button
 												variant="destructive"
 												disabled={

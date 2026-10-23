@@ -66,11 +66,11 @@ for (const prefix of ['', '/abs']) {
 			await page.keyboard.press('ArrowDown')
 			await expect(page.getByRole('menu')).toBeVisible()
 			await expect(
-				page.getByRole('menuitem', { name: 'Your statistics' }),
+				page.getByRole('menuitem', { name: 'User settings' }),
 			).toBeFocused()
 			await page.keyboard.press('ArrowDown')
 			await expect(
-				page.getByRole('menuitem', { name: / · Account$/ }),
+				page.getByRole('menuitemradio', { name: 'System', exact: true }),
 			).toBeFocused()
 			await page.keyboard.press('Escape')
 			await expect(appMenu(page)).toBeFocused()
@@ -192,7 +192,7 @@ for (const prefix of ['', '/abs'])
 		await openSidebar(page)
 		await appMenu(page).click()
 		await expect(
-			page.getByRole('menuitem', { name: 'Your statistics' }),
+			page.getByRole('menuitem', { name: 'User settings' }),
 		).toBeInViewport()
 		await page.keyboard.press('Escape')
 		await expect(appMenu(page)).toBeFocused()

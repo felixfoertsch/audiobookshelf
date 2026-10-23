@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LibrariesPage } from './libraries'
 
@@ -68,6 +74,20 @@ describe('LibrariesPage', () => {
 		)
 		expect(requests.some((x) => x.init?.method === 'DELETE')).toBe(false)
 		confirm.mockRestore()
+	})
+	it('library dialog closes with Escape and returns focus to opener', async () => {
+		render(<LibrariesPage />)
+		const opener = await screen.findByRole('button', { name: 'Add library' })
+		opener.focus()
+		fireEvent.click(opener)
+		expect(
+			await screen.findByRole('dialog', { name: 'Create library' }),
+		).toBeTruthy()
+		fireEvent.keyDown(document.activeElement || document.body, {
+			key: 'Escape',
+		})
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+		await waitFor(() => expect(document.activeElement).toBe(opener))
 	})
 	it('validates new-library payload before sending', async () => {
 		render(<LibrariesPage />)

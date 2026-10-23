@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 import { Button } from '../../shared/components/ui/button'
+import { Card, CardContent } from '../../shared/components/ui/card'
+import { Checkbox } from '../../shared/components/ui/checkbox'
+import { Label } from '../../shared/components/ui/label'
 import { NativeSelect } from '../../shared/components/ui/native-select'
+import { Textarea } from '../../shared/components/ui/textarea'
 import { setServerLanguage, useT } from '../i18n'
 
 const settingsSchema = z.object({
@@ -248,264 +252,270 @@ function SettingsForm() {
 			prefixSet(normalizePrefixes(settings.sortingPrefixes.join('\n')))
 	if (!allowed) return <p role="alert">Administrator access required.</p>
 	return (
-		<section className="space-y-5">
-			<h1 className="text-2xl font-semibold">Server settings</h1>
-			<p role="status">{message || (!settings ? 'Loading settings…' : '')}</p>
-			{errorMessage && <p role="alert">{errorMessage}</p>}
-			{settings && (
-				<fieldset disabled={pending} className="space-y-4">
-					<legend>General, scanner and web client</legend>
-					{toggles.map(([key, label]) => (
-						<label className="flex items-center gap-3" key={key}>
-							<input
-								aria-label={t(labelKeys[label] ?? label)}
-								type="checkbox"
-								checked={settings[key]}
-								onChange={(event) =>
-									void update({ [key]: event.target.checked })
+		<Card>
+			<CardContent className="space-y-5">
+				<h1 className="text-2xl font-semibold">Server settings</h1>
+				<p role="status">{message || (!settings ? 'Loading settings…' : '')}</p>
+				{errorMessage && <p role="alert">{errorMessage}</p>}
+				{settings && (
+					<fieldset disabled={pending} className="space-y-4">
+						<legend>General, scanner and web client</legend>
+						{toggles.map(([key, label]) => (
+							<Label
+								className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 [&>span]:col-start-2 [&>span]:leading-relaxed"
+								key={key}
+							>
+								<Checkbox
+									aria-label={t(labelKeys[label] ?? label)}
+									checked={settings[key]}
+									onCheckedChange={(checked) => void update({ [key]: checked })}
+								/>
+								{t(labelKeys[label] ?? label)}
+								{key === 'storeCoverWithItem' && (
+									<span className="block text-sm text-muted-foreground">
+										{help('LabelSettingsStoreCoversWithItemHelp')}
+									</span>
+								)}
+								{key === 'storeMetadataWithItem' && (
+									<span className="block text-sm text-muted-foreground">
+										{help('LabelSettingsStoreMetadataWithItemHelp')}
+									</span>
+								)}
+								{key === 'sortingIgnorePrefix' && (
+									<span className="block text-sm text-muted-foreground">
+										{help('LabelSettingsSortingIgnorePrefixesHelp')}
+									</span>
+								)}
+								{key === 'scannerParseSubtitle' && (
+									<span className="block text-sm text-muted-foreground">
+										{help('LabelSettingsParseSubtitlesHelp')}
+									</span>
+								)}
+								{key === 'scannerFindCovers' && (
+									<span className="block text-sm text-muted-foreground">
+										{help('LabelSettingsFindCoversHelp')}
+									</span>
+								)}
+								{key === 'scannerPreferMatchedMetadata' && (
+									<span className="block text-sm text-muted-foreground">
+										{help('LabelSettingsPreferMatchedMetadataHelp')}
+									</span>
+								)}
+							</Label>
+						))}
+						{settings.sortingIgnorePrefix && (
+							<form
+								className="space-y-2"
+								onSubmit={(event) => {
+									event.preventDefault()
+									const values = normalizePrefixes(prefixes)
+									if (!values.length) {
+										setErrorMessage('At least one sorting prefix required.')
+										return
+									}
+									if (prefixesChanged)
+										void update(
+											{ sortingPrefixes: values },
+											'/sorting-prefixes',
+										)
+								}}
+							>
+								<Label className="block">
+									Prefixes to ignore (one per line)
+									<Textarea
+										className="block w-full rounded border bg-background p-2"
+										value={prefixes}
+										onChange={(event) => setPrefixes(event.target.value)}
+									/>
+								</Label>
+								{prefixesChanged && <Button>Save prefixes</Button>}
+							</form>
+						)}
+						{settings.scannerFindCovers && (
+							<Label className="block" htmlFor="scannerCoverProvider">
+								Cover provider
+								<NativeSelect
+									id="scannerCoverProvider"
+									className="block rounded border bg-background p-2"
+									value={settings.scannerCoverProvider}
+									onChange={(event) =>
+										void update({ scannerCoverProvider: event.target.value })
+									}
+								>
+									{providers.map((provider) => (
+										<option key={provider.value} value={provider.value}>
+											{provider.text}
+										</option>
+									))}
+								</NativeSelect>
+							</Label>
+						)}
+						<Label className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 [&>span]:col-start-2 [&>span]:leading-relaxed">
+							<Checkbox
+								aria-label="Enable filesystem watcher"
+								checked={!settings.scannerDisableWatcher}
+								onCheckedChange={(checked) =>
+									void update({ scannerDisableWatcher: !checked })
 								}
 							/>
-							{t(labelKeys[label] ?? label)}
-							{key === 'storeCoverWithItem' && (
+							Enable filesystem watcher
+							<span className="block text-sm text-muted-foreground">
+								{help('LabelSettingsEnableWatcherHelp')}
+							</span>
+						</Label>
+						<h2 className="text-lg font-semibold">
+							{t('HeaderSettingsDisplay')}
+						</h2>
+						{(['homeBookshelfView', 'bookshelfView'] as const).map((key) => (
+							<Label
+								key={key}
+								className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 [&>span]:col-start-2 [&>span]:leading-relaxed"
+							>
+								<Checkbox
+									checked={settings[key] !== 1}
+									onCheckedChange={(checked) =>
+										void update({ [key]: checked ? 0 : 1 })
+									}
+								/>
+								{key === 'homeBookshelfView'
+									? 'Home page bookshelf view'
+									: 'Library bookshelf view'}
 								<span className="block text-sm text-muted-foreground">
-									{help('LabelSettingsStoreCoversWithItemHelp')}
+									{help('LabelSettingsBookshelfViewHelp')}
 								</span>
-							)}
-							{key === 'storeMetadataWithItem' && (
-								<span className="block text-sm text-muted-foreground">
-									{help('LabelSettingsStoreMetadataWithItemHelp')}
-								</span>
-							)}
-							{key === 'sortingIgnorePrefix' && (
-								<span className="block text-sm text-muted-foreground">
-									{help('LabelSettingsSortingIgnorePrefixesHelp')}
-								</span>
-							)}
-							{key === 'scannerParseSubtitle' && (
-								<span className="block text-sm text-muted-foreground">
-									{help('LabelSettingsParseSubtitlesHelp')}
-								</span>
-							)}
-							{key === 'scannerFindCovers' && (
-								<span className="block text-sm text-muted-foreground">
-									{help('LabelSettingsFindCoversHelp')}
-								</span>
-							)}
-							{key === 'scannerPreferMatchedMetadata' && (
-								<span className="block text-sm text-muted-foreground">
-									{help('LabelSettingsPreferMatchedMetadataHelp')}
-								</span>
-							)}
-						</label>
-					))}
-					{settings.sortingIgnorePrefix && (
+							</Label>
+						))}
+						<Label className="block" htmlFor="dateFormat">
+							Server date format
+							<NativeSelect
+								id="dateFormat"
+								className="block rounded border bg-background p-2"
+								value={settings.dateFormat}
+								onChange={(event) =>
+									void update({ dateFormat: event.target.value })
+								}
+							>
+								{[
+									'MM/dd/yyyy',
+									'dd/MM/yyyy',
+									'dd.MM.yyyy',
+									'yyyy-MM-dd',
+									'MMM do, yyyy',
+									'MMMM do, yyyy',
+									'dd MMM yyyy',
+									'dd MMMM yyyy',
+								].map((value) => (
+									<option key={value}>{value}</option>
+								))}
+							</NativeSelect>
+						</Label>
+						<p>
+							Example:{' '}
+							{
+								(
+									{
+										'MM/dd/yyyy': '01/23/2000',
+										'dd/MM/yyyy': '23/01/2000',
+										'dd.MM.yyyy': '23.01.2000',
+										'yyyy-MM-dd': '2000-01-23',
+										'MMM do, yyyy': 'Jan 23rd, 2000',
+										'MMMM do, yyyy': 'January 23rd, 2000',
+										'dd MMM yyyy': '23 Jan 2000',
+										'dd MMMM yyyy': '23 January 2000',
+									} as Record<string, string>
+								)[settings.dateFormat]
+							}
+						</p>
+						<Label className="block" htmlFor="timeFormat">
+							Server time format
+							<NativeSelect
+								id="timeFormat"
+								className="block rounded border bg-background p-2"
+								value={settings.timeFormat}
+								onChange={(event) =>
+									void update({ timeFormat: event.target.value })
+								}
+							>
+								<option value="h:mma">h:mma</option>
+								<option value="HH:mm">HH:mm</option>
+							</NativeSelect>
+						</Label>
+						<p>
+							Example: {settings.timeFormat === 'HH:mm' ? '13:45' : '1:45 PM'}.
+							Modern client displays ISO 8601 dates and 24-hour time. Server
+							preferences remain available for other clients.
+						</p>
+						<Label className="block" htmlFor="language">
+							Default server language
+							<NativeSelect
+								id="language"
+								className="block rounded border bg-background p-2"
+								value={settings.language}
+								onChange={(event) =>
+									void update({ language: event.target.value })
+								}
+							>
+								{languages.map(([code, label]) => (
+									<option key={code} value={code}>
+										{t(labelKeys[label] ?? label)}
+									</option>
+								))}
+							</NativeSelect>
+						</Label>
 						<form
 							className="space-y-2"
 							onSubmit={(event) => {
 								event.preventDefault()
-								const values = normalizePrefixes(prefixes)
-								if (!values.length) {
-									setErrorMessage('At least one sorting prefix required.')
-									return
+								try {
+									void update({ allowedOrigins: validateOrigins(origins) })
+								} catch {
+									setErrorMessage('Every allowed origin must be a valid URL.')
 								}
-								if (prefixesChanged)
-									void update({ sortingPrefixes: values }, '/sorting-prefixes')
 							}}
 						>
-							<label className="block">
-								Prefixes to ignore (one per line)
-								<textarea
+							<Label className="block">
+								CORS allowed origins (one URL per line)
+								<Textarea
 									className="block w-full rounded border bg-background p-2"
-									value={prefixes}
-									onChange={(event) => setPrefixes(event.target.value)}
+									value={origins}
+									onChange={(event) => setOrigins(event.target.value)}
 								/>
-							</label>
-							{prefixesChanged && <Button>Save prefixes</Button>}
+							</Label>
+							<Button>Save allowed origins</Button>
 						</form>
-					)}
-					{settings.scannerFindCovers && (
-						<label className="block" htmlFor="scannerCoverProvider">
-							Cover provider
-							<NativeSelect
-								id="scannerCoverProvider"
-								className="block rounded border bg-background p-2"
-								value={settings.scannerCoverProvider}
-								onChange={(event) =>
-									void update({ scannerCoverProvider: event.target.value })
-								}
-							>
-								{providers.map((provider) => (
-									<option key={provider.value} value={provider.value}>
-										{provider.text}
-									</option>
-								))}
-							</NativeSelect>
-						</label>
-					)}
-					<label className="flex items-center gap-3">
-						<input
-							aria-label="Enable filesystem watcher"
-							type="checkbox"
-							checked={!settings.scannerDisableWatcher}
-							onChange={(event) =>
-								void update({ scannerDisableWatcher: !event.target.checked })
-							}
-						/>
-						Enable filesystem watcher
-						<span className="block text-sm text-muted-foreground">
-							{help('LabelSettingsEnableWatcherHelp')}
-						</span>
-					</label>
-					<h2 className="text-lg font-semibold">
-						{t('HeaderSettingsDisplay')}
-					</h2>
-					{(['homeBookshelfView', 'bookshelfView'] as const).map((key) => (
-						<label key={key} className="flex items-center gap-3">
-							<input
-								type="checkbox"
-								checked={settings[key] !== 1}
-								onChange={(event) =>
-									void update({ [key]: event.target.checked ? 0 : 1 })
-								}
-							/>
-							{key === 'homeBookshelfView'
-								? 'Home page bookshelf view'
-								: 'Library bookshelf view'}
-							<span className="block text-sm text-muted-foreground">
-								{help('LabelSettingsBookshelfViewHelp')}
-							</span>
-						</label>
-					))}
-					<label className="block" htmlFor="dateFormat">
-						Server date format
-						<NativeSelect
-							id="dateFormat"
-							className="block rounded border bg-background p-2"
-							value={settings.dateFormat}
-							onChange={(event) =>
-								void update({ dateFormat: event.target.value })
-							}
-						>
-							{[
-								'MM/dd/yyyy',
-								'dd/MM/yyyy',
-								'dd.MM.yyyy',
-								'yyyy-MM-dd',
-								'MMM do, yyyy',
-								'MMMM do, yyyy',
-								'dd MMM yyyy',
-								'dd MMMM yyyy',
-							].map((value) => (
-								<option key={value}>{value}</option>
-							))}
-						</NativeSelect>
-					</label>
+						<div className="flex flex-wrap gap-2">
+							<Button variant="destructive" onClick={() => void purge(false)}>
+								Purge all cache
+							</Button>
+							<Button variant="outline" onClick={() => void purge(true)}>
+								Purge items cache
+							</Button>
+						</div>
+					</fieldset>
+				)}
+				{settings?.version && (
 					<p>
-						Example:{' '}
-						{
-							(
-								{
-									'MM/dd/yyyy': '01/23/2000',
-									'dd/MM/yyyy': '23/01/2000',
-									'dd.MM.yyyy': '23.01.2000',
-									'yyyy-MM-dd': '2000-01-23',
-									'MMM do, yyyy': 'Jan 23rd, 2000',
-									'MMMM do, yyyy': 'January 23rd, 2000',
-									'dd MMM yyyy': '23 Jan 2000',
-									'dd MMMM yyyy': '23 January 2000',
-								} as Record<string, string>
-							)[settings.dateFormat]
-						}
+						Server version: {settings.version}
+						{settings.buildNumber ? ` (build ${settings.buildNumber})` : ''}
 					</p>
-					<label className="block" htmlFor="timeFormat">
-						Server time format
-						<NativeSelect
-							id="timeFormat"
-							className="block rounded border bg-background p-2"
-							value={settings.timeFormat}
-							onChange={(event) =>
-								void update({ timeFormat: event.target.value })
-							}
-						>
-							<option value="h:mma">h:mma</option>
-							<option value="HH:mm">HH:mm</option>
-						</NativeSelect>
-					</label>
-					<p>
-						Example: {settings.timeFormat === 'HH:mm' ? '13:45' : '1:45 PM'}.
-						Modern client displays ISO 8601 dates and 24-hour time. Server
-						preferences remain available for other clients.
-					</p>
-					<label className="block" htmlFor="language">
-						Default server language
-						<NativeSelect
-							id="language"
-							className="block rounded border bg-background p-2"
-							value={settings.language}
-							onChange={(event) =>
-								void update({ language: event.target.value })
-							}
-						>
-							{languages.map(([code, label]) => (
-								<option key={code} value={code}>
-									{t(labelKeys[label] ?? label)}
-								</option>
-							))}
-						</NativeSelect>
-					</label>
-					<form
-						className="space-y-2"
-						onSubmit={(event) => {
-							event.preventDefault()
-							try {
-								void update({ allowedOrigins: validateOrigins(origins) })
-							} catch {
-								setErrorMessage('Every allowed origin must be a valid URL.')
-							}
-						}}
+				)}
+				<p className="flex gap-4">
+					<a
+						href="https://github.com/advplyr/audiobookshelf"
+						target="_blank"
+						rel="noreferrer"
 					>
-						<label className="block">
-							CORS allowed origins (one URL per line)
-							<textarea
-								className="block w-full rounded border bg-background p-2"
-								value={origins}
-								onChange={(event) => setOrigins(event.target.value)}
-							/>
-						</label>
-						<Button>Save allowed origins</Button>
-					</form>
-					<div className="flex flex-wrap gap-2">
-						<Button variant="destructive" onClick={() => void purge(false)}>
-							Purge all cache
-						</Button>
-						<Button variant="outline" onClick={() => void purge(true)}>
-							Purge items cache
-						</Button>
-					</div>
-				</fieldset>
-			)}
-			{settings?.version && (
-				<p>
-					Server version: {settings.version}
-					{settings.buildNumber ? ` (build ${settings.buildNumber})` : ''}
+						Report bugs and contribute
+					</a>
+					<a
+						href="https://discord.gg/HQgCbd6E75"
+						target="_blank"
+						rel="noreferrer"
+					>
+						Join Discord
+					</a>
 				</p>
-			)}
-			<p className="flex gap-4">
-				<a
-					href="https://github.com/advplyr/audiobookshelf"
-					target="_blank"
-					rel="noreferrer"
-				>
-					Report bugs and contribute
-				</a>
-				<a
-					href="https://discord.gg/HQgCbd6E75"
-					target="_blank"
-					rel="noreferrer"
-				>
-					Join Discord
-				</a>
-			</p>
-		</section>
+			</CardContent>
+		</Card>
 	)
 }
