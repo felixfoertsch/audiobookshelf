@@ -242,7 +242,7 @@ export function Layout({
 				Skip to content
 			</a>
 			<SidebarProvider>
-				<Sidebar className="z-30 [&_[data-slot=sidebar-inner]]:bg-sidebar/70 [&_[data-slot=sidebar-inner]]:backdrop-blur-md [&_[data-slot=sidebar-group-label]]:text-sidebar-foreground [&_[data-slot=sidebar-menu-button]]:rounded-lg [&_[data-active=true]]:bg-sidebar-accent [&_[data-active=true]_svg]:text-primary">
+				<Sidebar className="z-30 [&_[data-active=true]_svg]:text-sidebar-accent-foreground">
 					<SidebarHeader className="gap-4 px-4 pt-6 pb-2">
 						<Link to="/" className="px-2 text-lg font-semibold">
 							Audiobookshelf

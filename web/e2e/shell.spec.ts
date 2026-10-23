@@ -131,7 +131,7 @@ for (const prefix of ['', '/abs']) {
 				const colors = await page.getByRole('menu').evaluate((menu) => {
 					const root = getComputedStyle(document.documentElement)
 					const probe = document.createElement('div')
-					probe.style.backgroundColor = root.getPropertyValue('--popover')
+					probe.style.backgroundColor = root.getPropertyValue('--glass-tint')
 					document.body.append(probe)
 					const expected = getComputedStyle(probe).backgroundColor
 					probe.remove()
