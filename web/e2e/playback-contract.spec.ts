@@ -210,9 +210,58 @@ for (const prefix of ['', '/abs']) {
 			await expect.poll(time).toBeGreaterThan(4.3)
 			expect(await time()).toBeLessThan(10)
 			await audio.evaluate((node: HTMLAudioElement) => node.pause())
-			await page.screenshot({
-				path: `/private/tmp/opencode/player-segments/player-markers${prefix ? '-abs' : ''}.png`,
-			})
+			for (const theme of ['light', 'dark']) {
+				await page.evaluate(
+					(theme) =>
+						document.documentElement.classList.toggle('dark', theme === 'dark'),
+					theme,
+				)
+				const contrast = await page
+					.getByTestId('segment-marker')
+					.evaluate((marker) => {
+						const track = document.querySelector(
+							'[data-slot="slider-track"]',
+						) as HTMLElement
+						const luminance = (color: string) => {
+							const canvas = document.createElement('canvas')
+							canvas.width = canvas.height = 1
+							const context = canvas.getContext('2d')
+							if (!context)
+								throw new Error('Canvas unavailable for contrast measurement')
+							context.fillStyle = color
+							context.fillRect(0, 0, 1, 1)
+							const rgb = Array.from(context.getImageData(0, 0, 1, 1).data)
+								.slice(0, 3)
+								.map((channel) => {
+									const value = channel / 255
+									return value <= 0.04045
+										? value / 12.92
+										: ((value + 0.055) / 1.055) ** 2.4
+								})
+							return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
+						}
+						const markerColor = getComputedStyle(marker).backgroundColor
+						const trackColor = getComputedStyle(track).backgroundColor
+						const a = luminance(markerColor)
+						const b = luminance(trackColor)
+						return {
+							ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+							markerColor,
+							trackColor,
+							gap:
+								marker.getBoundingClientRect().top -
+								track.getBoundingClientRect().bottom,
+						}
+					})
+				expect(contrast.ratio).toBeGreaterThanOrEqual(3)
+				expect(contrast.gap).toBeGreaterThanOrEqual(0)
+				console.log(
+					`Segment contrast ${prefix || 'root'} ${theme}: ${JSON.stringify(contrast)}`,
+				)
+				await page.screenshot({
+					path: `/private/tmp/opencode/player-segments/player-markers${prefix ? '-abs' : ''}-${theme}.png`,
+				})
+			}
 			await page.reload()
 			await page
 				.getByRole('button', {

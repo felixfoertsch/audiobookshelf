@@ -36,8 +36,9 @@ test('cached page candidates never override fresh stale session', async ({
 		.toBeGreaterThan(0.1)
 	await openPlayerOptions(page)
 	await expect(
-		page.getByRole('checkbox', { name: 'Skip detected inserted audio' }),
-	).toBeDisabled()
+		page.getByRole('checkbox', { name: 'Auto-skip detected segments' }),
+	).toBeChecked()
+	await expect(page.getByTestId('segment-marker')).toHaveCount(0)
 	await audio.evaluate((node: HTMLAudioElement) => {
 		node.currentTime = 2.2
 		node.dispatchEvent(new Event('timeupdate'))

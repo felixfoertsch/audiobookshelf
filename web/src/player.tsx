@@ -1864,13 +1864,13 @@ function SegmentMarkers({
 	return (
 		<span
 			aria-hidden="true"
-			className="pointer-events-none absolute inset-x-0 flex h-1.5"
+			className="pointer-events-none absolute inset-x-0 top-1/2 flex h-1 translate-y-1.5"
 		>
 			{segments.map((s) => (
 				<span
 					key={`${s.start}-${s.end}`}
 					data-testid="segment-marker"
-					className="absolute h-full rounded-full bg-destructive ring-1 ring-background"
+					className="absolute h-full rounded-full bg-amber-700 dark:bg-amber-400"
 					style={{
 						left: `${(s.start / total) * 100}%`,
 						width: `${((s.end - s.start) / total) * 100}%`,
