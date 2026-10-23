@@ -708,7 +708,7 @@ export function HomePage({
 							shelf.label
 						)}
 					</h2>
-					<div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [&>article]:w-[140px] [&>article]:shrink-0 [&>article]:snap-start sm:[&>article]:w-[160px]">
+					<div className="flex w-screen -ml-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] snap-x snap-mandatory gap-4 overflow-x-auto pl-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] pr-[var(--shelf-gutter)] scroll-pl-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] scroll-pr-[var(--shelf-gutter)] pb-2 [&>article]:w-[140px] [&>article]:shrink-0 [&>article]:snap-start sm:[&>article]:w-[160px]">
 						{shelf.entities.map((entry) => (
 							<EntryCard
 								key={entry.id}

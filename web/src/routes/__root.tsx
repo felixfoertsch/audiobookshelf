@@ -242,7 +242,7 @@ export function Layout({
 				Skip to content
 			</a>
 			<SidebarProvider>
-				<Sidebar className="z-30 [&_[data-slot=sidebar-menu-button]]:rounded-lg [&_[data-active=true]]:bg-sidebar-accent [&_[data-active=true]_svg]:text-primary">
+				<Sidebar className="z-30 [&_[data-slot=sidebar-inner]]:bg-sidebar/80 [&_[data-slot=sidebar-inner]]:backdrop-blur-xl [&_[data-slot=sidebar-menu-button]]:rounded-lg [&_[data-active=true]]:bg-sidebar-accent [&_[data-active=true]_svg]:text-primary">
 					<SidebarHeader className="gap-4 px-4 pt-6 pb-2">
 						<Link to="/" className="px-2 text-lg font-semibold">
 							Audiobookshelf
@@ -415,7 +415,7 @@ export function Layout({
 					</header>
 					<div
 						id="content"
-						className="mx-auto w-full min-w-0 min-h-[60vh] max-w-6xl px-4 py-8 pb-80"
+						className="mx-auto w-full min-w-0 min-h-[60vh] max-w-6xl px-4 py-8 pb-80 [--shelf-sidebar:0px] md:[--shelf-sidebar:var(--sidebar-width)] [--shelf-gutter:max(1rem,calc((100vw-var(--shelf-sidebar)-72rem)/2+1rem))]"
 					>
 						{error && (
 							<p role="alert" className="text-destructive">
