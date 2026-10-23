@@ -551,7 +551,8 @@ export function EntryCard({
 								item.media.metadata.authors?.map((a) => a.name).join(', ')}
 					</p>
 					{episode ? (
-						recentDuration != null && (
+						recentDuration != null &&
+						recentDuration > 0 && (
 							<p className="truncate text-xs">{duration(recentDuration)}</p>
 						)
 					) : item.mediaType === 'podcast' ? (

@@ -41,12 +41,43 @@ describe('Podcast episode summary', () => {
     await podcastUtils.getCachedPodcastFeed('https://example.com/first')
     await podcastUtils.getCachedPodcastFeed('https://example.com/first')
     expect(fetch.callCount).to.equal(1)
-    clock.tick(60_001)
+    clock.tick(30 * 60_000 - 1)
+    await podcastUtils.getCachedPodcastFeed('https://example.com/first')
+    expect(fetch.callCount).to.equal(1)
+    clock.tick(2)
     await podcastUtils.getCachedPodcastFeed('https://example.com/first')
     expect(fetch.callCount).to.equal(2)
     for (let index = 0; index < 100; index++) await podcastUtils.getCachedPodcastFeed(`https://example.com/${index}`)
     await podcastUtils.getCachedPodcastFeed('https://example.com/first')
     expect(fetch.callCount).to.equal(103)
+  })
+
+  it('shares an in-flight fetch even beyond the failure cache window', async () => {
+    const clock = sinon.useFakeTimers()
+    let resolve
+    const fetch = sinon.stub(podcastUtils, 'getPodcastFeed').returns(new Promise((done) => { resolve = done }))
+    const first = podcastUtils.getCachedPodcastFeed('https://example.com/rss')
+    clock.tick(60_001)
+    const second = podcastUtils.getCachedPodcastFeed('https://example.com/rss')
+    expect(fetch.calledOnce).to.equal(true)
+    const feed = { episodes: [] }
+    resolve(feed)
+    expect(await first).to.equal(feed)
+    expect(await second).to.equal(feed)
+  })
+
+  for (const rejects of [false, true]) it(`caches ${rejects ? 'rejected' : 'null'} failures for one minute`, async () => {
+    const clock = sinon.useFakeTimers()
+    const fetch = sinon.stub(podcastUtils, 'getPodcastFeed')
+    if (rejects) fetch.rejects(new Error('Feed unavailable'))
+    else fetch.resolves(null)
+    expect(await podcastUtils.getCachedPodcastFeed('https://example.com/dead')).to.equal(null)
+    clock.tick(59_999)
+    expect(await podcastUtils.getCachedPodcastFeed('https://example.com/dead')).to.equal(null)
+    expect(fetch.calledOnce).to.equal(true)
+    clock.tick(2)
+    await podcastUtils.getCachedPodcastFeed('https://example.com/dead')
+    expect(fetch.callCount).to.equal(2)
   })
 
   it('keeps cached feed shared but completion counts user-specific', async () => {

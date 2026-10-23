@@ -51,6 +51,38 @@ for (const base of ['', '/abs']) {
 	}
 }
 
+test('podcast cards render downloaded fallback while summaries remain pending', async ({
+	page,
+}) => {
+	await page.goto('/new/')
+	await page.getByLabel('Username', { exact: true }).fill('admin')
+	await page.getByLabel('Password', { exact: true }).fill('password')
+	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+	await expect(
+		page.getByRole('heading', { name: 'Home', exact: true }),
+	).toBeVisible()
+	let release!: () => void
+	const pending = new Promise<void>((resolve) => {
+		release = resolve
+	})
+	await page.route('**/episode-summary', async (route) => {
+		await pending
+		await route.continue()
+	})
+	try {
+		await page.goto('/new/library/podcasts/bookshelf')
+		await expect(
+			page.getByText(/downloaded · checking feed/).first(),
+		).toBeVisible()
+		await expect(
+			page.getByRole('heading', { name: 'Field Notes', exact: true }),
+		).toBeVisible()
+	} finally {
+		release()
+	}
+	await expect(page.getByText('117 unplayed of 120').first()).toBeVisible()
+})
+
 for (const width of [1280, 390])
 	for (const theme of ['light', 'dark']) {
 		test(`podcast UX captures ${width} ${theme}`, async ({ page }) => {
@@ -84,6 +116,31 @@ for (const width of [1280, 390])
 					}),
 				).toBeVisible()
 				await settleAnimations(page)
+				if (name === 'home') {
+					await expect(page.getByText('00:00:00', { exact: true })).toHaveCount(
+						0,
+					)
+					await expect(
+						page.getByText('00:00:12', { exact: true }).first(),
+					).toBeVisible()
+				}
+				if (name === 'latest') {
+					const covers = page.getByRole('img', { name: / cover$/ })
+					await expect(covers.first()).toBeVisible()
+					await expect
+						.poll(() =>
+							covers.evaluateAll((images) =>
+								images
+									.filter(
+										(image) => image.getBoundingClientRect().top < innerHeight,
+									)
+									.every(
+										(image) => (image as HTMLImageElement).naturalWidth > 0,
+									),
+							),
+						)
+						.toBe(true)
+				}
 				await page.screenshot({
 					path: `/private/tmp/opencode/podcast-ux/${name}-${width}-${theme}.png`,
 					fullPage: name !== 'latest',

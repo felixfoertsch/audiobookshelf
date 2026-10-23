@@ -83,6 +83,23 @@ it('preserves recent audioFile duration through serializer schema and prioritize
 	expect(screen.getByText('00:02:03')).toBeTruthy()
 	expect(screen.queryByText('00:00:00')).toBeNull()
 })
+it.each([undefined, 0])(
+	'omits unknown or zero episode duration (%s)',
+	async (duration) => {
+		await show(
+			<EntryCard
+				library="lib"
+				entry={{
+					...podcast(1),
+					_type: 'episode',
+					recentEpisode: { id: 'ep', title: 'Unknown duration', duration },
+				}}
+			/>,
+		)
+		expect(screen.getByText('Unknown duration')).toBeTruthy()
+		expect(screen.queryByText('00:00:00')).toBeNull()
+	},
+)
 it('separates library context from page title and links episode shelf to latest', async () => {
 	await show(
 		<LibraryNameContext value="Podcasts">
