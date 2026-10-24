@@ -161,7 +161,7 @@ for (const prefix of ['']) {
 			expect(row?.body.currentTime).toBeGreaterThanOrEqual(0)
 		}
 		const logs = await page.request.get(
-			`${process.env.ABS_MOCK_CONTROL_URL || page.url().split('/').slice(0, 3).join('/')}/__fixture/observations`,
+			`${process.env.ABS_MOCK_CONTROL_URL || 'http://abs-mock:4179'}/__fixture/observations`,
 		)
 		const observations = await logs.json()
 		for (const action of ['sync', 'close'])
