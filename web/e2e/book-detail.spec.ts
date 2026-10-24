@@ -27,13 +27,27 @@ for (const prefix of ['', '/abs']) {
 				})
 			}, prefix)
 			await page.goto(`${prefix}/new/item/book-1`)
-			await expect(
-				page.getByRole('table', { name: 'Audio tracks' }),
-			).toHaveCount(1).catch(async (error) => {
-				console.log('Audio tracks diagnostic', JSON.stringify(await page.getByRole('table', { name: 'Audio tracks' }).evaluateAll(nodes => nodes.map(node => ({ html: node.outerHTML.slice(0, 1200), owner: node.closest('article,dialog,section')?.outerHTML.slice(0, 600) }))))))
-				console.log(await page.locator('body').ariaSnapshot())
-				throw error
-			})
+			await expect(page.getByRole('table', { name: 'Audio tracks' }))
+				.toHaveCount(1)
+				.catch(async (error) => {
+					console.log(
+						'Audio tracks diagnostic',
+						JSON.stringify(
+							await page
+								.getByRole('table', { name: 'Audio tracks' })
+								.evaluateAll((nodes) =>
+									nodes.map((node) => ({
+										html: node.outerHTML.slice(0, 1200),
+										owner: node
+											.closest('article,dialog,section')
+											?.outerHTML.slice(0, 600),
+									})),
+								),
+						),
+					)
+					console.log(await page.locator('body').ariaSnapshot())
+					throw error
+				})
 			await expect(
 				page.getByRole('table', { name: 'Audio tracks' }),
 			).toBeVisible()
