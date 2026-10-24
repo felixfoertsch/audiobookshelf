@@ -68,7 +68,10 @@ for (const prefix of ['', '/abs']) {
 		const headers = page.getByRole('heading', { name: 'Continue Listening' })
 		await page.goto(`${prefix}/new/library/books`)
 		await expect(headers).toBeVisible()
-		const shelf = headers.locator('xpath=..')
+		const shelf = page.getByRole('region', {
+			name: 'Continue Listening',
+			exact: true,
+		})
 		await expect(
 			shelf.getByRole('link', { name: 'The Glass Orchard' }),
 		).toBeVisible()
@@ -115,9 +118,10 @@ for (const prefix of ['', '/abs']) {
 			})
 		}, prefix)
 		await page.goto(`${prefix}/new/library/books`)
-		const seriesShelf = page
-			.getByRole('heading', { name: 'Continue Series', exact: true })
-			.locator('xpath=..')
+		const seriesShelf = page.getByRole('region', {
+			name: 'Continue Series',
+			exact: true,
+		})
 		await expect(
 			seriesShelf.getByRole('link', {
 				name: 'Atlas of Small Stars',

@@ -91,6 +91,7 @@ const itemSchema = z
 					.object({
 						episodes: z.array(z.unknown()).optional(),
 						feedUrl: z.string().nullish(),
+						itunesId: z.union([z.string(), z.number()]).nullish(),
 						title: z.string().nullish(),
 					})
 					.optional(),
@@ -278,8 +279,12 @@ export function PodcastSearch({ libraryId }: { libraryId: string }) {
 	const [opmlLibrary, setOpmlLibrary] = useState<z.infer<
 		typeof librarySchema
 	> | null>(null)
+	const [libraryPodcasts, setLibraryPodcasts] = useState<
+		{ feedUrl: string | null; itunesId: string | null; id: string }[]
+	>([])
 	useEffect(() => {
 		setOpmlLibrary(null)
+		setLibraryPodcasts([])
 		if (!admin) return
 		let active = true
 		const generation = getAuthGeneration()
@@ -298,6 +303,44 @@ export function PodcastSearch({ libraryId }: { libraryId: string }) {
 					library.mediaType === 'podcast'
 				) {
 					setOpmlLibrary(library)
+					void api(
+						`/api/libraries/${encodeURIComponent(libraryId)}/items?limit=0&minified=1`,
+						z.object({
+							results: z.array(
+								z.object({
+									id: z.string(),
+									media: z.object({
+										metadata: z.object({
+											feedUrl: z.string().nullish(),
+											itunesId: z.union([z.string(), z.number()]).nullish(),
+										}),
+									}),
+								}),
+							),
+						}),
+						{ signal: controller.signal },
+					)
+						.then(({ results }) => {
+							if (active && generation === getAuthGeneration())
+								setLibraryPodcasts(
+									results.map((item) => ({
+										id: item.id,
+										feedUrl: item.media.metadata.feedUrl || null,
+										itunesId:
+											item.media.metadata.itunesId == null
+												? null
+												: String(item.media.metadata.itunesId),
+									})),
+								)
+						})
+						.catch((e) => {
+							if (active && !controller.signal.aborted)
+								setError(
+									e instanceof Error
+										? e.message
+										: 'Could not load library podcasts',
+								)
+						})
 					setFolders(library.folders)
 					setFolderId(library.folders[0]?.id || '')
 				}
@@ -449,12 +492,27 @@ export function PodcastSearch({ libraryId }: { libraryId: string }) {
 								{p.artistName} · {p.trackCount ?? '—'} episodes
 							</p>
 						</div>
-						<Button
-							disabled={!admin || busy || !p.feedUrl}
-							onClick={() => void choose(p)}
-						>
-							Subscribe
-						</Button>
+						{(() => {
+							const existing =
+								libraryPodcasts.find((item) => item.feedUrl === p.feedUrl) ||
+								libraryPodcasts.find((item) => item.itunesId === String(p.id))
+							return existing ? (
+								<Link
+									to="/items/$itemId"
+									params={{ itemId: existing.id }}
+									className="text-sm underline"
+								>
+									In library
+								</Link>
+							) : (
+								<Button
+									disabled={!admin || busy || !p.feedUrl}
+									onClick={() => void choose(p)}
+								>
+									Subscribe
+								</Button>
+							)
+						})()}
 					</li>
 				))}
 			</ul>

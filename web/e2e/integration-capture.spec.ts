@@ -94,8 +94,7 @@ for (const width of [1280, 390]) {
 			).toBeVisible()
 			await expect(
 				page
-					.getByRole('heading', { name: 'Continue Listening' })
-					.locator('xpath=..')
+					.getByRole('region', { name: 'Continue Listening', exact: true })
 					.getByRole('link', { name: 'The Glass Orchard' }),
 			).toBeVisible()
 			await settleAnimations(page)

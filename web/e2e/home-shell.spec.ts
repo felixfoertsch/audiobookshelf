@@ -117,6 +117,21 @@ for (const width of [1280, 390]) {
 			await expect
 				.poll(() => page.evaluate(() => window.scrollY))
 				.toBeGreaterThan(before)
+			if (width === 1280) {
+				await expect
+					.poll(() =>
+						page
+							.locator('[data-slot="sidebar-container"]')
+							.evaluate((node) => node.getBoundingClientRect().top),
+					)
+					.toBe(0)
+			}
+			await expect(
+				page.getByRole('button', {
+					name: 'Next Continue Listening',
+					exact: true,
+				}),
+			).toHaveCount(0)
 			await page.screenshot({
 				path: `/private/tmp/opencode/home-shell/home-${width}-${theme}.png`,
 				fullPage: true,

@@ -851,53 +851,58 @@ export function HomePage({
 				: data
 			).map((shelf) => (
 				<section key={shelf.id} className="space-y-3">
-					<h2 className="text-xl font-semibold">
-						{shelf.id === 'newest-episodes' ? (
-							<Link
-								className="inline-flex items-center gap-1"
-								to="/library/$library/podcast/latest"
-								params={{ library }}
-							>
-								{shelf.label}
-								<ChevronRight
-									aria-hidden="true"
-									className="size-4 text-muted-foreground"
-								/>
-							</Link>
-						) : shelf.id === 'recently-added' ? (
-							<Link
-								className="inline-flex items-center gap-1"
-								to="/library/$library/bookshelf"
-								params={{ library }}
-								search={{ sort: 'addedAt', desc: '1' }}
-							>
-								{shelf.label}
-								<ChevronRight
-									aria-hidden="true"
-									className="size-4 text-muted-foreground"
-								/>
-							</Link>
-						) : ['recent-series', 'newest-authors'].includes(shelf.id) ? (
-							<Link
-								className="inline-flex items-center gap-1"
-								to="/library/$library/bookshelf/$id"
-								params={{
-									library,
-									id: shelf.id === 'recent-series' ? 'series' : 'authors',
-								}}
-								search={{ sort: 'addedAt', desc: '1' }}
-							>
-								{shelf.label}
-								<ChevronRight
-									aria-hidden="true"
-									className="size-4 text-muted-foreground"
-								/>
-							</Link>
-						) : (
-							shelf.label
-						)}
-					</h2>
-					<ShelfCarousel label={shelf.label} hero={shelf.id === 'continue-listening'}>article]:w-[140px] [&>article]:shrink-0 [&>article]:snap-start sm:[&>article]:w-[160px]">
+					<ShelfCarousel
+						label={shelf.label}
+						hero={shelf.id === 'continue-listening'}
+						heading={
+							<h2 className="text-xl font-semibold">
+								{shelf.id === 'newest-episodes' ? (
+									<Link
+										className="inline-flex items-center gap-1"
+										to="/library/$library/podcast/latest"
+										params={{ library }}
+									>
+										{shelf.label}
+										<ChevronRight
+											aria-hidden="true"
+											className="size-4 text-muted-foreground"
+										/>
+									</Link>
+								) : shelf.id === 'recently-added' ? (
+									<Link
+										className="inline-flex items-center gap-1"
+										to="/library/$library/bookshelf"
+										params={{ library }}
+										search={{ sort: 'addedAt', desc: '1' }}
+									>
+										{shelf.label}
+										<ChevronRight
+											aria-hidden="true"
+											className="size-4 text-muted-foreground"
+										/>
+									</Link>
+								) : ['recent-series', 'newest-authors'].includes(shelf.id) ? (
+									<Link
+										className="inline-flex items-center gap-1"
+										to="/library/$library/bookshelf/$id"
+										params={{
+											library,
+											id: shelf.id === 'recent-series' ? 'series' : 'authors',
+										}}
+										search={{ sort: 'addedAt', desc: '1' }}
+									>
+										{shelf.label}
+										<ChevronRight
+											aria-hidden="true"
+											className="size-4 text-muted-foreground"
+										/>
+									</Link>
+								) : (
+									shelf.label
+								)}
+							</h2>
+						}
+					>
 						{(shelf.id === 'newest-episodes' && feedEpisodes.length
 							? feedEpisodes.map((episode) => ({
 									id: episode.libraryItemId,
@@ -917,24 +922,29 @@ export function HomePage({
 													? 'playlists'
 													: shelf.type,
 								}))
-						).map((entry) => (shelf.id === 'continue-listening' && entry.mediaType === 'podcast' ? <ContinueCard key={entryIdentity(entry)} entry={entry} /> :
-							<EntryCard
-								key={
-									'recentEpisode' in entry
-										? `${entry.id}:${entry.recentEpisode?.id}`
-										: entry.id
-								}
-								shelfId={shelf.id}
-								headingLevel={3}
-								library={library}
-								entry={entry as Entry}
-								downloads={
-									shelf.id === 'newest-episodes' ? downloads : undefined
-								}
-							/>
-						))}
+						).map((entry) =>
+							shelf.id === 'continue-listening' &&
+							'mediaType' in entry &&
+							entry.mediaType === 'podcast' ? (
+								<ContinueCard key={entryIdentity(entry)} entry={entry} />
+							) : (
+								<EntryCard
+									key={
+										'recentEpisode' in entry
+											? `${entry.id}:${entry.recentEpisode?.id}`
+											: entry.id
+									}
+									shelfId={shelf.id}
+									headingLevel={3}
+									library={library}
+									entry={entry as Entry}
+									downloads={
+										shelf.id === 'newest-episodes' ? downloads : undefined
+									}
+								/>
+							),
+						)}
 					</ShelfCarousel>
-
 				</section>
 			))}
 		</section>

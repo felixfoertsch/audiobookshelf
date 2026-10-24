@@ -56,6 +56,7 @@ export function OpmlImport({ library }: { library: Library }) {
 	const [busy, setBusy] = useState(false)
 	const [error, setError] = useState('')
 	const [message, setMessage] = useState('')
+	const [fileName, setFileName] = useState('')
 	const defaultFolder = library.folders[0]?.id || ''
 	const current = useRef({ id: library.id, userId: user?.id, allowed })
 	current.current = { id: library.id, userId: user?.id, allowed }
@@ -68,6 +69,7 @@ export function OpmlImport({ library }: { library: Library }) {
 		setBusy(false)
 		setError('')
 		setMessage('')
+		setFileName('')
 		setFolderId(defaultFolder)
 		setAutoDownloadEpisodes(false)
 		return () => {
@@ -203,19 +205,36 @@ export function OpmlImport({ library }: { library: Library }) {
 	if (!allowed) return null
 	return (
 		<section aria-label="OPML import" className="space-y-2">
-			<label className="block">
-				Import OPML{' '}
-				<input
-					ref={upload}
-					type="file"
-					accept=".opml,.txt"
+			<div className="flex items-center gap-2">
+				<Button
+					type="button"
+					variant="outline"
 					disabled={busy || !library.folders.length}
-					onChange={(event) => {
-						const file = event.target.files?.[0]
-						if (file) void parse(file)
-					}}
-				/>
-			</label>
+					onClick={() => upload.current?.click()}
+				>
+					Choose OPML file
+				</Button>
+				<span aria-live="polite" className="text-sm text-muted-foreground">
+					{fileName || 'No file chosen'}
+				</span>
+				<label className="sr-only">
+					Import OPML
+					<input
+						ref={upload}
+						type="file"
+						accept=".opml,.txt"
+						disabled={busy || !library.folders.length}
+						className="sr-only"
+						onChange={(event) => {
+							const file = event.target.files?.[0]
+							if (file) {
+								setFileName(file.name)
+								void parse(file)
+							}
+						}}
+					/>
+				</label>
+			</div>
 			{busy && <p role="status">Processing OPML…</p>}
 			{error && <p role="alert">{error}</p>}
 			{message && <p role="status">{message}</p>}

@@ -33,3 +33,35 @@ it('disables ends and scrolls one page with snap enabled', () => {
 			.disabled,
 	).toBe(true)
 })
+
+it('hides controls without overflow, rechecks changed content and resize', () => {
+	const { rerender } = render(
+		<ShelfCarousel label="Shows" hero={false}>
+			<article>One</article>
+		</ShelfCarousel>,
+	)
+	const region = screen.getByRole('region', { name: 'Shows' })
+	Object.defineProperties(region, {
+		clientWidth: { value: 500, configurable: true },
+		scrollWidth: { value: 500, configurable: true },
+	})
+	fireEvent.scroll(region)
+	expect(screen.queryByRole('button', { name: 'Next Shows' })).toBeNull()
+	Object.defineProperty(region, 'scrollWidth', {
+		value: 1000,
+		configurable: true,
+	})
+	rerender(
+		<ShelfCarousel label="Shows" hero={false}>
+			<article>One</article>
+			<article>Two</article>
+		</ShelfCarousel>,
+	)
+	expect(screen.getByRole('button', { name: 'Next Shows' })).toBeTruthy()
+	Object.defineProperty(region, 'clientWidth', {
+		value: 1000,
+		configurable: true,
+	})
+	fireEvent(window, new Event('resize'))
+	expect(screen.queryByRole('button', { name: 'Next Shows' })).toBeNull()
+})

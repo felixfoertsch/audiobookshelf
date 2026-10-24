@@ -54,6 +54,17 @@ beforeEach(() => {
 	)
 })
 afterEach(cleanup)
+it('opens hidden file picker from button and displays chosen filename', () => {
+	render(<OpmlImport library={library} />)
+	const input = screen.getByLabelText('Import OPML') as HTMLInputElement
+	expect(input.className).toContain('sr-only')
+	const click = vi.spyOn(input, 'click')
+	fireEvent.click(screen.getByRole('button', { name: 'Choose OPML file' }))
+	expect(click).toHaveBeenCalledOnce()
+	const file = new File([xml], 'feeds.opml')
+	fireEvent.change(input, { target: { files: [file] } })
+	expect(screen.getByText('feeds.opml')).toBeTruthy()
+})
 it('parses on server, reviews native controls, starts background import with exact payload', async () => {
 	render(<OpmlImport library={library} />)
 	upload()
