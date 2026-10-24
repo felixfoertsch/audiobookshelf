@@ -18,30 +18,14 @@ afterEach(() => {
 	history.replaceState(null, '', '/')
 })
 describe('native login forms', () => {
-	it('shows setup directory paths and validates password confirmation before mutation', async () => {
-		useAuth.setState({
-			serverStatus: {
-				isInit: false,
-				ConfigPath: '/config',
-				MetadataPath: '/metadata',
-			},
-		})
+	it('refuses uninitialized upstream without setup controls or mutations', () => {
+		useAuth.setState({ serverStatus: { isInit: false } })
 		const fetcher = vi.spyOn(globalThis, 'fetch')
 		render(<Login />)
-		expect(screen.getByLabelText('Config Path')).toHaveValue('/config')
-		fireEvent.change(screen.getByLabelText('Username'), {
-			target: { value: 'root' },
-		})
-		fireEvent.change(screen.getByLabelText('Password'), {
-			target: { value: 'one' },
-		})
-		fireEvent.change(screen.getByLabelText('Confirm Password'), {
-			target: { value: 'two' },
-		})
-		fireEvent.click(screen.getByRole('button', { name: 'Initialize server' }))
-		expect(await screen.findByRole('alert')).toHaveTextContent(
-			'Passwords do not match',
+		expect(screen.getByRole('alert')).toHaveTextContent(
+			'Upstream server must be initialized separately.',
 		)
+		expect(screen.queryByLabelText('Username')).toBeNull()
 		expect(fetcher).not.toHaveBeenCalled()
 	})
 	it('renders server failure and retry instead of misleading sign-in controls', () => {

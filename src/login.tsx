@@ -1,6 +1,5 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
-import { z } from 'zod'
-import { api, initializeAuth, login, startOidcLogin, useAuth } from './api'
+import { initializeAuth, login, startOidcLogin, useAuth } from './api'
 import { loginDestination } from './features/auth/navigation'
 import { useT } from './features/i18n'
 import { Button } from './shared/components/ui/button'
@@ -11,11 +10,8 @@ export function Login() {
 		() => new URLSearchParams(location.search).get('error') || '',
 	)
 	const [pending, setPending] = useState(false)
-	const [username, setUsername] = useState(() =>
-		useAuth.getState().serverStatus?.isInit === false ? 'root' : '',
-	)
+	const [username, setUsername] = useState('')
 	const [password, setPassword] = useState('')
-	const [confirm, setConfirm] = useState('')
 	const status = useAuth((state) => state.serverStatus)
 	const methods = useAuth((state) => state.authMethods)
 	const startupError = useAuth((state) => state.startupError)
@@ -60,35 +56,21 @@ export function Login() {
 			setError('Username required')
 			return
 		}
-		if (setup && password !== confirm) {
-			setError('Passwords do not match')
-			return
-		}
-		if (
-			setup &&
-			!password &&
-			!window.confirm('Create root user with no password?')
-		)
-			return
 		setPending(true)
 		try {
-			if (setup) {
-				await api('/init', z.unknown(), {
-					method: 'POST',
-					body: JSON.stringify({
-						newRoot: { username: username.trim(), password },
-					}),
-				})
-				location.reload()
-			} else {
-				await login(username.trim(), password)
-			}
+			await login(username.trim(), password)
 		} catch (cause) {
 			setError(cause instanceof Error ? cause.message : 'Sign in failed')
 		} finally {
 			setPending(false)
 		}
 	}
+	if (setup)
+		return (
+			<main className="mx-auto max-w-md p-6 pt-16">
+				<p role="alert">Upstream server must be initialized separately.</p>
+			</main>
+		)
 	if (startupError)
 		return (
 			<main className="mx-auto max-w-md p-6 pt-16">
@@ -116,11 +98,7 @@ export function Login() {
 	return (
 		<main className="mx-auto max-w-md p-6 pt-16">
 			<h1 className="text-3xl font-semibold">Audiobookshelf</h1>
-			<h2 className="my-4 text-xl">
-				{setup
-					? 'Initial Server Setup · Create Root User'
-					: t('HeaderLogin', [], 'Sign in')}
-			</h2>
+			<h2 className="my-4 text-xl">{t('HeaderLogin', [], 'Sign in')}</h2>
 			{status?.authFormData?.authLoginCustomMessage && (
 				// ServerSettings.authFormData sanitizes tags, attributes and URL schemes.
 				<div
@@ -139,7 +117,7 @@ export function Login() {
 							className="h-11 rounded-md border bg-background px-3"
 							autoComplete="username"
 							value={username}
-							placeholder={setup ? 'root' : ''}
+							placeholder=""
 							disabled={pending}
 							onChange={(e) => setUsername(e.target.value)}
 						/>
@@ -149,52 +127,14 @@ export function Login() {
 						<input
 							className="h-11 rounded-md border bg-background px-3"
 							type="password"
-							autoComplete={setup ? 'new-password' : 'current-password'}
+							autoComplete="current-password"
 							value={password}
 							disabled={pending}
 							onChange={(e) => setPassword(e.target.value)}
 						/>
 					</label>
-					{setup && (
-						<>
-							<label className="flex flex-col gap-2">
-								Confirm Password
-								<input
-									className="h-11 rounded-md border bg-background px-3"
-									type="password"
-									autoComplete="new-password"
-									value={confirm}
-									disabled={pending}
-									onChange={(e) => setConfirm(e.target.value)}
-								/>
-							</label>
-							<h3>Directory Paths</h3>
-							<label className="block">
-								Config Path
-								<input
-									className="block w-full bg-muted p-2"
-									disabled
-									value={status.ConfigPath ?? ''}
-								/>
-							</label>
-							<label className="block">
-								Metadata Path
-								<input
-									className="block w-full bg-muted p-2"
-									disabled
-									value={status.MetadataPath ?? ''}
-								/>
-							</label>
-						</>
-					)}
 					<Button type="submit" disabled={pending}>
-						{pending
-							? setup
-								? 'Initializing…'
-								: 'Signing in…'
-							: setup
-								? 'Initialize server'
-								: 'Sign in'}
+						{pending ? 'Signing in…' : 'Sign in'}
 					</Button>
 				</form>
 			)}
