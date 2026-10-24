@@ -804,13 +804,13 @@ export function ItemView({ id }: { id: string }) {
 			</section>
 			{item.mediaType === 'book' && (
 				<BookFiles
-					key={`${user?.id}:${id}`}
+					key={`files:${user?.id}:${id}`}
 					item={item}
 					onChanged={() => void action(async () => {})}
 				/>
 			)}
 			<ItemActions
-				key={`${user?.id}:${id}`}
+				key={`actions:${user?.id}:${id}`}
 				item={item}
 				onChanged={() => void action(async () => {})}
 			/>
