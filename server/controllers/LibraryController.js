@@ -19,6 +19,7 @@ const Scanner = require('../scanner/Scanner')
 const Database = require('../Database')
 const Watcher = require('../Watcher')
 const RssFeedManager = require('../managers/RssFeedManager')
+const podcastUtils = require('../utils/podcastUtils')
 
 const libraryFilters = require('../utils/queries/libraryFilters')
 const libraryItemsPodcastFilters = require('../utils/queries/libraryItemsPodcastFilters')
@@ -1285,14 +1286,97 @@ class LibraryController {
       return res.sendStatus(404)
     }
 
+    const includeFeed = req.query.includeFeed === '1'
+    const requestedLimit = includeFeed ? (req.query.limit === undefined ? 50 : Number(req.query.limit)) : req.query.limit || 0
+    const requestedPage = includeFeed ? (req.query.page === undefined ? 0 : Number(req.query.page)) : req.query.page || 0
+    if (includeFeed && ((req.query.limit !== undefined && (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 200)) || (req.query.page !== undefined && (!Number.isSafeInteger(requestedPage) || requestedPage < 0 || requestedPage > Math.floor(Number.MAX_SAFE_INTEGER / requestedLimit))))) {
+      return res.status(400).send('Invalid limit or page')
+    }
     const payload = {
       episodes: [],
-      limit: req.query.limit || 0,
-      page: req.query.page || 0
+      limit: includeFeed ? (req.query.limit === undefined ? 50 : requestedLimit) : requestedLimit,
+      page: includeFeed ? (req.query.page === undefined ? 0 : requestedPage) : requestedPage
     }
 
     const offset = payload.page * payload.limit
-    payload.episodes = await libraryItemsPodcastFilters.getRecentEpisodes(req.user, req.library, payload.limit, offset)
+    if (!includeFeed) payload.episodes = await libraryItemsPodcastFilters.getRecentEpisodes(req.user, req.library, payload.limit, offset)
+    if (includeFeed) {
+      const podcasts = await libraryItemsPodcastFilters.getAccessiblePodcasts(req.user, req.library, 101)
+      const truncated = podcasts.length > 100
+      const feedSources = podcasts.slice(0, 100).map((podcast) => ({
+        libraryItemId: podcast.libraryItem.id,
+        item: { id: podcast.libraryItem.id, libraryId: podcast.libraryItem.libraryId, media: { tags: podcast.tags, explicit: podcast.explicit } },
+        feedURL: podcast.feedURL,
+        podcast: podcast.toOldJSONMinified()
+      }))
+      const permittedItems = feedSources.filter(({ item }) => req.user.checkCanAccessLibraryItem(item))
+      const downloadedEpisodes = await libraryItemsPodcastFilters.getDownloadedEpisodes(req.user, req.library, permittedItems.map(({ item }) => item.id))
+      const downloadedByGuid = new Map()
+      const downloadedByUrl = new Map()
+      for (const episode of downloadedEpisodes) {
+        if (episode.guid) downloadedByGuid.set(`${episode.libraryItemId}:${episode.guid}`, episode)
+        if (episode.enclosure?.url) downloadedByUrl.set(`${episode.libraryItemId}:${episode.enclosure.url}`, episode)
+      }
+      const feeds = permittedItems
+      const feedEpisodes = []
+      let feedUnavailable = false
+      for (let index = 0; index < feeds.length; index += 4) {
+        const results = await Promise.all(feeds.slice(index, index + 4).map(async ({ libraryItemId, podcast, feedURL }) => {
+          if (!feedURL) return { libraryItemId, podcast, episodes: null }
+          try {
+            const feed = await podcastUtils.getCachedPodcastFeed(feedURL)
+            return { libraryItemId, podcast, episodes: feed?.episodes || null }
+          } catch {
+            return { libraryItemId, podcast, episodes: null }
+          }
+        }))
+        for (const result of results) {
+          if (!result.episodes) { feedUnavailable = true; continue }
+          const seenGuids = new Set()
+          const seenUrls = new Set()
+          for (const feedEpisode of result.episodes) {
+            const guid = feedEpisode.guid
+            const enclosureURL = feedEpisode.enclosure?.url
+            const guidKey = guid && `${result.libraryItemId}:${guid}`
+            const urlKey = enclosureURL && `${result.libraryItemId}:${enclosureURL}`
+            const matchedDownloaded = (guidKey && downloadedByGuid.get(guidKey)) || (urlKey && downloadedByUrl.get(urlKey))
+            if (matchedDownloaded) continue
+            if (!enclosureURL || !feedEpisode.title) continue
+            if ((guidKey && seenGuids.has(guidKey)) || (urlKey && seenUrls.has(urlKey))) continue
+            if (guidKey) seenGuids.add(guidKey)
+            if (urlKey) seenUrls.add(urlKey)
+            feedEpisodes.push({
+              id: `feed:${result.libraryItemId}:${guid || enclosureURL || feedEpisode.publishedAt}`,
+              podcastId: result.podcast.id,
+              title: feedEpisode.title,
+              enclosure: feedEpisode.enclosure || null,
+              enclosureURL,
+              guid: guid || null,
+              publishedAt: feedEpisode.publishedAt,
+              duration: feedEpisode.durationSeconds || 0,
+              libraryItemId: result.libraryItemId,
+              downloaded: false,
+              podcast: result.podcast
+            })
+          }
+        }
+      }
+      const mergedEpisodes = []
+      const seenGuids = new Set()
+      const seenUrls = new Set()
+      for (const episode of [...downloadedEpisodes, ...feedEpisodes]) {
+        const guid = episode.guid && `${episode.libraryItemId}:${episode.guid}`
+        const url = episode.enclosure?.url && `${episode.libraryItemId}:${episode.enclosure.url}`
+        if ((guid && seenGuids.has(guid)) || (url && seenUrls.has(url))) continue
+        if (guid) seenGuids.add(guid)
+        if (url) seenUrls.add(url)
+        mergedEpisodes.push(episode)
+      }
+      const merged = mergedEpisodes.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
+      payload.episodes = merged.slice(offset, offset + Number(payload.limit))
+      payload.feedUnavailable = feedUnavailable
+      payload.feedTruncated = truncated
+    }
     res.json(payload)
   }
 

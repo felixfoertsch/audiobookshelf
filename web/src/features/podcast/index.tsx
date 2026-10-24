@@ -18,6 +18,8 @@ import { episodeProgress, refreshProgress } from '../item/progress'
 import { updateProgress } from '../item/service'
 import { AdAnalysisStatus } from './AdAnalysisStatus'
 import { EpisodeDescription, EpisodeRow } from './EpisodeRow'
+import { FeedDownloadAction } from './FeedDownloadAction'
+import { feedFields, useEpisodeDownloads } from './feed-episodes'
 import { OpmlImport } from './opml'
 
 export const searchSchema = z.array(
@@ -111,6 +113,7 @@ const feedEpisodeSchema = z
 const feedEpisodesSchema = z.object({ episodes: z.array(feedEpisodeSchema) })
 const episodeSchema = z
 	.object({
+		...feedFields,
 		id: z.string(),
 		title: z.string().nullish(),
 		subtitle: z.string().nullish(),
@@ -129,6 +132,8 @@ const episodeSchema = z
 	})
 	.passthrough()
 const latestSchema = z.object({
+	feedUnavailable: z.boolean().optional(),
+	feedTruncated: z.boolean().optional(),
 	episodes: z.array(episodeSchema),
 	limit: z.union([z.string(), z.number()]).optional(),
 	page: z.union([z.string(), z.number()]).optional(),
@@ -545,14 +550,27 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 	>([])
 	const [error, setError] = useState('')
 	const [busy, setBusy] = useState(true)
+	const [feedWarning, setFeedWarning] = useState('')
+	const [revision, setRevision] = useState(0)
+	const refreshEpisodes = useCallback(() => setRevision((n) => n + 1), [])
+	const downloads = useEpisodeDownloads(libraryId, refreshEpisodes)
 	useEffect(() => {
 		let active = true
 		void api(
-			`/api/libraries/${encodeURIComponent(libraryId)}/recent-episodes?limit=50&page=0`,
+			`/api/libraries/${encodeURIComponent(libraryId)}/recent-episodes?limit=50&page=0&includeFeed=1&revision=${revision}`,
 			latestSchema,
 		)
 			.then((x) => {
-				if (active) setEpisodes(x.episodes)
+				if (active) {
+					setEpisodes(x.episodes)
+					setFeedWarning(
+						x.feedUnavailable
+							? 'Some feeds unavailable. Showing downloaded episodes for those podcasts.'
+							: x.feedTruncated
+								? 'Feed episodes limited to 100 podcasts.'
+								: '',
+					)
+				}
 			})
 			.catch((e) => {
 				if (active)
@@ -564,14 +582,17 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 		return () => {
 			active = false
 		}
-	}, [libraryId])
+	}, [libraryId, revision])
 	return (
 		<section className="space-y-4">
 			<h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
 				Latest episodes
 			</h1>
 			{busy && <p role="status">Loading episodes…</p>}
-			{error && <p role="alert">{error}</p>}
+			{feedWarning && <p role="status">{feedWarning}</p>}
+			{(error || downloads.error) && (
+				<p role="alert">{error || downloads.error}</p>
+			)}
 			{!!(warning || user?.progressWarning) && (
 				<p role="status">{warning || String(user?.progressWarning)}</p>
 			)}
@@ -630,8 +651,13 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 								<Button
 									className="min-h-11 min-w-11 rounded-full"
 									aria-label={`Play ${title}`}
+									disabled={e.downloaded === false}
 									title={
-										remaining == null ? 'Play' : `${remaining} min remaining`
+										e.downloaded === false
+											? 'Not downloaded'
+											: remaining == null
+												? 'Play'
+												: `${remaining} min remaining`
 									}
 									onClick={() =>
 										void playEpisode(e.libraryItemId, e.id).catch((error) =>
@@ -644,13 +670,18 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 									}
 								>
 									<Play aria-hidden="true" className="size-4" />
-									{remaining == null ? 'Play' : `${remaining} min`}
+									{e.downloaded === false
+										? 'Not downloaded'
+										: remaining == null
+											? 'Play'
+											: `${remaining} min`}
 								</Button>
 								<Button
 									variant="outline"
 									className="min-h-11"
 									aria-pressed={!!progress?.isFinished}
 									disabled={
+										e.downloaded === false ||
 										progressBusy ||
 										progressUnavailable ||
 										!!warning ||
@@ -723,6 +754,7 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 											? `Remove ${title} from player queue`
 											: `Add ${title} to player queue`
 									}
+									disabled={e.downloaded === false}
 									aria-pressed={queueIndex >= 0}
 									title={
 										queueIndex >= 0
@@ -741,14 +773,20 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 								>
 									<ListPlus aria-hidden="true" />
 								</Button>
-								<span
-									className="inline-flex min-h-11 items-center gap-1 text-xs text-muted-foreground"
-									title="Downloaded on server"
-								>
-									<Download aria-hidden="true" className="size-4" />
-									Downloaded
-								</span>
-								<AdAnalysisStatus itemId={e.libraryItemId} episode={e} />
+								{e.downloaded === false ? (
+									<FeedDownloadAction episode={e} downloads={downloads} />
+								) : (
+									<span
+										className="inline-flex min-h-11 items-center gap-1 text-xs text-muted-foreground"
+										title="Downloaded on server"
+									>
+										<Download aria-hidden="true" className="size-4" />
+										Downloaded
+									</span>
+								)}
+								{e.downloaded !== false && (
+									<AdAnalysisStatus itemId={e.libraryItemId} episode={e} />
+								)}
 							</div>
 						</EpisodeRow>
 					)

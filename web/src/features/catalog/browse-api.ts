@@ -109,6 +109,20 @@ export function loadHome(library: string) {
 		shelvesSchema,
 	)
 }
+export const recentFeedEpisodesSchema = z.object({
+	episodes: z.array(
+		episodeSchema.extend({
+			libraryItemId: z.string(),
+			podcast: itemSchema.shape.media,
+		}),
+	),
+})
+export function loadRecentFeedEpisodes(library: string, revision = 0) {
+	return api(
+		`${libraryPath(library)}/recent-episodes?includeFeed=1&limit=12&page=0&revision=${revision}`,
+		recentFeedEpisodesSchema,
+	)
+}
 const filterValue = z.union([
 	z.string(),
 	z.object({ id: z.string(), name: z.string() }),

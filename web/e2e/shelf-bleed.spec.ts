@@ -31,6 +31,23 @@ for (const prefix of ['', '/abs'])
 					await route.fulfill({ json: shelves })
 				},
 			)
+			await page.route(
+				`**${prefix}/api/libraries/podcasts/recent-episodes*`,
+				async (route) => {
+					const response = await route.fetch()
+					const data = await response.json()
+					const source = data.episodes[0]
+					await route.fulfill({
+						json: {
+							...data,
+							episodes: Array.from({ length: 20 }, (_, i) => ({
+								...source,
+								id: `${source.id}-${i}`,
+							})),
+						},
+					})
+				},
+			)
 			await page.goto(`${prefix}/new/`)
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')

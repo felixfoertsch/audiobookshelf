@@ -12,7 +12,9 @@ import { items, libraries, playable } from './data'
 import {
 	authSessions,
 	browserUser,
+	downloadedFeedUsers,
 	fixtureApi,
+	fixtureFeedEpisode,
 	fixturePasswords,
 	fixtureUsers,
 	loginPayload,
@@ -292,6 +294,47 @@ async function handleRequest(request: Request) {
 					downloadQueues.get(user.id) || { queue: [], currentDownload: null },
 				)
 			: json({ error: 'Forbidden' }, 403)
+	if (
+		path === '/api/podcasts/podcast-1/download-episodes' &&
+		request.method === 'POST' &&
+		user
+	) {
+		if (!['admin', 'root'].includes(user.type)) return json({}, 403)
+		const input = await request.clone().json()
+		if (Array.isArray(input) && input[0]?.guid === fixtureFeedEpisode.guid) {
+			const download = {
+				...fixtureFeedEpisode,
+				url: fixtureFeedEpisode.enclosure.url,
+				startedAt: Date.now(),
+			}
+			downloadQueues.set(user.id, { queue: [], currentDownload: download })
+			for (const io of socketServers)
+				io.to(user.id).emit('episode_download_started', download)
+			return new Response('OK')
+		}
+	}
+	if (
+		path === '/__fixture/feed-complete' &&
+		request.method === 'DELETE' &&
+		user
+	) {
+		downloadedFeedUsers.delete(user.id)
+		return json({ ok: true })
+	}
+	if (
+		path === '/__fixture/feed-complete' &&
+		request.method === 'POST' &&
+		user
+	) {
+		downloadedFeedUsers.add(user.id)
+		downloadQueues.set(user.id, { queue: [], currentDownload: null })
+		for (const io of socketServers)
+			io.to(user.id).emit('episode_download_finished', {
+				...fixtureFeedEpisode,
+				failed: false,
+			})
+		return json({ ok: true })
+	}
 	const isCover = /^\/api\/items\/[^/]+\/cover$/.test(path)
 	if (path.startsWith('/api/') && !user && !(isCover && cookieUser))
 		return json({}, 401)

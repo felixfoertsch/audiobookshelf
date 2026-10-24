@@ -9,6 +9,17 @@ let emitUserUpdated: (user: FixtureUser) => void = () => {}
 export function onFixtureUserUpdated(listener: (user: FixtureUser) => void) {
 	emitUserUpdated = listener
 }
+export const fixtureFeedEpisode = {
+	id: 'feed-only-episode',
+	libraryItemId: 'podcast-1',
+	title: 'Feed-only fixture episode',
+	guid: 'fixture-feed-guid',
+	enclosure: { url: 'https://example.test/feed-only.mp3', type: 'audio/mpeg' },
+	publishedAt: 1893456000000,
+	duration: 2100,
+	downloaded: false,
+}
+export const downloadedFeedUsers = new Set<string>()
 const now = Date.now()
 const progress = new Map<string, Record<string, unknown>>()
 const bookmarks: {
@@ -999,6 +1010,25 @@ export async function fixtureApi(
 				),
 			)
 			.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
+		if (
+			url.searchParams.get('includeFeed') === '1' &&
+			recentEpisodes[1] === 'podcasts'
+		) {
+			const podcast = items.find((i) => i.id === 'podcast-1')
+			if (podcast)
+				return json({
+					episodes: [
+						{
+							...fixtureFeedEpisode,
+							downloaded: downloadedFeedUsers.has(user.id),
+							podcast: podcast.media,
+						},
+						...episodes.map((e) => ({ ...e, downloaded: true })),
+					],
+					limit: 50,
+					page: 0,
+				})
+		}
 		return json({ episodes, limit: 50, page: 0 })
 	}
 	const episodeSummary = /^\/api\/podcasts\/([^/]+)\/episode-summary$/.exec(

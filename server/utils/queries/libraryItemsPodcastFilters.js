@@ -495,6 +495,38 @@ module.exports = {
     }
   },
 
+  async getDownloadedEpisodes(user, library, libraryItemIds) {
+    if (!libraryItemIds.length) return []
+    const permissions = this.getUserPermissionPodcastWhereQuery(user)
+    const episodes = await Database.podcastEpisodeModel.findAll({
+      replacements: permissions.replacements,
+      include: [
+        { model: Database.podcastModel, where: permissions.podcastWhere, required: true, include: { model: Database.libraryItemModel, where: { libraryId: library.id, id: libraryItemIds }, required: true } }
+      ],
+      order: [['publishedAt', 'DESC']],
+      subQuery: false
+    })
+    return episodes.filter((episode) => user.checkCanAccessLibraryItem({ libraryId: episode.podcast.libraryItem.libraryId, media: episode.podcast })).map((episode) => {
+      const libraryItemId = episode.podcast.libraryItem.id
+      const json = episode.toOldJSONExpanded(libraryItemId)
+      json.podcast = episode.podcast.toOldJSONMinified()
+      json.libraryId = episode.podcast.libraryItem.libraryId
+      json.downloaded = true
+      return json
+    })
+  },
+
+  async getAccessiblePodcasts(user, library, limit = 100) {
+    const permissions = this.getUserPermissionPodcastWhereQuery(user)
+    return Database.podcastModel.findAll({
+      where: permissions.podcastWhere,
+      replacements: permissions.replacements,
+      include: { model: Database.libraryItemModel, attributes: ['id', 'libraryId', 'mediaType', 'extraData'], where: { libraryId: library.id } },
+      limit,
+      order: [['id', 'ASC']]
+    })
+  },
+
   /**
    * Most recent podcast episodes not finished
    * @param {import('../../models/User')} user

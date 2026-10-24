@@ -13,7 +13,7 @@ describe('Podcast episode summary', () => {
   })
 
   it('rejects summary access before exposing inaccessible podcast', async () => {
-    sinon.stub(Database.libraryItemModel, 'getExpandedById').resolves({ isPodcast: true, media: {} })
+    sinon.stub(Database, 'libraryItemModel').get(() => ({ getExpandedById: async () => ({ isPodcast: true, media: {} }) }))
     const next = sinon.spy()
     const res = { sendStatus: sinon.spy() }
     await controller.middleware({ params: { id: 'private' }, method: 'GET', user: { checkCanAccessLibraryItem: () => false } }, res, next)

@@ -1,6 +1,13 @@
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { ChevronRight, SlidersHorizontal } from 'lucide-react'
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useRef,
+	useState,
+} from 'react'
 import { z } from 'zod'
 import { api, getAuthGeneration, useAuth } from '../../api'
 import { duration, episodeSchema, itemSchema } from '../../catalog'
@@ -29,6 +36,8 @@ import { episodeProgress, refreshProgress } from '../item/progress'
 import { getItem, writeProgress } from '../item/service'
 import { WorkflowSheet } from '../item/WorkflowSheet'
 import { EpisodeRow } from '../podcast/EpisodeRow'
+import { FeedDownloadAction } from '../podcast/FeedDownloadAction'
+import { type FeedEpisode, useEpisodeDownloads } from '../podcast/feed-episodes'
 import { PodcastEpisodeCount } from '../podcast/PodcastEpisodeCount'
 import {
 	type BrowseSearch,
@@ -40,6 +49,7 @@ import {
 	type loadFilters,
 	type loadHome,
 	type loadNarrators,
+	loadRecentFeedEpisodes,
 	type loadSeries,
 	type loadStats,
 	saveNarrator,
@@ -456,8 +466,10 @@ export function EntryCard({
 	select,
 	shelfId,
 	headingLevel = 2,
+	downloads,
 }: {
 	entry: Entry
+	downloads?: ReturnType<typeof useEpisodeDownloads>
 	library: string
 	headingLevel?: 2 | 3
 	view?: string
@@ -568,6 +580,38 @@ export function EntryCard({
 						)
 					)}
 
+					{episode && downloads && (
+						<div className="flex flex-wrap items-center gap-2">
+							<Button
+								size="sm"
+								disabled={episode.downloaded === false}
+								title={
+									episode.downloaded === false
+										? 'Not downloaded'
+										: 'Play episode'
+								}
+								onClick={() =>
+									void playEpisode(item.id, episode.id).catch(
+										(error: unknown) =>
+											setShelfError(
+												error instanceof Error
+													? error.message
+													: 'Playback failed',
+											),
+									)
+								}
+							>
+								{episode.downloaded === false ? 'Not downloaded' : 'Play'}
+							</Button>
+							{episode.downloaded === false && (
+								<FeedDownloadAction
+									episode={{ ...episode, libraryItemId: item.id }}
+									downloads={downloads}
+								/>
+							)}
+						</div>
+					)}
+					{episode && shelfError && <p role="alert">{shelfError}</p>}
 					{item.isMissing && <p role="status">Missing media files</p>}
 					{item.isInvalid && <p role="status">Invalid media files</p>}
 					{(item.rssFeed || item.mediaItemShare) && (
@@ -746,12 +790,41 @@ function EntityLink({
 export function HomePage({
 	library,
 	data,
+	podcast,
 }: {
 	library: string
 	data: Awaited<ReturnType<typeof loadHome>>
 	podcast: boolean
 }) {
+	const router = useRouter()
+	const [feedRevision, setFeedRevision] = useState(0)
+	const refresh = useCallback(() => {
+		setFeedRevision((n) => n + 1)
+		void router.invalidate()
+	}, [router])
 	useCatalogRefresh()
+	const [feedEpisodes, setFeedEpisodes] = useState<
+		(FeedEpisode & { podcast: z.infer<typeof itemSchema>['media'] })[]
+	>([])
+	useEffect(() => {
+		if (!podcast) {
+			setFeedEpisodes([])
+			return
+		}
+		setFeedEpisodes([])
+		let active = true
+		void loadRecentFeedEpisodes(library, feedRevision)
+			.then((result) => {
+				if (active) setFeedEpisodes(result.episodes)
+			})
+			.catch(() => {
+				if (active) setFeedEpisodes([])
+			})
+		return () => {
+			active = false
+		}
+	}, [library, podcast, feedRevision])
+	const downloads = useEpisodeDownloads(podcast ? library : '', refresh)
 	useEffect(() => {
 		localStorage.setItem('currentLibraryId', library)
 	}, [library])
@@ -759,10 +832,24 @@ export function HomePage({
 		<section className="min-w-0 space-y-8">
 			<CatalogHeading title="Home" />
 
+			{downloads.error && <p role="status">{downloads.error}</p>}
 			{!data.length && (
 				<p>No shelves available. Browse library to start listening.</p>
 			)}
-			{data.map((shelf) => (
+			{(podcast &&
+			feedEpisodes.length &&
+			!data.some((shelf) => shelf.id === 'newest-episodes')
+				? [
+						{
+							id: 'newest-episodes',
+							label: 'Newest Episodes',
+							type: 'episode',
+							entities: [],
+						},
+						...data,
+					]
+				: data
+			).map((shelf) => (
 				<section key={shelf.id} className="space-y-3">
 					<h2 className="text-xl font-semibold">
 						{shelf.id === 'newest-episodes' ? (
@@ -811,13 +898,15 @@ export function HomePage({
 						)}
 					</h2>
 					<div className="flex w-screen -ml-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] snap-x snap-mandatory gap-4 overflow-x-auto pl-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] pr-[var(--shelf-gutter)] scroll-pl-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] scroll-pr-[var(--shelf-gutter)] pb-2 [&>article]:w-[140px] [&>article]:shrink-0 [&>article]:snap-start sm:[&>article]:w-[160px]">
-						{shelf.entities.map((entry) => (
-							<EntryCard
-								key={entry.id}
-								shelfId={shelf.id}
-								headingLevel={3}
-								library={library}
-								entry={{
+						{(shelf.id === 'newest-episodes' && feedEpisodes.length
+							? feedEpisodes.map((episode) => ({
+									id: episode.libraryItemId,
+									_type: 'episode',
+									mediaType: 'podcast' as const,
+									media: episode.podcast,
+									recentEpisode: episode,
+								}))
+							: shelf.entities.map((entry) => ({
 									...entry,
 									_type:
 										shelf.type === 'author'
@@ -827,7 +916,21 @@ export function HomePage({
 												: shelf.type === 'playlist'
 													? 'playlists'
 													: shelf.type,
-								}}
+								}))
+						).map((entry) => (
+							<EntryCard
+								key={
+									'recentEpisode' in entry
+										? `${entry.id}:${entry.recentEpisode?.id}`
+										: entry.id
+								}
+								shelfId={shelf.id}
+								headingLevel={3}
+								library={library}
+								entry={entry as Entry}
+								downloads={
+									shelf.id === 'newest-episodes' ? downloads : undefined
+								}
 							/>
 						))}
 					</div>

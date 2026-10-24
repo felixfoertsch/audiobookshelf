@@ -1,8 +1,10 @@
 import { z } from 'zod'
 import { api } from './api'
+import { feedFields } from './features/podcast/feed-episodes'
 
 const text = z.string().nullish()
 export const episodeSchema = z.object({
+	...feedFields,
 	id: z.string().min(1),
 	title: text,
 	description: text,

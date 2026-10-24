@@ -275,6 +275,25 @@ for (const prefix of ['', '/abs']) {
 				total: 2,
 			},
 		])
+		await override(page, prefix, '/api/libraries/podcasts/recent-episodes', {
+			episodes: [
+				{
+					...recent.recentEpisode,
+					libraryItemId: known.id,
+					podcast: known.media,
+					downloaded: true,
+				},
+				{
+					...episode,
+					title: 'Duration unknown episode',
+					duration: undefined,
+					audioFile: null,
+					libraryItemId: unknown.id,
+					podcast: unknown.media,
+					downloaded: true,
+				},
+			],
+		})
 		await override(page, prefix, '/api/libraries/podcasts/items', {
 			results: [known, empty, unknown],
 			total: 3,
