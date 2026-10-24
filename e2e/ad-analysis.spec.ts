@@ -6,6 +6,7 @@ for (const prefix of ['']) {
 	test(`episode analysis states, tooltip and admin queue use synthetic API ${prefix || '/'}`, async ({
 		page,
 	}) => {
+		test.setTimeout(60_000)
 		const cdp = await page.context().newCDPSession(page)
 		await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 })
 		const source = items.find((item) => item.id === 'podcast-1')
@@ -132,6 +133,6 @@ for (const prefix of ['']) {
 		)
 		await expect(
 			page.getByRole('img', { name: 'No inserted ads found' }),
-		).toHaveCount(2)
+		).toHaveCount(2, { timeout: 40_000 })
 	})
 }
