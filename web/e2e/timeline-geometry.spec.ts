@@ -96,7 +96,7 @@ for (const prefix of ['', '/abs']) {
 		for (const width of [390, 1280]) {
 			await page.setViewportSize({ width, height: 900 })
 			await page
-				.getByRole('button', { name: '00:00:02 Clip both edges', exact: true })
+				.getByRole('button', { name: '0:02 Clip both edges', exact: true })
 				.click()
 			await expect(
 				page.locator('[role="slider"][aria-label="Playback progress"]'),
@@ -121,9 +121,7 @@ for (const prefix of ['', '/abs']) {
 			expect(rect.left).toBeLessThanOrEqual(1)
 			expect(rect.right).toBeLessThanOrEqual(1)
 		}
-		await page
-			.getByRole('button', { name: '00:00:04 After', exact: true })
-			.click()
+		await page.getByRole('button', { name: '0:04 After', exact: true }).click()
 		await expect(page.getByTestId('segment-marker')).toHaveCount(0)
 	})
 	test(`Cast compact and expanded timeline pixel geometry ${prefix || 'root'}`, async ({

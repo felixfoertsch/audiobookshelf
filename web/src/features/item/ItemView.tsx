@@ -506,7 +506,7 @@ export function ItemView({ id }: { id: string }) {
 			{item.mediaType === 'book' && bookProgress && (
 				<p>
 					Progress {Math.round((bookProgress.progress || 0) * 100)}% ·{' '}
-					{duration(bookProgress.currentTime || 0)} listened
+					{duration(bookProgress.currentTime || 0, true)} listened
 				</p>
 			)}
 			{item.mediaType === 'podcast' && media.episodes && (
@@ -766,7 +766,7 @@ export function ItemView({ id }: { id: string }) {
 											)
 									}}
 								>
-									{duration(ch.start)} · {ch.title}
+									{duration(ch.start, true)} · {ch.title}
 								</Button>
 							</li>
 						))}

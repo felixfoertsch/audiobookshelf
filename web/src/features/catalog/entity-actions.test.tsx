@@ -331,7 +331,7 @@ test('playlist owner can play, reorder, remove, save and delete; other user cann
 	const fetcher = fetchApi()
 	vi.spyOn(window, 'confirm').mockReturnValue(true)
 	const { rerender } = render(<PlaylistDetail playlist={playlist} />)
-	expect(screen.getByText('2 items · 00:02:00')).toBeTruthy()
+	expect(screen.getByText('2 items · 2:00')).toBeTruthy()
 	fireEvent.keyDown(screen.getByRole('button', { name: 'Playlist actions' }), {
 		key: 'Enter',
 	})

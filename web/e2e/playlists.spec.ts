@@ -35,7 +35,7 @@ for (const prefix of ['', '/abs']) {
 				await expect(
 					page.getByRole('heading', { name: 'Evening Queue' }),
 				).toBeVisible()
-				await expect(page.getByText('2 items · 00:00:13')).toBeVisible()
+				await expect(page.getByText('2 items · 0:13')).toBeVisible()
 				await expect(page.getByText('Audio unavailable')).toBeVisible()
 				await capture('detail')
 				await page

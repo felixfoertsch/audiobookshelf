@@ -94,7 +94,9 @@ test('podcast cards render downloaded fallback while summaries remain pending', 
 	} finally {
 		release()
 	}
-	await expect(page.getByText('117 unplayed of 120').first()).toBeVisible()
+	await expect(
+		page.getByText('3/120 (3 %)', { exact: true }).first(),
+	).toBeVisible()
 })
 
 for (const width of [1280, 390])
@@ -120,7 +122,7 @@ for (const width of [1280, 390])
 					page.getByRole('heading', {
 						name:
 							name === 'search'
-								? 'Find podcasts'
+								? 'Add podcast'
 								: name === 'home'
 									? 'Home'
 									: name === 'latest'
@@ -135,7 +137,7 @@ for (const width of [1280, 390])
 						0,
 					)
 					await expect(
-						page.getByText('00:00:12', { exact: true }).first(),
+						page.getByText('2026-10-20', { exact: true }).first(),
 					).toBeVisible()
 				}
 				if (name === 'latest') {

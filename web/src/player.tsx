@@ -22,7 +22,6 @@ import {
 	setBeforeLogout,
 	useAuth,
 } from './api'
-import { duration } from './catalog'
 import { useT } from './features/i18n'
 import { CastControl } from './features/player/CastControl'
 import {
@@ -67,6 +66,7 @@ import {
 	SheetTrigger,
 } from './shared/components/ui/sheet'
 import { Slider } from './shared/components/ui/slider'
+import { duration } from './shared/lib/duration'
 
 const segment = z
 	.object({ start: z.number().nonnegative(), end: z.number().positive() })
@@ -1010,7 +1010,7 @@ export function Player() {
 				<p id={markerDescription} className="sr-only">
 					{t('Player.SegmentRanges', {}, 'Detected segment ranges')}:{' '}
 					{segments
-						.map((s) => `${duration(s.start)}–${duration(s.end)}`)
+						.map((s) => `${duration(s.start, true)}–${duration(s.end, true)}`)
 						.join(', ') || t('Player.NoSegments', {}, 'None')}
 				</p>
 				{streamMessage && <p role="status">{streamMessage}</p>}
@@ -1118,7 +1118,7 @@ export function Player() {
 								aria-label="Elapsed time"
 								className="text-[10px] tabular-nums text-muted-foreground"
 							>
-								{duration(timelinePosition)}
+								{duration(timelinePosition, true)}
 							</span>
 							<div className="relative flex min-w-0 flex-1 items-center">
 								<Slider
@@ -1129,7 +1129,7 @@ export function Player() {
 											?.querySelector('[role="slider"]')
 											?.setAttribute('aria-describedby', markerDescription)
 									}}
-									aria-valuetext={`${duration(timelinePosition)} of ${duration(timelineEnd - timelineStart)}`}
+									aria-valuetext={`${duration(timelinePosition, true)} of ${duration(timelineEnd - timelineStart, true)}`}
 									className="h-6 [&_[data-slot=slider-thumb]]:z-10"
 									min={0}
 									max={timelineEnd - timelineStart}
@@ -1561,7 +1561,7 @@ export function Player() {
 															)
 													}}
 													aria-describedby={markerDescription}
-													aria-valuetext={`${duration(timelinePosition)} of ${duration(timelineEnd - timelineStart)}`}
+													aria-valuetext={`${duration(timelinePosition, true)} of ${duration(timelineEnd - timelineStart, true)}`}
 													min={0}
 													max={timelineEnd - timelineStart}
 													step={0.1}
@@ -1573,8 +1573,8 @@ export function Player() {
 												/>
 											</span>
 											<span className="text-xs tabular-nums">
-												{duration(timelinePosition)} /{' '}
-												{duration(timelineEnd - timelineStart)}
+												{duration(timelinePosition, true)} /{' '}
+												{duration(timelineEnd - timelineStart, true)}
 											</span>
 										</div>
 									)}
@@ -1629,8 +1629,8 @@ export function Player() {
 												onChange={(event) => setSeekDraft(event.target.value)}
 											/>
 											<span>
-												{duration(timelinePosition)} /{' '}
-												{duration(timelineEnd - timelineStart)}
+												{duration(timelinePosition, true)} /{' '}
+												{duration(timelineEnd - timelineStart, true)}
 											</span>
 											<Button
 												type="submit"
@@ -1671,7 +1671,7 @@ export function Player() {
 															variant="link"
 															onClick={() => seekPlayback(chapter.start)}
 														>
-															{duration(chapter.start)} {chapter.title}
+															{duration(chapter.start, true)} {chapter.title}
 														</Button>
 													</li>
 												))}
@@ -1742,7 +1742,8 @@ export function Player() {
 																	variant="link"
 																	onClick={() => seekPlayback(bookmark.time)}
 																>
-																	{duration(bookmark.time)} {bookmark.title}
+																	{duration(bookmark.time, true)}{' '}
+																	{bookmark.title}
 																</Button>
 																<Button
 																	variant="outline"
@@ -1914,7 +1915,10 @@ export function Player() {
 										<p className="text-xs text-muted-foreground">
 											Candidate markers:{' '}
 											{segments
-												.map((s) => `${duration(s.start)}–${duration(s.end)}`)
+												.map(
+													(s) =>
+														`${duration(s.start, true)}–${duration(s.end, true)}`,
+												)
 												.join(', ')}
 										</p>
 									)}

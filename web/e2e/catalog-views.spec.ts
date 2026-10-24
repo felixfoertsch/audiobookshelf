@@ -52,7 +52,7 @@ for (const prefix of ['', '/abs']) {
 					await expect(entry).toContainText(
 						library === 'books'
 							? /Rowan Vale|Amara Okafor|Jun Park/
-							: /unplayed of/,
+							: /\d+\/\d+ \(\d+ %\)/,
 					)
 					await page
 						.getByRole('button', { name: 'Select', exact: true })

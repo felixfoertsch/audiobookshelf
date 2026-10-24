@@ -37,7 +37,7 @@ for (const width of [1280, 390]) {
 			await closeSidebar(page)
 			await check(
 				'chapter',
-				page.getByRole('button', { name: /00:00:00.*The Glass Orchard/ }),
+				page.getByRole('button', { name: /0:00.*The Glass Orchard/ }),
 			)
 			await check(
 				'More',

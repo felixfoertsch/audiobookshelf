@@ -38,7 +38,7 @@ describe('stats', () => {
 		await waitFor(() =>
 			expect(screen.getByText('Book · 2026-10-20 10:00 UTC')).toBeTruthy(),
 		)
-		expect(screen.getByText('1h 1m')).toBeTruthy()
+		expect(screen.getByText('1:01:00')).toBeTruthy()
 		expect(screen.getByText('Items finished')).toBeTruthy()
 	})
 })

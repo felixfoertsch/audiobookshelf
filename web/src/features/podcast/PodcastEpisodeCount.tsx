@@ -52,9 +52,9 @@ export function PodcastEpisodeCount({
 		}
 	}, [itemId, userId])
 	return (
-		<p className="text-xs" aria-live="polite">
+		<p className="h-8 text-xs leading-4" aria-live="polite">
 			{summary
-				? `${summary.unplayed.toLocaleString()} unplayed of ${summary.total.toLocaleString()}${summary.source === 'downloaded' ? ' downloaded · feed unavailable' : ''}`
+				? `${Math.max(0, summary.total - summary.unplayed).toLocaleString()}/${summary.total.toLocaleString()} (${summary.total ? Math.round((Math.max(0, summary.total - summary.unplayed) / summary.total) * 100) : 0} %)${summary.source === 'downloaded' ? ' downloaded · feed unavailable' : ''}`
 				: `${downloaded == null ? 'Downloaded count unavailable' : `${downloaded.toLocaleString()} downloaded`}${unavailable ? ' · feed unavailable' : ' · checking feed…'}`}
 		</p>
 	)

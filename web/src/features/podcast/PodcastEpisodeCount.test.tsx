@@ -6,12 +6,12 @@ afterEach(() => {
 	cleanup()
 	vi.restoreAllMocks()
 })
-it('shows feed-wide unplayed total, not downloaded count', async () => {
+it('shows feed-wide finished total, not downloaded count', async () => {
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(
 		new Response(JSON.stringify({ total: 120, unplayed: 3, source: 'feed' })),
 	)
 	render(<PodcastEpisodeCount itemId="p" downloaded={4} />)
-	expect(await screen.findByText('3 unplayed of 120')).toBeTruthy()
+	expect(await screen.findByText('117/120 (98 %)')).toBeTruthy()
 })
 it('labels server downloaded fallback honestly', async () => {
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -21,7 +21,7 @@ it('labels server downloaded fallback honestly', async () => {
 	)
 	render(<PodcastEpisodeCount itemId="p" downloaded={4} />)
 	expect(
-		await screen.findByText('2 unplayed of 4 downloaded · feed unavailable'),
+		await screen.findByText('2/4 (50 %) downloaded · feed unavailable'),
 	).toBeTruthy()
 })
 it('labels unavailable feed totals honestly', async () => {

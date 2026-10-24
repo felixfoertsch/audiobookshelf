@@ -134,11 +134,4 @@ export async function getItems(id: string, q: string, page: number) {
 		listSchema,
 	)
 }
-export function duration(seconds: number) {
-	const total = Math.max(0, Math.floor(seconds))
-	return `${Math.floor(total / 3600)
-		.toString()
-		.padStart(2, '0')}:${Math.floor((total / 60) % 60)
-		.toString()
-		.padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}`
-}
+export { duration } from './shared/lib/duration'

@@ -34,6 +34,7 @@ import {
 import { ServerActivityObserver } from '../features/catalog/server-activity'
 import { DebugMenu, RouteDebugOverlay } from '../features/debug'
 import { useT } from '../features/i18n'
+import { PodcastSearchModal } from '../features/podcast/PodcastSearchModal'
 import { Player } from '../player'
 import { Button } from '../shared/components/ui/button'
 import {
@@ -115,6 +116,11 @@ export function RouteError({ error }: ErrorComponentProps) {
 	)
 }
 export const Route = createRootRoute({
+	validateSearch: (
+		search: Record<string, unknown>,
+	): { addPodcast?: number } => ({
+		...(Number(search.addPodcast) === 1 ? { addPodcast: 1 } : {}),
+	}),
 	component: Layout,
 	errorComponent: ({ error, reset }) => (
 		<Layout routeError={{ error, reset }} />
@@ -153,6 +159,9 @@ export function Layout({
 	})
 	const query = useRouterState({
 		select: (state) => state.location.search as { q?: unknown },
+	})
+	const addPodcast = useRouterState({
+		select: (state) => state.location.search as { addPodcast?: unknown },
 	})
 	const routeIds = useRouterState({
 		select: (state) => state.matches.map((match) => match.routeId),
@@ -303,7 +312,7 @@ export function Layout({
 							</div>
 						)}
 					</SidebarHeader>
-					<SidebarContent>
+					<SidebarContent className="[scrollbar-width:none] [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0">
 						{currentLibrary && (
 							<LibraryNav
 								library={currentLibrary.id}
@@ -421,7 +430,7 @@ export function Layout({
 					</header>
 					<div
 						id="content"
-						className="w-full min-w-0 min-h-[60vh] px-4 py-8 pb-80 [--shelf-sidebar:0px] md:[--shelf-sidebar:var(--sidebar-width)] [--shelf-gutter:1rem]"
+						className="w-full min-w-0 min-h-[60vh] px-6 py-8 pb-80 [--shelf-sidebar:0px] [scrollbar-width:none] md:[--shelf-sidebar:var(--sidebar-width)] [--shelf-gutter:1.5rem] sm:[--shelf-gutter:2rem] sm:px-8 [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0"
 					>
 						{error && (
 							<p role="alert" className="text-destructive">
@@ -430,6 +439,10 @@ export function Layout({
 						)}
 						<LibraryNameContext.Provider value={currentLibrary?.name || ''}>
 							{routeError ? <RouteError {...routeError} /> : <Outlet />}
+							{addPodcast.addPodcast === 1 &&
+								currentLibrary?.mediaType === 'podcast' && (
+									<PodcastSearchModal libraryId={currentLibrary.id} />
+								)}
 						</LibraryNameContext.Provider>
 					</div>
 					<RouteDebugOverlay path={pathname} />

@@ -122,8 +122,12 @@ for (const prefix of ['', '/abs'])
 					})
 			}
 			// Tab back into first card after it has moved beneath the sidebar.
-			await scroller.locator('..').locator('h2 a').focus()
-			await page.keyboard.press('Tab')
+			await scroller
+				.locator('article')
+				.first()
+				.getByRole('link')
+				.first()
+				.focus()
 			await expect(
 				scroller.locator('article').first().getByRole('link').first(),
 			).toBeFocused()

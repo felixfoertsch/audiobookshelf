@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { duration, itemSchema, librariesSchema, listSchema } from './catalog'
+import { itemSchema, librariesSchema, listSchema } from './catalog'
 import { Button } from './shared/components/ui/button'
+import { duration } from './shared/lib/duration'
 
 describe('catalog trust boundary', () => {
 	it('rejects malformed, null and missing payloads', () => {
@@ -24,9 +25,13 @@ describe('catalog trust boundary', () => {
 		})
 		expect(item.media.episodes).toEqual([])
 	})
-	it('formats original timeline with 24-hour units', () => {
-		expect(duration(3661.7)).toBe('01:01:01')
-		expect(duration(-1)).toBe('00:00:00')
+	it('formats durations compactly and hides missing or zero values', () => {
+		expect(duration(0)).toBeNull()
+		expect(duration(Number.NaN)).toBeNull()
+		expect(duration(59)).toBe('0:59')
+		expect(duration(3661.7)).toBe('1:01:01')
+		expect(duration(36000)).toBe('10:00:00')
+		expect(duration(39600)).toBe('11:00:00')
 	})
 	it('renders registry button with native disabled behavior', () => {
 		render(<Button disabled>Play</Button>)

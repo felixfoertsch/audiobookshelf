@@ -36,7 +36,7 @@ for (const prefix of ['', '/abs'])
 					padding: parseFloat(getComputedStyle(node).paddingLeft),
 					margin: parseFloat(getComputedStyle(node).marginLeft),
 				}))
-				expect(inset).toEqual({ padding: 16, margin: 0 })
+				expect(inset).toEqual({ padding: width < 640 ? 24 : 32, margin: 0 })
 				await openSidebar(page)
 				const library = page.getByRole('button', { name: /^Library:/ })
 				const boundary = await library.evaluate((node) => {

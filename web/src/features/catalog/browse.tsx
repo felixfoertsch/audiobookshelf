@@ -32,6 +32,7 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from '../../shared/components/ui/sidebar'
+import { formatIsoDate } from '../../shared/lib/datetime'
 import { episodeProgress, refreshProgress } from '../item/progress'
 import { getItem, writeProgress } from '../item/service'
 import { WorkflowSheet } from '../item/WorkflowSheet'
@@ -45,6 +46,7 @@ import {
 	type Entry,
 	encodeFilter,
 	entitySchema,
+	entryIdentity,
 	loadBrowse,
 	type loadFilters,
 	type loadHome,
@@ -55,11 +57,13 @@ import {
 	saveNarrator,
 	searchLibrary,
 } from './browse-api'
+import { ContinueCard } from './continue-card'
 import { type Playlist, playlistSchema } from './entities-api'
 import { PlaylistList } from './playlist-list'
 import { persistSearch, useCoverSize, useShelfPosition } from './preferences'
 import { SelectionToolbar } from './selection-toolbar'
 import { SelectionTools } from './selection-tools'
+import { ShelfCarousel } from './shelf-carousel'
 
 export async function updateSelectedProgress(
 	ids: string[],
@@ -348,8 +352,8 @@ export function LibraryNav({
 						<SidebarMenuItem>
 							<SidebarMenuButton asChild>
 								<Link
-									to="/library/$library/podcast/search"
-									params={{ library }}
+									to="."
+									search={(previous) => ({ ...previous, addPodcast: 1 })}
 									activeProps={{ 'data-active': true }}
 								>
 									{icons['Add podcast']}
@@ -499,9 +503,7 @@ export function EntryCard({
 			: null
 	const episode =
 		entry._type === 'episode' && recent?.success ? recent.data : null
-	const recentDuration = recent?.success
-		? (recent.data.duration ?? recent.data.audioFile?.duration)
-		: null
+	const publishedAt = recent?.success ? recent.data.publishedAt : null
 	const Heading = headingLevel === 3 ? 'h3' : 'h2'
 	const collapsed =
 		'collapsedSeries' in entry
@@ -563,9 +565,10 @@ export function EntryCard({
 								item.media.metadata.authors?.map((a) => a.name).join(', ')}
 					</p>
 					{episode ? (
-						recentDuration != null &&
-						recentDuration > 0 && (
-							<p className="truncate text-xs">{duration(recentDuration)}</p>
+						publishedAt != null && (
+							<p className="truncate text-xs">
+								{formatIsoDate(new Date(publishedAt))}
+							</p>
 						)
 					) : item.mediaType === 'podcast' ? (
 						<PodcastEpisodeCount
@@ -644,7 +647,7 @@ export function EntryCard({
 							<div className="space-y-1 text-xs">
 								{shelfProgress?.currentTime != null && (
 									<p>
-										Progress: {duration(shelfProgress.currentTime)}
+										Progress: {duration(shelfProgress.currentTime, true)}
 										{shelfProgress.duration != null
 											? ` / ${duration(shelfProgress.duration)}`
 											: ''}
@@ -894,7 +897,7 @@ export function HomePage({
 							shelf.label
 						)}
 					</h2>
-					<div className="flex w-screen -ml-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] snap-x snap-mandatory gap-4 overflow-x-auto pl-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] pr-[var(--shelf-gutter)] scroll-pl-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] scroll-pr-[var(--shelf-gutter)] pb-2 [&>article]:w-[140px] [&>article]:shrink-0 [&>article]:snap-start sm:[&>article]:w-[160px]">
+					<ShelfCarousel label={shelf.label} hero={shelf.id === 'continue-listening'}>article]:w-[140px] [&>article]:shrink-0 [&>article]:snap-start sm:[&>article]:w-[160px]">
 						{(shelf.id === 'newest-episodes' && feedEpisodes.length
 							? feedEpisodes.map((episode) => ({
 									id: episode.libraryItemId,
@@ -914,7 +917,7 @@ export function HomePage({
 													? 'playlists'
 													: shelf.type,
 								}))
-						).map((entry) => (
+						).map((entry) => (shelf.id === 'continue-listening' && entry.mediaType === 'podcast' ? <ContinueCard key={entryIdentity(entry)} entry={entry} /> :
 							<EntryCard
 								key={
 									'recentEpisode' in entry
@@ -930,7 +933,8 @@ export function HomePage({
 								}
 							/>
 						))}
-					</div>
+					</ShelfCarousel>
+
 				</section>
 			))}
 		</section>

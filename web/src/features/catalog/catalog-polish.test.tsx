@@ -59,7 +59,11 @@ it('preserves recent audioFile duration through serializer schema and prioritize
 		recentEpisode: {
 			id: 'episode',
 			title: 'Episode title',
-			audioFile: { duration: 123 },
+			publishedAt: new Date(2026, 9, 20).getTime(),
+			audioFile: {
+				duration: 123,
+				publishedAt: new Date(2026, 9, 20).getTime(),
+			},
 		},
 	})
 	await show(
@@ -80,7 +84,7 @@ it('preserves recent audioFile duration through serializer schema and prioritize
 		screen.getByRole('heading', { level: 3, name: 'Episode title' }),
 	).toBeTruthy()
 	expect(screen.getByText('Show title')).toBeTruthy()
-	expect(screen.getByText('00:02:03')).toBeTruthy()
+	expect(screen.getByText('2026-10-20')).toBeTruthy()
 	expect(screen.queryByText('00:00:00')).toBeNull()
 })
 it.each([undefined, 0])(
@@ -123,7 +127,7 @@ it('separates library context from page title and links episode shelf to latest'
 		screen.getByRole('link', { name: 'Newest Episodes' }).getAttribute('href'),
 	).toBe('/library/lib/podcast/latest')
 })
-it('keeps episode cards to show identity and one duration line', async () => {
+it('keeps episode cards to show identity and one release date line', async () => {
 	await show(
 		<EntryCard
 			library="lib"
@@ -134,13 +138,18 @@ it('keeps episode cards to show identity and one duration line', async () => {
 					...podcast(489).media,
 					metadata: { title: 'Show title', author: 'Show author' },
 				},
-				recentEpisode: { id: 'ep', title: 'Episode title', duration: 123 },
+				recentEpisode: {
+					id: 'ep',
+					title: 'Episode title',
+					duration: 123,
+					publishedAt: new Date(2026, 9, 20).getTime(),
+				},
 			}}
 		/>,
 	)
 	expect(screen.getByRole('heading', { name: 'Episode title' })).toBeTruthy()
 	expect(screen.getByText('Show title')).toBeTruthy()
-	expect(screen.getByText('00:02:03')).toBeTruthy()
+	expect(screen.getByText('2026-10-20')).toBeTruthy()
 	expect(screen.queryByText('Show author')).toBeNull()
 	expect(screen.queryByText('489 episodes')).toBeNull()
 })

@@ -18,6 +18,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from '../../shared/components/ui/tooltip'
+import { duration } from '../../shared/lib/duration'
 import { useT } from '../i18n'
 
 const resultSchema = z.object({
@@ -239,8 +240,7 @@ export function AdAnalysisStatus({ itemId, episode, enabled }: Props) {
 							{t('AdAnalysis.candidateDetail', [], labels.candidateDetail)}{' '}
 							{segments
 								.map(
-									(s) =>
-										`${Math.floor(s.start / 60)}:${String(Math.floor(s.start % 60)).padStart(2, '0')}–${Math.floor(s.end / 60)}:${String(Math.floor(s.end % 60)).padStart(2, '0')}`,
+									(s) => `${duration(s.start, true)}–${duration(s.end, true)}`,
 								)
 								.join(', ')}
 						</>

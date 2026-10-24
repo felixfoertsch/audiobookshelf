@@ -101,7 +101,7 @@ for (const prefix of ['', '/abs']) {
 			.getByRole('button', { name: 'Add bookmark', exact: true })
 			.click()
 		const mark = page.getByRole('button', {
-			name: `00:00:03 Bridge ${prefix || 'root'}`,
+			name: `0:03 Bridge ${prefix || 'root'}`,
 			exact: true,
 		})
 		await expect(mark).toBeVisible()
@@ -117,7 +117,7 @@ for (const prefix of ['', '/abs']) {
 			.getByRole('button', { name: 'Edit bookmark', exact: true })
 			.click()
 		await expect(
-			page.getByRole('button', { name: '00:00:03 Edited bridge', exact: true }),
+			page.getByRole('button', { name: '0:03 Edited bridge', exact: true }),
 		).toBeVisible()
 		await page.reload()
 		await start()
@@ -128,14 +128,14 @@ for (const prefix of ['', '/abs']) {
 			page.getByLabel('Chapter timeline', { exact: true }),
 		).toBeChecked()
 		await page
-			.getByRole('button', { name: '00:00:03 Edited bridge', exact: true })
+			.getByRole('button', { name: '0:03 Edited bridge', exact: true })
 			.click()
 		page.once('dialog', (dialog) => dialog.accept())
 		await page
 			.getByRole('button', { name: 'Delete bookmark', exact: true })
 			.click()
 		await expect(
-			page.getByRole('button', { name: '00:00:03 Edited bridge', exact: true }),
+			page.getByRole('button', { name: '0:03 Edited bridge', exact: true }),
 		).toHaveCount(0)
 		await page
 			.getByLabel('Sleep timer', { exact: true })

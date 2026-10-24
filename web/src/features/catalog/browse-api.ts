@@ -95,12 +95,27 @@ export function loadBrowse(
 ) {
 	return api(browsePath(library, section, search), list)
 }
+export function entryIdentity(entry: Entry) {
+	const episode =
+		'recentEpisode' in entry
+			? episodeSchema.safeParse(entry.recentEpisode)
+			: null
+	return JSON.stringify([entry.id, episode?.success ? episode.data.id : null])
+}
 export const shelvesSchema = z.array(
 	z.object({
 		id: z.string(),
 		label: z.string(),
 		type: z.string(),
-		entities: z.array(entrySchema),
+		entities: z.array(entrySchema).transform((entries) => {
+			const seen = new Set<string>()
+			return entries.filter((entry) => {
+				const key = entryIdentity(entry)
+				if (seen.has(key)) return false
+				seen.add(key)
+				return true
+			})
+		}),
 	}),
 )
 export function loadHome(library: string) {

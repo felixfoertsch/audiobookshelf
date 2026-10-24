@@ -185,7 +185,7 @@ for (const prefix of ['', '/abs']) {
 			}
 			await expect(page.getByTestId('segment-marker')).toBeVisible()
 			await expect(progress).toHaveAccessibleDescription(
-				/Detected segment ranges: 00:00:04–00:00:10/,
+				/Detected segment ranges: 0:04–0:10/,
 			)
 			const measureMarker = async () =>
 				page.getByTestId('segment-marker').evaluate((node: HTMLElement) => {

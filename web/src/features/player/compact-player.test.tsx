@@ -296,7 +296,7 @@ test('bookmark create, edit, delete and seek report UI and request outcomes', as
 		'/api/me/item/book/bookmark',
 		expect.objectContaining({ method: 'POST' }),
 	)
-	fireEvent.click(screen.getByRole('button', { name: /00:12 Initial/ }))
+	fireEvent.click(screen.getByRole('button', { name: /0:12 Initial/ }))
 	expect(audio.currentTime).toBe(12)
 	fireEvent.click(screen.getAllByRole('button', { name: 'Edit bookmark' })[0])
 	await screen.findByRole('button', { name: /Edited/ })

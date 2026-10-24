@@ -32,10 +32,16 @@ export function PodcastSearchModal({ libraryId }: { libraryId: string }) {
 		if (router.history.canGoBack()) router.history.back()
 		else
 			void navigate({
-				to: '/library/$library',
-				params: { library: libraryId },
+				to: '.',
+				search: (previous) => {
+					const { addPodcast: _addPodcast, ...rest } = previous as Record<
+						string,
+						unknown
+					>
+					return rest
+				},
 				replace: true,
-			})
+			} as Parameters<typeof navigate>[0])
 	}
 	const restoreFocus = (event: Event) => {
 		event.preventDefault()
@@ -44,7 +50,9 @@ export function PodcastSearchModal({ libraryId }: { libraryId: string }) {
 				returnFocus.current?.isConnected &&
 				returnFocus.current !== document.body
 					? returnFocus.current
-					: document.querySelector<HTMLElement>('a[href$="/podcast/search"]')
+					: document.querySelector<HTMLElement>(
+							'a[href*="addPodcast=1"], a[href$="/podcast/search"]',
+						)
 			trigger?.focus()
 		})
 	}

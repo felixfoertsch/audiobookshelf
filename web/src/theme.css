@@ -4,8 +4,13 @@
 html {
 	scrollbar-width: none;
 }
-html::-webkit-scrollbar {
-	display: none;
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+	width: 0;
+	height: 0;
+}
+body {
+	scrollbar-width: none;
 }
 :root {
 	--font-sans:

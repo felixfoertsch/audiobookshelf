@@ -87,7 +87,7 @@ test('playlist tile shows cover, name, item count and duration', () => {
 		<PlaylistList playlists={[playlist]} pending={false} create={vi.fn()} />,
 	)
 	expect(screen.getByRole('heading', { name: 'Evening' })).toBeTruthy()
-	expect(screen.getByText('1 item · 00:01:00')).toBeTruthy()
+	expect(screen.getByText('1 item · 1:00')).toBeTruthy()
 	expect(container.querySelector('img')?.getAttribute('src')).toBe(
 		'/api/items/book/cover?token=',
 	)

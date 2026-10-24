@@ -6,6 +6,7 @@ import { Button } from '../../shared/components/ui/button'
 import { Label } from '../../shared/components/ui/label'
 import { NativeSelect } from '../../shared/components/ui/native-select'
 import { dateTime } from '../../shared/date-time'
+import { duration } from '../../shared/lib/duration'
 
 const sessionSchema = z.object({
 	id: z.string(),
@@ -48,9 +49,7 @@ function number(value: number) {
 	return new Intl.NumberFormat().format(value)
 }
 function elapsed(seconds: number) {
-	const hours = Math.floor(seconds / 3600)
-	const minutes = Math.floor((seconds % 3600) / 60)
-	return hours ? `${hours}h ${minutes}m` : `${minutes}m`
+	return duration(seconds, true)
 }
 function dateKey(date: Date) {
 	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`

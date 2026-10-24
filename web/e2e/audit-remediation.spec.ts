@@ -307,10 +307,10 @@ for (const prefix of ['', '/abs']) {
 				has: page.getByRole('heading', { name: title, exact: true }),
 			})
 		await expect(
-			card('Counted show').getByText('117 unplayed of 120', { exact: true }),
+			card('Counted show').getByText('3/120 (3 %)', { exact: true }),
 		).toBeVisible()
 		await expect(
-			card('Empty show').getByText('117 unplayed of 120', { exact: true }),
+			card('Empty show').getByText('3/120 (3 %)', { exact: true }),
 		).toBeVisible()
 		await expect(
 			card('Unknown show').getByText('0 episodes', { exact: true }),
@@ -319,7 +319,7 @@ for (const prefix of ['', '/abs']) {
 			card('Distinct recent episode').getByRole('heading', { level: 3 }),
 		).toHaveText('Distinct recent episode')
 		await expect(card('Distinct recent episode')).toContainText('Counted show')
-		await expect(card('Distinct recent episode')).toContainText('01:01:11')
+		await expect(card('Distinct recent episode')).toContainText('2026-10-20')
 		await expect(card('Duration unknown episode')).not.toContainText('00:00:00')
 		await expect(
 			page.getByRole('button', { name: 'Item actions', exact: true }),
@@ -331,7 +331,7 @@ for (const prefix of ['', '/abs']) {
 		await page.goto(
 			`${prefix}/new/library/podcasts/bookshelf?filter=feed-open&sort=media.metadata.title`,
 		)
-		await expect(card('Counted show')).toContainText('117 unplayed of 120')
+		await expect(card('Counted show')).toContainText('3/120 (3 %)')
 		await page
 			.getByRole('button', { name: 'View options', exact: true })
 			.click()
