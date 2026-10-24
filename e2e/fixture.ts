@@ -18,6 +18,7 @@ import {
 } from './fixture-api'
 import { readerFixtureResponse } from './reader-preview'
 import { realRecords } from './real-media/load'
+import { handleSidecarRequest } from './sidecar-mock'
 
 const dist = process.env.FIXTURE_DIST_PATH
 	? new URL(`file://${process.env.FIXTURE_DIST_PATH.replace(/\/$/, '')}/`)
@@ -124,6 +125,10 @@ async function fileResponse(
 async function handleRequest(request: Request) {
 	const url = new URL(request.url)
 	const path = url.pathname
+	if (path.startsWith('/psb/')) {
+		url.pathname = path.slice(4)
+		return handleSidecarRequest(new Request(url, request))
+	}
 	if (path === '/health') return new Response('ok')
 	if (path === '/__fixture/observations') return json(observations)
 	if (

@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 
 export async function socketControl(
 	page: Page,
@@ -26,4 +26,7 @@ export async function signIn(
 	await page.getByLabel('Username', { exact: true }).fill(username)
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+	await expect(
+		page.getByRole('button', { name: 'Sign in', exact: true }),
+	).toHaveCount(0)
 }
