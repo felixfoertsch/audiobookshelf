@@ -166,6 +166,13 @@ async function fingerprint(path, dir, label, duration, signal, stage = () => {})
   }
 }
 
+function catalogEndpoint(provider, media) {
+  // Stable catalog identity avoids search ranking and default-storefront omissions.
+  if (provider === 'apple' && typeof media.itunesId === 'string' && /^[1-9][0-9]{0,19}$/.test(media.itunesId)) return `https://itunes.apple.com/lookup?id=${media.itunesId}&entity=podcast`
+  const query = encodeURIComponent(`${media.title} ${media.author || ''}`.trim())
+  return provider === 'apple' ? `https://itunes.apple.com/search?media=podcast&entity=podcast&limit=5&term=${query}` : `https://gpodder.net/search.json?q=${query}`
+}
+
 function catalogResults(provider, payload) {
   const rows = provider === 'apple' ? payload?.results : payload
   if (!Array.isArray(rows)) throw new Error('malformed_catalog')
@@ -311,7 +318,6 @@ class AdAnalysisManager {
       const title = initial.item.media.title
       const author = initial.item.media.author
       if (!result.corpus.collectionPaused && (!normalize(title) || title.length > 200 || (author && author.length > 200) || /https?:|[\r\n\u0000]/i.test(`${title} ${author || ''}`))) throw new Error('unsafe_public_metadata')
-      const query = encodeURIComponent(`${title} ${author || ''}`.trim())
       const feeds = new Map()
       const audioUrls = new Set()
       let extras = 0
@@ -322,7 +328,7 @@ class AdAnalysisManager {
         const attempt = { provider, route, status: 'empty' }
         result.catalogs.push(attempt)
         try {
-          const endpoint = provider === 'apple' ? `https://itunes.apple.com/search?media=podcast&entity=podcast&limit=5&term=${query}` : `https://gpodder.net/search.json?q=${query}`
+          const endpoint = catalogEndpoint(provider, initial.item.media)
           setStage('catalog_search')
           const response = await guardedRequest(endpoint)
           const candidates = catalogResults(provider, JSON.parse(response.data.toString()))
@@ -433,6 +439,7 @@ module.exports.signature = signature
 module.exports.publicResult = publicResult
 module.exports.request = request
 module.exports.fingerprint = fingerprint
+module.exports.catalogEndpoint = catalogEndpoint
 module.exports.catalogResults = catalogResults
 module.exports.combineSegments = combineSegments
 module.exports.alignAsync = alignAsync

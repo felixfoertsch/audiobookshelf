@@ -35,7 +35,7 @@ describe('sanitized ad-analysis diagnostics', () => {
     const secret = 'SECRET /private/audio https://token@example.org'
     const audioFile = { metadata: { path }, duration: 60 }
     const episode = { id: 'ep', title: 'Episode', publishedAt: new Date('2026-01-01'), audioFile, duration: 60, extraData: {}, save: async () => {} }
-    const item = { id: 'item', extraData: { adAnalysisEnabled: true }, media: { title: 'Show & punctuation!', author: 'Public Author', podcastEpisodes: [episode] } }
+    const item = { id: 'item', extraData: { adAnalysisEnabled: true }, media: { title: 'Show & punctuation!', author: 'Public Author', itunesId: '1519234952', podcastEpisodes: [episode] } }
     let failAt = 'catalog_search'
     let feedPadding = 0
     let corpusFailure = ''
@@ -60,6 +60,7 @@ describe('sanitized ad-analysis diagnostics', () => {
         callback(null, { stdout: JSON.stringify({ fingerprint: Array(Math.round((60 - DELAY) / PERIOD)).fill(1) }) })
       } }
       if (name === 'axios') return { get: async (url, config) => {
+        if (url.includes('itunes.apple.com')) expect(url).to.equal('https://itunes.apple.com/lookup?id=1519234952&entity=podcast')
         const stage = url.includes('itunes.apple.com') || url.includes('gpodder.net') ? 'catalog_search' : url.endsWith('/rss') ? 'catalog_feed' : 'catalog_audio'
         if (stage === failAt) throw new Error('maxContentLength SECRET /private/audio')
         let data = stage === 'catalog_search' ? JSON.stringify(url.includes('itunes.apple.com') ? { results: [{ feedUrl: 'https://example.org/rss', collectionName: item.media.title }] } : [{ url: 'https://example.org/rss', title: item.media.title }]) : '<rss version="2.0"><channel><title>Show</title><item><title>Episode</title><pubDate>Thu, 01 Jan 2026 00:00:00 GMT</pubDate><enclosure url="https://example.org/audio" type="audio/mpeg" length="100"/></item></channel></rss>'
