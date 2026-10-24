@@ -126,5 +126,7 @@ test('reserved routes fail closed and SPA deep links stay root-based', async ({
 	expect(manifest.headers()['cache-control']).toContain('no-store')
 	const missingAsset = await request.get(`${base}/assets/plain.js`)
 	expect(missingAsset.status()).toBe(404)
-	expect(missingAsset.headers()['cache-control']).not.toContain('immutable')
+	expect(missingAsset.headers()['cache-control'] ?? '').not.toContain(
+		'immutable',
+	)
 })
