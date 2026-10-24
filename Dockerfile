@@ -37,6 +37,6 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 COPY . .
 ENV CI=1
-CMD ["bunx", "playwright", "test"]
+CMD ["bun", "x", "playwright", "test"]
 
 FROM runtime AS final

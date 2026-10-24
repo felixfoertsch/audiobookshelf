@@ -54,7 +54,7 @@ test('native login cookie refresh, Range, and WebSocket cross proxy', async ({
 test('sidecar prefix strip, bearer-only auth, availability, and item ACL', async ({
 	request,
 }) => {
-	const mock = 'http://sidecar-mock:4181/__mock/state'
+	const mock = `${process.env.PSB_MOCK_CONTROL_URL || 'http://sidecar-mock:4181'}/__mock/state`
 	await request.post(mock, {
 		data: { unavailable: false, unauthorized: false },
 	})

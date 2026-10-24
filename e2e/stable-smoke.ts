@@ -21,6 +21,17 @@ const secret = (key: string) => {
 const browser = await chromium.launch()
 try {
 	const context = await browser.newContext()
+	await context.route('**/*', (route) => {
+		const request = route.request()
+		const url = new URL(request.url())
+		const read = ['GET', 'HEAD', 'OPTIONS'].includes(request.method())
+		const session =
+			request.method() === 'POST' &&
+			['/login', '/auth/refresh'].includes(url.pathname)
+		return url.origin === origin && (read || session)
+			? route.continue()
+			: route.abort()
+	})
 	const page = await context.newPage()
 	await page.goto(`${origin}/login`)
 	await page
