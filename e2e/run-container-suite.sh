@@ -24,5 +24,5 @@ for attempt in {1..30}; do
 	sleep 1
 done
 curl --fail --silent http://127.0.0.1:4180/health >/dev/null
-docker run --rm --network "$network" -e BUILT_BASE_URL=http://modern-ui-e2e-frontend:8080 \
+docker run --rm --network "container:$frontend" -e BUILT_BASE_URL=http://127.0.0.1:8080 \
 	modern-ui-e2e:runner

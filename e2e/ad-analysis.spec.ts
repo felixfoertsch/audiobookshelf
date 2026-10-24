@@ -72,7 +72,7 @@ for (const prefix of ['']) {
 			}),
 		)
 		await page.route(
-			'**/psb/api/items/podcast-1/episodes/new/analysis/enqueue',
+			'**/psb/api/podcasts/podcast-1/episode/new/ad-analysis',
 			(route) => {
 				queued++
 				return route.fulfill({ status: 202, json: { queued: true } })

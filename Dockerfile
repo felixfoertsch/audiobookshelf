@@ -9,6 +9,9 @@ FROM build AS check
 RUN bun run typecheck && bun run lint && bun run test
 
 FROM nginxinc/nginx-unprivileged:1.27.5-alpine3.21@sha256:65e3e85dbaed8ba248841d9d58a899b6197106c23cb0ff1a132b7bfe0547e4c0 AS runtime
+USER root
+RUN apk add --no-cache --upgrade ca-certificates && update-ca-certificates
+USER 101
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY proxy/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --chmod=0555 proxy/entrypoint.sh /usr/local/bin/modern-ui-entrypoint

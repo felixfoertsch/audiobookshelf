@@ -20,7 +20,9 @@ const secret = (key: string) => {
 }
 const browser = await chromium.launch()
 try {
-	const context = await browser.newContext()
+	const context = await browser.newContext({
+		extraHTTPHeaders: { Connection: 'close' },
+	})
 	await context.route('**/*', (route) => {
 		const request = route.request()
 		const url = new URL(request.url())

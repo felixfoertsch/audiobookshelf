@@ -19,6 +19,7 @@ server {
 		proxy_ssl_server_name on;
 		proxy_ssl_name ${ABS_UPSTREAM_HOST};
 		proxy_ssl_verify on;
+		proxy_ssl_verify_depth 5;
 		proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
 		proxy_set_header X-Forwarded-Proto ${EXTERNAL_SCHEME};
 		proxy_set_header X-Forwarded-Host "";
@@ -36,6 +37,7 @@ server {
 		proxy_ssl_server_name on;
 		proxy_ssl_name ${ABS_UPSTREAM_HOST};
 		proxy_ssl_verify on;
+		proxy_ssl_verify_depth 5;
 		proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
 		proxy_set_header X-Forwarded-Proto ${EXTERNAL_SCHEME};
 		proxy_set_header X-Forwarded-Host "";
@@ -58,6 +60,7 @@ server {
 		proxy_ssl_server_name on;
 		proxy_ssl_name ${PSB_UPSTREAM_HOST};
 		proxy_ssl_verify on;
+		proxy_ssl_verify_depth 5;
 		proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
 		proxy_cache off;
 		proxy_buffering off;
@@ -72,6 +75,7 @@ server {
 		proxy_ssl_server_name on;
 		proxy_ssl_name ${ABS_UPSTREAM_HOST};
 		proxy_ssl_verify on;
+		proxy_ssl_verify_depth 5;
 		proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
 		proxy_set_header X-Forwarded-Proto ${EXTERNAL_SCHEME};
 		proxy_set_header X-Forwarded-Host "";
@@ -98,6 +102,7 @@ server {
 		proxy_ssl_server_name on;
 		proxy_ssl_name ${ABS_UPSTREAM_HOST};
 		proxy_ssl_verify on;
+		proxy_ssl_verify_depth 5;
 		proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
 		proxy_set_header X-Forwarded-Proto ${EXTERNAL_SCHEME};
 		proxy_set_header X-Forwarded-Host "";
