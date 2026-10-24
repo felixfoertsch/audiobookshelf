@@ -805,7 +805,20 @@ export function ItemView({ id }: { id: string }) {
 			{item.mediaType === 'book' && (
 				<BookFiles
 					key={`${user?.id}:${id}`}
-					item={item}
+					item={{
+						...item,
+						libraryFiles: item.libraryFiles?.filter(
+							(file) =>
+								file.fileType !== 'ebook' &&
+								!file.ebookFormat &&
+								!(item.media.audioFiles ?? []).some(
+									(audio) =>
+										audio.ino != null &&
+										file.ino != null &&
+										String(audio.ino) === String(file.ino),
+								),
+						),
+					}}
 					onChanged={() => void action(async () => {})}
 				/>
 			)}

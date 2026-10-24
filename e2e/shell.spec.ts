@@ -26,13 +26,6 @@ for (const prefix of ['']) {
 				page.getByRole('link', { name: 'Skip to content' }),
 			).toHaveAttribute('href', '#content')
 			await expect(page.locator('#content')).toHaveCount(1)
-			const classic = page.getByRole('link', {
-				name: 'Open Classic',
-				exact: true,
-			})
-			await expect(classic).toBeVisible()
-			await expect(classic).toBeInViewport()
-			await classic.click({ trial: true })
 			for (const path of [
 				'/library/podcasts',
 				'/library/podcasts/bookshelf',

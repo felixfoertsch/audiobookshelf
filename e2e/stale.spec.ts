@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import fixtures from '../contract/fixtures.json' with { type: 'json' }
 import { appMenu, chooseLibrary, openPlayerOptions } from './shell-controls'
 
 test('cached page candidates never override fresh stale session', async ({
@@ -9,11 +10,13 @@ test('cached page candidates never override fresh stale session', async ({
 			json: {
 				episodes: {
 					'podcast-1-ep-1': {
+						...fixtures.analysis.episodes['episode-id'],
 						status: 'stale',
 						version: null,
 						sourceSha256: null,
 						segments: [],
 						adAnalysisEnabled: true,
+						applicable: false,
 					},
 				},
 			},

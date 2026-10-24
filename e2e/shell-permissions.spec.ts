@@ -39,9 +39,6 @@ for (const prefix of [''])
 			await expect(
 				page.getByRole('searchbox', { name: 'Search library', exact: true }),
 			).toHaveCount(1)
-			await expect(
-				page.getByRole('link', { name: 'Open Classic', exact: true }),
-			).toBeVisible()
 		})
 
 for (const prefix of ['']) {

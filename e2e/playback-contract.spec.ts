@@ -112,6 +112,22 @@ for (const prefix of ['']) {
 		test('forced HLS decodes media and advances currentTime', async ({
 			page,
 		}) => {
+			await page.route('**/api/items/podcast-1/analysis', (route) =>
+				route.fulfill({
+					json: {
+						episodes: {
+							'podcast-1-ep-0': {
+								status: 'candidates',
+								version: 'fixture-v1',
+								sourceSha256: 'a'.repeat(64),
+								segments: [{ start: 4, end: 10 }],
+								adAnalysisEnabled: true,
+								applicable: true,
+							},
+						},
+					},
+				}),
+			)
 			await page.route('**/api/items/podcast-1/play/*', async (route) => {
 				const response = await route.fetch()
 				const body = await response.json()

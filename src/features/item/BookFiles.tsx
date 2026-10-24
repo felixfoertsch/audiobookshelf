@@ -30,7 +30,15 @@ export function BookFiles({
 		data: unknown
 	} | null>(null)
 	const audioFiles = item.media.audioFiles ?? []
-	const libraryFiles = item.libraryFiles ?? []
+	const audioInodes = new Set(
+		audioFiles.flatMap((file) => (file.ino == null ? [] : [String(file.ino)])),
+	)
+	const libraryFiles = (item.libraryFiles ?? []).filter(
+		(file) =>
+			!audioFiles.length ||
+			file.ino == null ||
+			!audioInodes.has(String(file.ino)),
+	)
 	const apiBase = window.__ABS_WEB_CONFIG__?.apiBasePath || ''
 	const download = (ino: string | number) =>
 		`${apiBase}/api/items/${encodeURIComponent(item.id)}/file/${encodeURIComponent(String(ino))}/download${localStorage.getItem('token') ? `?token=${encodeURIComponent(localStorage.getItem('token') || '')}` : ''}`

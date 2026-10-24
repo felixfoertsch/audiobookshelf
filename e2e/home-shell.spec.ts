@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import fixtures from '../contract/fixtures.json' with { type: 'json' }
 import { chooseTheme, settleAnimations } from './shell-controls'
 
 async function signIn(page: Page, base = '') {
@@ -168,9 +169,11 @@ test('podcast episode count card height stays stable while summary pending', asy
 	const pending = new Promise<void>((resolve) => {
 		release = resolve
 	})
-	await page.route('**/episode-summary', async (route) => {
+	await page.route('**/psb/api/podcasts/*/episode-summary', async (route) => {
 		await pending
-		await route.continue()
+		await route.fulfill({
+			json: { ...fixtures.summary, total: 120, unplayed: 117 },
+		})
 	})
 	await page.goto('/library/podcasts/bookshelf')
 	const fallback = page.getByText(/downloaded · checking feed/).first()

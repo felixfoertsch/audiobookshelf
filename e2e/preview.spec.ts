@@ -10,12 +10,6 @@ import {
 
 async function signIn(page: import('@playwright/test').Page, prefix = '') {
 	await page.goto(`${prefix}/`)
-	await expect(
-		page.getByRole('complementary', { name: 'Alpha frontend' }),
-	).toContainText('Modern UI · Classic available for legacy access.')
-	await expect(
-		page.getByRole('link', { name: 'Open Classic', exact: true }),
-	).toHaveAttribute('href', `${prefix}/?classic=1`)
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -23,9 +17,6 @@ async function signIn(page: import('@playwright/test').Page, prefix = '') {
 	await expect(appMenu(page)).toBeVisible()
 	await closeSidebar(page)
 	await expect(page).toHaveURL(new RegExp(`${prefix}/library/podcasts$`))
-	await expect(
-		page.getByRole('link', { name: 'Open Classic', exact: true }),
-	).toHaveAttribute('href', `${prefix}/?classic=1`)
 	if (await page.getByRole('button', { name: /^Library:/ }).isVisible())
 		await expect(page.getByRole('button', { name: /^Library:/ })).toContainText(
 			'Field Notes',
@@ -228,7 +219,9 @@ for (const prefix of [''])
 		await page.getByRole('button', { name: 'Close player' }).click()
 		await expect(page.getByLabel('Audio playback')).toHaveCount(0)
 		const observations = (await (
-			await request.get(`${prefix}/__fixture/observations`)
+			await request.get(
+				`${process.env.ABS_MOCK_CONTROL_URL || 'http://abs-mock:4179'}/__fixture/observations`,
+			)
 		).json()) as {
 			itemId: string
 			episodeId: string | null

@@ -1,17 +1,43 @@
 // Sidecar contract fixture for proxy E2E; isolated from the stock ABS mock.
+import fixtures from '../contract/fixtures.json' with { type: 'json' }
 import { items } from './data'
 
-const state = { unavailable: false, unauthorized: false }
-const hash = 'a'.repeat(64)
+const state = {
+	unavailable: false,
+	unauthorized: false,
+	feedComplete: false,
+}
+const feedUsers = new Set([
+	'fixture-access',
+	'fixture-admin-access',
+	'fixture-root-access',
+	'fixture-guest-access',
+])
+const analysisFixture = fixtures.analysis.episodes['episode-id']
+const feedEpisode = {
+	id: 'feed-only-episode',
+	libraryItemId: 'podcast-1',
+	guid: 'fixture-feed-guid',
+	title: 'Feed-only fixture episode',
+	enclosureURL: 'https://example.test/feed-only.mp3',
+	publishedAt: 1893456000000,
+	duration: 2100,
+	podcast: {},
+	get downloaded() {
+		return state.feedComplete
+	},
+}
 const result = (
 	status: 'disabled' | 'complete',
 	segments: { start: number; end: number }[] = [],
 ) => ({
+	...analysisFixture,
 	status,
 	version: status === 'complete' ? 'fixture-v1' : null,
-	sourceSha256: status === 'complete' ? hash : null,
+	sourceSha256: status === 'complete' ? analysisFixture.sourceSha256 : null,
 	segments,
 	adAnalysisEnabled: status === 'complete',
+	applicable: true,
 })
 const server = Bun.serve({
 	port: Number(process.env.PSB_MOCK_PORT || 4181),
@@ -24,6 +50,8 @@ const server = Bun.serve({
 				state.unavailable = body.unavailable
 			if (typeof body.unauthorized === 'boolean')
 				state.unauthorized = body.unauthorized
+			if (typeof body.feedComplete === 'boolean')
+				state.feedComplete = body.feedComplete
 			return Response.json({ ...state })
 		}
 		if (url.pathname === '/__mock/state') return Response.json({ ...state })
@@ -31,16 +59,24 @@ const server = Bun.serve({
 		const token = request.headers
 			.get('authorization')
 			?.match(/^Bearer ([^\s]+)$/)?.[1]
-		const user = [
-			'fixture-access',
-			'fixture-admin-access',
-			'fixture-root-access',
-			'fixture-guest-access',
-		].includes(token || '')
+		const user = feedUsers.has(token || '')
 		if (state.unauthorized || !user)
 			return Response.json({ error: 'unauthorized' }, { status: 401 })
 
 		const path = url.pathname
+		if (path === '/api/podcasts/podcast-1/ad-analysis') {
+			if (request.method === 'GET') return Response.json(fixtures.consent)
+			if (request.method === 'POST') {
+				if (
+					!['fixture-admin-access', 'fixture-root-access'].includes(token || '')
+				)
+					return Response.json({ error: 'forbidden' }, { status: 403 })
+				const body = await request.json().catch(() => null)
+				if (typeof body?.enabled !== 'boolean')
+					return Response.json({ error: 'invalid_body' }, { status: 400 })
+				return Response.json(body)
+			}
+		}
 		if (path === '/api/debug/auth') {
 			return ['fixture-admin-access', 'fixture-root-access'].includes(
 				token || '',
@@ -55,7 +91,7 @@ const server = Bun.serve({
 				jobStatus[1] !== 'allowed-item'
 			)
 				return Response.json({ error: 'forbidden' }, { status: 403 })
-			return Response.json({ jobs: [] })
+			return Response.json(fixtures.status)
 		}
 		const analysis = /^\/api\/items\/([^/]+)\/analysis$/.exec(path)
 		if (analysis && request.method === 'GET') {
@@ -88,14 +124,14 @@ const server = Bun.serve({
 				return Response.json({ error: 'invalid_body' }, { status: 400 })
 			if (enqueue[1] === 'other-item')
 				return Response.json({ error: 'forbidden' }, { status: 403 })
-			return Response.json({ queued: true }, { status: 202 })
+			return Response.json(fixtures.enqueue, { status: 202 })
 		}
 		const consent = /^\/api\/podcasts\/([^/]+)\/ad-analysis$/.exec(path)
 		if (consent) {
 			const item = items.find((entry) => entry.id === consent[1])
 			if (item?.mediaType !== 'podcast')
 				return Response.json({ error: 'not_found' }, { status: 404 })
-			if (request.method === 'GET') return Response.json({ enabled: false })
+			if (request.method === 'GET') return Response.json(fixtures.consent)
 			if (request.method === 'POST') {
 				if (
 					!['fixture-admin-access', 'fixture-root-access'].includes(token || '')
@@ -114,11 +150,11 @@ const server = Bun.serve({
 				return Response.json({ error: 'not_found' }, { status: 404 })
 			const total =
 				'episodes' in item.media ? item.media.episodes?.length || 0 : 0
-			return Response.json({ total, unplayed: total, source: 'downloaded' })
+			return Response.json({ ...fixtures.summary, total, unplayed: total })
 		}
 		const recent = /^\/api\/libraries\/([^/]+)\/recent-episodes$/.exec(path)
 		if (recent) {
-			const episodes = items
+			const episodes: Record<string, unknown>[] = items
 				.filter(
 					(item) =>
 						item.mediaType === 'podcast' &&
@@ -142,12 +178,14 @@ const server = Bun.serve({
 									enclosureURL,
 									guid: episode.guid || null,
 									publishedAt: Date.parse(episode.pubDate || '') || null,
-									downloaded: true,
+									downloaded:
+										!episode.id.startsWith('feed-only') || state.feedComplete,
 									podcast: item.media,
 								}
 							})
 						: [],
 				)
+			if (recent[1] === 'podcasts') episodes.unshift(feedEpisode)
 			const limit = Math.min(100, Number(url.searchParams.get('limit') || 50))
 			const page = Math.max(0, Number(url.searchParams.get('page') || 0))
 			return Response.json({

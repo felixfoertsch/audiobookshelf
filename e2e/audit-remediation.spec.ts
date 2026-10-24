@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test'
+import fixtures from '../contract/fixtures.json' with { type: 'json' }
 import { items } from './data'
 import { chooseTheme, closeSidebar, openSidebar } from './shell-controls'
 
@@ -237,6 +238,19 @@ for (const prefix of ['']) {
 		const known = minified('podcast-1', 'Counted show', 489)
 		const empty = minified('podcast-2', 'Empty show', 0)
 		const unknown = minified('podcast-3', 'Unknown show', undefined)
+		for (const id of [known.id, empty.id])
+			await override(page, prefix, `/psb/api/podcasts/${id}/episode-summary`, {
+				...fixtures.summary,
+				total: 120,
+				unplayed: 3,
+			})
+		await override(
+			page,
+			prefix,
+			`/psb/api/podcasts/${unknown.id}/episode-summary`,
+			{},
+			503,
+		)
 		const recent = {
 			...known,
 			_type: 'episode',
@@ -275,25 +289,31 @@ for (const prefix of ['']) {
 				total: 2,
 			},
 		])
-		await override(page, prefix, '/api/libraries/podcasts/recent-episodes', {
-			episodes: [
-				{
-					...recent.recentEpisode,
-					libraryItemId: known.id,
-					podcast: known.media,
-					downloaded: true,
-				},
-				{
-					...episode,
-					title: 'Duration unknown episode',
-					duration: undefined,
-					audioFile: null,
-					libraryItemId: unknown.id,
-					podcast: unknown.media,
-					downloaded: true,
-				},
-			],
-		})
+		await override(
+			page,
+			prefix,
+			'/psb/api/libraries/podcasts/recent-episodes',
+			{
+				...fixtures.recent,
+				episodes: [
+					{
+						...recent.recentEpisode,
+						libraryItemId: known.id,
+						podcast: known.media,
+						downloaded: true,
+					},
+					{
+						...episode,
+						title: 'Duration unknown episode',
+						duration: undefined,
+						audioFile: null,
+						libraryItemId: unknown.id,
+						podcast: unknown.media,
+						downloaded: true,
+					},
+				],
+			},
+		)
 		await override(page, prefix, '/api/libraries/podcasts/items', {
 			results: [known, empty, unknown],
 			total: 3,
@@ -499,16 +519,22 @@ for (const [width, prefix] of [
 			hostileRequests.push(route.request().url())
 			return route.abort()
 		})
-		await override(page, prefix, '/api/libraries/podcasts/recent-episodes', {
-			episodes: [
-				{
-					...episodes[0],
-					subtitle: '',
-					libraryItemId: 'podcast-1',
-					podcast: { metadata: { title: 'Distinct show' } },
-				},
-			],
-		})
+		await override(
+			page,
+			prefix,
+			'/psb/api/libraries/podcasts/recent-episodes',
+			{
+				...fixtures.recent,
+				episodes: [
+					{
+						...episodes[0],
+						subtitle: '',
+						libraryItemId: 'podcast-1',
+						podcast: { metadata: { title: 'Distinct show' } },
+					},
+				],
+			},
+		)
 		await signIn(page, prefix)
 		await page.goto(`${prefix}/library/podcasts/podcast/latest`)
 		await expect(

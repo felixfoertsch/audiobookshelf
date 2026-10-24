@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import fixtures from '../contract/fixtures.json' with { type: 'json' }
 import { chooseTheme, settleAnimations } from './shell-controls'
 
 for (const base of ['']) {
@@ -77,9 +78,11 @@ test('podcast cards render downloaded fallback while summaries remain pending', 
 	const pending = new Promise<void>((resolve) => {
 		release = resolve
 	})
-	await page.route('**/episode-summary', async (route) => {
+	await page.route('**/psb/api/podcasts/*/episode-summary', async (route) => {
 		await pending
-		await route.continue()
+		await route.fulfill({
+			json: { ...fixtures.summary, total: 120, unplayed: 117 },
+		})
 	})
 	try {
 		await page.goto('/library/podcasts/bookshelf')

@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test'
+import fixtures from '../contract/fixtures.json' with { type: 'json' }
+import { items } from './data'
 import { appMenu, openPlayerOptions } from './shell-controls'
 
 // SDK boundary only. Real DOM geometry, session API and player code remain live.
@@ -13,6 +15,29 @@ const sender = `(() => {
  window.__onGCastApiAvailable(true);
 })();`
 
+test.beforeEach(async ({ page }) => {
+	const podcast = items.find((item) => item.id === 'podcast-1')
+	if (!podcast || !('episodes' in podcast.media))
+		throw new Error('Missing podcast fixture')
+	const episodes = podcast.media.episodes
+	await page.route('**/psb/api/items/podcast-1/analysis', (route) =>
+		route.fulfill({
+			json: {
+				episodes: Object.fromEntries(
+					episodes.map((episode) => [
+						episode.id,
+						{
+							...fixtures.analysis.episodes['episode-id'],
+							status: 'candidates',
+							applicable: true,
+							segments: [{ start: 2.1, end: 3.8 }],
+						},
+					]),
+				),
+			},
+		}),
+	)
+})
 for (const prefix of ['']) {
 	test(`local compact and expanded timeline pixel geometry ${prefix || 'root'}`, async ({
 		page,
@@ -38,7 +63,7 @@ for (const prefix of ['']) {
 					.evaluate((slider) => {
 						const root = slider.closest('[data-slot="slider"]')
 						const track = root?.querySelector('[data-slot="slider-track"]')
-						const marker = root?.parentElement?.querySelector(
+						const marker = slider.parentElement?.parentElement?.querySelector(
 							'[data-testid="segment-marker"]',
 						)
 						if (!track || !marker)
@@ -134,6 +159,8 @@ for (const prefix of ['']) {
 			await page.route(
 				(url) => url.pathname === `${prefix}${path}`,
 				async (route) => {
+					if (path === '/login' && route.request().method() === 'GET')
+						return route.continue()
 					const response = await route.fetch()
 					if (!response.ok()) return route.fulfill({ response })
 					const body = await response.json()

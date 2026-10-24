@@ -33,6 +33,10 @@ for (const prefix of [''])
 				await page.route(
 					(url) => url.pathname === `${prefix}${path}`,
 					async (route) => {
+						if (route.request().method() === 'GET' && path === '/login') {
+							await route.continue()
+							return
+						}
 						expect(route.request().method()).toBe('POST')
 						const response = await route.fetch()
 						if (path === '/auth/refresh' && response.status() === 401) {

@@ -61,6 +61,12 @@ Baseline Playwright manifest: **54 specs**. All retained by filename. Adaptation
 /e2e/timeline-geometry.spec.ts
 ```
 
+## Dropped obsolete assertions
+
+- `preview.spec.ts` sign-in helper: removed Alpha banner and Open Classic link assertions; standalone has no Classic frontend. All browsing/playback/layout tests retained.
+- `shell.spec.ts`: removed Open Classic visibility, viewport and click checks; remaining shell accessibility/navigation checks retained.
+- `shell-permissions.spec.ts`: removed Open Classic link check; native permission checks retained.
+
 ## Adaptation notes
 
 - `alpha-landing.spec.ts`: replaced Classic/Alpha banner assertions with standalone root login check.
@@ -70,4 +76,10 @@ Baseline Playwright manifest: **54 specs**. All retained by filename. Adaptation
 - `proxy-contract.spec.ts`: validates contract-shaped `{ episodes: record }` response, auth, ACL and proxy prefix.
 - Remaining specs: root `/` SPA and root deep links; native ABS APIs stay under their stock routes. Any per-test request overrides remain local to that spec.
 
-Full container-backed run on ffunraid: 205 tests across 55 files; 135 passed, 63 failed, 7 skipped. Final runtime image: `sha256:3bf8f6a3734a150723a5a863b74e4ca1015e114ad487722fc4e0881b62f58518`. Result copied to `/private/tmp/opencode/standalone-playwright-final.json`. Sidecar mock still lacks full debug dashboard, feed-only download lifecycle and corpus state. Playback, duplicate detail tables and old-contract assertions also fail. Retained specs are not certified passing; built-container acceptance remains failed. Restricted stable smoke passed. All test containers/images/network removed; stable and experiment unchanged.
+Latest container gate on ffunraid: **170 passed, 28 failed, 7 skipped / 205 tests**. Four launches used: rounds 1 and 3 failed discovery (AppleDouble archive files; missing JSON import attribute); round 2 ran 177/21/7; round 4 ran 170/28/7. No further rounds run. Gate remains failed; do not merge.
+
+Final runtime image: `sha256:62129769b83b49a3ce60665242292740c836f1eba8b6474cea7c9bcf534a79ed`. JSON: `/private/tmp/opencode/standalone-gate-round4.json`; exact failed assertions and stack locations: `/private/tmp/opencode/standalone-gate-remaining.txt`. Unit suite: 437 passed; typecheck, Biome and build passed.
+
+Remaining failures: analysis completion icon count (1); audiobook observations still sent through production proxy (1); audit feed count missing (1); book download/table ownership regression (7); feed-only download/shelf/permission rendering (6); HLS marker absent (1); shared socket connection/auth counts (2); library selection missing (1); missing-asset cache header absent (1); PDF canvas unpainted (1); disposed shelf response intercepts (3); shell and stale fixture links absent (2); local timeline marker geometry absent (1). Counts total 28. These are observed failure boundaries; unresolved root causes are not certified.
+
+Cleanup proof: `/private/tmp/opencode/standalone-gate-cleanup-proof.txt`. All seven test containers, tagged/superseded test images and isolated network removed. Stable and experiment container IDs/image digests match `/private/tmp/opencode/standalone-gate-before.txt`. No push or deployment.

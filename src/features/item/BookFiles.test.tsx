@@ -80,11 +80,12 @@ describe('BookFiles', () => {
 		expect(screen.getByRole('table', { name: 'Library files' })).toBeTruthy()
 		expect(screen.getByText('track metadata.m4b')).toBeTruthy()
 		expect(screen.getByText(/Narrated title/)).toBeTruthy()
+		expect(screen.queryByRole('row', { name: /part 1\.m4b/ })).toBeNull()
 		expect(
 			screen
-				.getByRole('link', { name: 'Download part 1.m4b' })
+				.getByRole('link', { name: 'Download part 2.m4b' })
 				.getAttribute('href'),
-		).toContain('/api/items/book%2F1/file/7/download')
+		).toContain('/api/items/book%2F1/file/8/download')
 	})
 
 	it('shows ffprobe JSON to admins without reloading and deletes only confirmed listed file', async () => {
@@ -106,14 +107,17 @@ describe('BookFiles', () => {
 			{ method: 'GET' },
 		)
 		expect(onChanged).not.toHaveBeenCalled()
-		const library = screen.getAllByRole('table', { name: 'Library files' })[0]
+		const library = screen.getByRole('table', { name: 'Library files' })
+		expect(
+			screen.getAllByRole('table', { name: 'Library files' }),
+		).toHaveLength(1)
 		fireEvent.click(
-			within(library).getByRole('button', { name: 'Delete part 1.m4b' }),
+			within(library).getByRole('button', { name: 'Delete part 2.m4b' }),
 		)
 		await waitFor(() =>
 			expect(api).toHaveBeenNthCalledWith(
 				2,
-				'/api/items/book%2F1/file/7',
+				'/api/items/book%2F1/file/8',
 				expect.anything(),
 				{ method: 'DELETE' },
 			),
@@ -127,9 +131,10 @@ describe('BookFiles', () => {
 		const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
 		render(<BookFiles item={item} onChanged={vi.fn()} />)
 		fireEvent.click(
-			within(
-				screen.getAllByRole('table', { name: 'Library files' })[0],
-			).getByRole('button', { name: 'Delete part 1.m4b' }),
+			within(screen.getByRole('table', { name: 'Library files' })).getByRole(
+				'button',
+				{ name: 'Delete part 2.m4b' },
+			),
 		)
 		expect(confirm).toHaveBeenCalled()
 		expect(api).not.toHaveBeenCalled()
@@ -142,9 +147,10 @@ describe('BookFiles', () => {
 		const onChanged = vi.fn()
 		render(<BookFiles item={item} onChanged={onChanged} />)
 		fireEvent.click(
-			within(
-				screen.getAllByRole('table', { name: 'Library files' })[0],
-			).getByRole('button', { name: 'Delete part 1.m4b' }),
+			within(screen.getByRole('table', { name: 'Library files' })).getByRole(
+				'button',
+				{ name: 'Delete part 2.m4b' },
+			),
 		)
 		expect((await screen.findByRole('alert')).textContent).toContain(
 			'Delete denied',

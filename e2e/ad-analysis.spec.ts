@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import fixtures from '../contract/fixtures.json' with { type: 'json' }
 import { items } from './data'
 
 for (const prefix of ['']) {
@@ -43,18 +44,21 @@ for (const prefix of ['']) {
 		)
 		let queued = 0
 		const completed = (segments: { start: number; end: number }[]) => ({
+			...fixtures.analysis.episodes['episode-id'],
 			status: 'complete',
 			version: 'fixture-v1',
-			sourceSha256: 'a'.repeat(64),
 			segments,
 			adAnalysisEnabled: true,
+			applicable: true,
 		})
 		const notAnalysed = {
+			...fixtures.analysis.episodes['episode-id'],
 			status: 'disabled',
 			version: null,
 			sourceSha256: null,
 			segments: [],
 			adAnalysisEnabled: true,
+			applicable: true,
 		}
 		await page.route('**/psb/api/items/podcast-1/analysis', (route) =>
 			route.fulfill({
@@ -75,7 +79,7 @@ for (const prefix of ['']) {
 			'**/psb/api/podcasts/podcast-1/episode/new/ad-analysis',
 			(route) => {
 				queued++
-				return route.fulfill({ status: 202, json: { queued: true } })
+				return route.fulfill({ status: 202, json: fixtures.enqueue })
 			},
 		)
 		await page.goto(`${prefix}/`)
@@ -115,7 +119,8 @@ for (const prefix of ['']) {
 				json: {
 					episodes: {
 						new: {
-							status: 'complete',
+							...completed([]),
+							status: 'no_difference',
 							version: 'fixture-v1',
 							sourceSha256: 'b'.repeat(64),
 							segments: [],

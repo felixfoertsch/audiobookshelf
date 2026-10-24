@@ -5,6 +5,13 @@ server {
 	index index.html;
 
 	location = /health { access_log off; return 200 "ok\\n"; }
+	location = /psb { return 404; }
+	location = /manifest.webmanifest {
+		default_type application/manifest+json;
+		add_header Cache-Control "no-store";
+		try_files $uri =404;
+	}
+
 	location ^~ /init { return 404; }
 	location = /login {
 		error_page 418 = @abs_login;
@@ -48,6 +55,7 @@ server {
 		proxy_cookie_flags ~.* secure httponly samesite=lax;
 		add_header Cache-Control "no-store" always;
 	}
+	location = /psb/ { return 404; }
 	location ^~ /psb/ {
 		proxy_pass ${PSB_UPSTREAM}/;
 		proxy_set_header Authorization $http_authorization;
@@ -66,7 +74,7 @@ server {
 		proxy_buffering off;
 		add_header Cache-Control "no-store" always;
 	}
-	location ~ ^/(api|auth|socket\.io|public|hls|feed)(/|$) {
+	location ~ ^/(api|auth|socket\.io|public|hls|feed|media)(/|$) {
 		proxy_pass ${ABS_UPSTREAM};
 		proxy_http_version 1.1;
 		proxy_set_header Host ${ABS_UPSTREAM_HOST};
@@ -91,7 +99,7 @@ server {
 		add_header Cache-Control "no-store" always;
 	}
 	location ^~ /internal-api { return 404; }
-	location ~ ^/(api|auth|socket\.io|public|hls|feed|psb)$ { return 404; }
+	location ~ ^/(api|auth|socket\.io|public|hls|feed|media|psb)$ { return 404; }
 	location ~ ^/(status|ping|healthcheck)$ {
 		limit_except GET { deny all; }
 		proxy_pass ${ABS_UPSTREAM};

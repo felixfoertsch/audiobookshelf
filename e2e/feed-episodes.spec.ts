@@ -67,18 +67,43 @@ for (const prefix of ['']) {
 					fullPage: false,
 				})
 				const token = await page.evaluate(() => localStorage.getItem('token'))
+				const absControl =
+					process.env.ABS_MOCK_CONTROL_URL || 'http://abs-mock:4179'
+				const psbControl =
+					process.env.PSB_MOCK_CONTROL_URL || 'http://sidecar-mock:4181'
+				const initialState = await page.request.post(
+					`${psbControl}/__mock/state`,
+					{
+						data: { feedComplete: false },
+					},
+				)
+				expect(initialState.ok()).toBe(true)
 				const response = await page.request.post(
-					`${prefix}/__fixture/feed-complete`,
+					`${absControl}/__fixture/feed-complete`,
 					{ headers: { authorization: `Bearer ${token}` } },
 				)
 				expect(response.ok()).toBe(true)
+				const sidecarResponse = await page.request.post(
+					`${psbControl}/__mock/state`,
+					{
+						data: { feedComplete: true },
+					},
+				)
+				expect(sidecarResponse.ok()).toBe(true)
 				await expect(
 					row.getByRole('button', { name: 'Play Feed-only fixture episode' }),
 				).toBeEnabled()
 				// Restore fixture membership for next viewport/theme run.
-				await page.request.delete(`${prefix}/__fixture/feed-complete`, {
+				await page.request.delete(`${absControl}/__fixture/feed-complete`, {
 					headers: { authorization: `Bearer ${token}` },
 				})
+				const resetSidecar = await page.request.post(
+					`${psbControl}/__mock/state`,
+					{
+						data: { feedComplete: false },
+					},
+				)
+				expect(resetSidecar.ok()).toBe(true)
 			})
 		}
 	}

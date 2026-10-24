@@ -564,7 +564,7 @@ async function handleRequest(request: Request) {
 			audioTracks: syntheticTracks
 				? syntheticTracks.map((track, index) => ({
 						index: track.index,
-						contentUrl: `/media/boundary-${index + 1}`,
+						contentUrl: `/public/session/${id}/track/${index + 1}?source=boundary-${index + 1}`,
 						mimeType: 'audio/wav',
 						duration: track.duration,
 						startOffset: track.startOffset,
@@ -572,7 +572,7 @@ async function handleRequest(request: Request) {
 				: bookRecord
 					? bookRecord.tracks.map((track, index, tracks) => ({
 							index: index + 1,
-							contentUrl: `/media/${encodeURIComponent(index === 0 ? item.id : track.id)}`,
+							contentUrl: `/public/session/${id}/track/${index + 1}`,
 							mimeType: 'audio/mpeg',
 							duration: track.duration,
 							startOffset: tracks
