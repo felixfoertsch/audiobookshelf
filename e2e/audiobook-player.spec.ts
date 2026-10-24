@@ -160,7 +160,9 @@ for (const prefix of ['']) {
 			expect(row).toBeTruthy()
 			expect(row?.body.currentTime).toBeGreaterThanOrEqual(0)
 		}
-		const logs = await page.request.get(`${prefix}/__fixture/observations`)
+		const logs = await page.request.get(
+			`${process.env.ABS_MOCK_CONTROL_URL || page.url().split('/').slice(0, 3).join('/')}/__fixture/observations`,
+		)
 		const observations = await logs.json()
 		for (const action of ['sync', 'close'])
 			expect(observations).toEqual(
