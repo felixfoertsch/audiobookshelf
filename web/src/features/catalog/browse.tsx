@@ -1467,14 +1467,15 @@ export function BrowsePage({
 				{!section && (
 					<div className="flex flex-wrap items-center gap-2">
 						<Button
-							className={selectMode ? 'invisible' : ''}
 							size="sm"
 							variant="outline"
 							ref={selectTrigger}
 							aria-pressed={selectMode}
-							onClick={() => setSelectMode(true)}
+							onClick={() =>
+								selectMode ? exitSelection() : setSelectMode(true)
+							}
 						>
-							Select
+							{selectMode ? 'Done' : 'Select'}
 						</Button>
 						{selectMode && (
 							<SelectionToolbar

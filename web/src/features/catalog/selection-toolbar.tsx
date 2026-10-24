@@ -32,7 +32,7 @@ export function SelectionToolbar({
 	return (
 		<section
 			aria-label="Selection"
-			className="fixed inset-x-3 bottom-24 z-30 mx-auto flex max-w-2xl flex-wrap items-center justify-center gap-2 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg"
+			className="fixed inset-x-3 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-2xl flex-wrap items-center justify-center gap-2 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg"
 		>
 			<span role="status" className="text-sm tabular-nums">
 				{count} selected
@@ -46,7 +46,12 @@ export function SelectionToolbar({
 			</Button>
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
-					<Button size="sm" variant="outline" disabled={!count || pending}>
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={!count || pending}
+						aria-describedby={!count ? 'selection-help' : undefined}
+					>
 						<ListChecks />
 						Bulk actions
 					</Button>
@@ -63,6 +68,11 @@ export function SelectionToolbar({
 					)}
 				</DropdownMenuContent>
 			</DropdownMenu>
+			{!count && (
+				<p id="selection-help" className="text-sm text-muted-foreground">
+					Select items to enable bulk actions.
+				</p>
+			)}
 			{children}
 			<Button size="sm" onClick={done}>
 				Done

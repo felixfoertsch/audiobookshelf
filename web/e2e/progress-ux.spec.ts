@@ -143,7 +143,10 @@ test('library selection stays compact until explicit action sheet; cover opens s
 		page.getByRole('dialog', { name: 'More actions', exact: true }),
 	).toBeVisible()
 	await page.keyboard.press('Escape')
-	await page.getByRole('button', { name: 'Done', exact: true }).click()
+	await page
+		.getByRole('region', { name: 'Selection', exact: true })
+		.getByRole('button', { name: 'Done', exact: true })
+		.click()
 	await expect(page.getByRole('checkbox', { name: /^Select / })).toHaveCount(0)
 	await page
 		.getByRole('link', { name: 'Field Notes', exact: true })

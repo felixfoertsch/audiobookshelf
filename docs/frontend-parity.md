@@ -6,6 +6,12 @@ Modern is only supported frontend. Classic remains reachable for legacy access b
 
 Safari/iOS and Cast hardware deferred to #8. Browser Cast code advertises direct-audio-only and hardware unverified (`web/src/features/player/CastControl.tsx:78`).
 
+## Selection and episode control regression checks
+
+- Bookshelf Select remains visible as Done while selection is active; toolbar also retains Done. Empty bulk menu stays disabled with visible explanation. Fixed toolbar includes bottom safe-area offset. `e2e/select-latest.spec.ts` covers mini-player-preserving client navigation, 390/1280, root and `/abs`, zero/selected actions and exit; no live bulk mutations.
+- Shared `EpisodeRow.tsx` gives every labeled non-play button the same secondary tint, current-color boundary and coarse-pointer targets. Pressed state retains accent tint and existing icons/labels. Play retains primary fill. Contrast guard in `e2e/select-latest.spec.ts` checks ≥4.5:1 foreground/background and matching boundary color (therefore ≥3:1), light/dark at both widths and mount paths.
+- Live checks reproduced disappearing Select toggle, but not missing toolbar: live toolbar remained visible with mini-player at both widths. Existing geometry checks asserted DOM visibility and Escape but never persistent exit toggle, zero-selection explanation or mini-player. No evidence supports claiming a portal/permission fault. Before/after captures use live data; after uses local built assets intercepted in browser, not deployment.
+
 ## Routes and concrete action ownership
 
 Route files live in `web/src/routes/`; routes rendering a feature delegate to the listed feature owner. Permissions below describe visible client gates only; backend authorization remains authoritative. `A` authenticated; `M` root/admin; `upload` is `user.permissions.upload`; `update/delete/download` are per-user permission flags. Route guards and non-action redirects have no mutation action.

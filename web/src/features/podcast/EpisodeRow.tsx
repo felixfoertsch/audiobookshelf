@@ -50,7 +50,7 @@ export function EpisodeRow({
 	actions?: ReactNode
 }) {
 	return (
-		<li className="flex min-w-0 gap-4 py-5 [overflow-wrap:anywhere]">
+		<li className="flex min-w-0 gap-4 py-5 [overflow-wrap:anywhere] [&_button[aria-label]:not([aria-label^='Play'])]:min-h-6 [&_button[aria-label]:not([aria-label^='Play'])]:min-w-6 [&_button[aria-label]:not([aria-label^='Play'])]:rounded-md [&_button[aria-label]:not([aria-label^='Play'])]:border [&_button[aria-label]:not([aria-label^='Play'])]:border-current [&_button[aria-label]:not([aria-label^='Play'])]:bg-secondary [&_button[aria-label]:not([aria-label^='Play'])]:text-secondary-foreground [&_button[aria-pressed=true]]:bg-accent [&_button[aria-pressed=true]]:text-accent-foreground [@media(pointer:coarse)]:[&_button[aria-label]]:min-h-11 [@media(pointer:coarse)]:[&_button[aria-label]]:min-w-11">
 			{image}
 			<div className="min-w-0 flex-1">
 				{children}

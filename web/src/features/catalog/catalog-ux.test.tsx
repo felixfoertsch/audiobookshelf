@@ -104,7 +104,7 @@ it('starts without selection controls; Select shows compact count only; More act
 		screen.getByRole('button', { name: 'Mark all episodes unfinished' }),
 	).toBeTruthy()
 	fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0])
-	fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+	fireEvent.click(screen.getByRole('button', { name: 'Done', pressed: true }))
 	expect(screen.queryByRole('checkbox')).toBeNull()
 	expect(screen.getByRole('button', { name: 'Select' })).toBeTruthy()
 })
