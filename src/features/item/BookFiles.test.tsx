@@ -80,7 +80,7 @@ describe('BookFiles', () => {
 		expect(screen.getByRole('table', { name: 'Library files' })).toBeTruthy()
 		expect(screen.getByText('track metadata.m4b')).toBeTruthy()
 		expect(screen.getByText(/Narrated title/)).toBeTruthy()
-		expect(screen.queryByRole('row', { name: /part 1\.m4b/ })).toBeNull()
+		expect(screen.getByRole('row', { name: /part 1\.m4b/ })).toBeTruthy()
 		expect(
 			screen
 				.getByRole('link', { name: 'Download part 2.m4b' })
