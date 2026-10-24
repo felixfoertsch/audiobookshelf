@@ -1,13 +1,45 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { useAuth } from '../../api'
+import german from './fixtures/lage-der-nation-search.json'
+import lateralFeed from './fixtures/lateral-feed.json'
+import lateral from './fixtures/lateral-search.json'
+import uncharted from './fixtures/uncharted-search.json'
 import {
 	canManagePodcasts,
 	clearPodcastDownloadQueue,
 	createPodcast,
 	downloadPodcastEpisodes,
+	feedSchema,
 	makePodcastPayload,
+	searchSchema,
 	updatePodcastMedia,
 } from './index'
+
+// Public iTunes results and Lateral RSS metadata captured through native ABS API;
+// allowlisted publisher fields only, no credentials, account data or episodes.
+it('parses public live iTunes results, including missing artist IDs', () => {
+	for (const results of [lateral, uncharted, german]) {
+		expect(results.some((result) => result.artistId === null)).toBe(true)
+		expect(searchSchema.parse(results)).toHaveLength(results.length)
+	}
+})
+it('parses live feed preview metadata', () => {
+	expect(feedSchema.parse(lateralFeed).podcast.metadata.title).toBe(
+		'Lateral with Tom Scott',
+	)
+})
+it('accepts serializer null artwork and omitted feed URLs without weakening field types', () => {
+	const { feedUrl: _, ...withoutFeed } = lateral[0]
+	expect(
+		searchSchema.parse([{ ...withoutFeed, cover: null }])[0].feedUrl,
+	).toBeUndefined()
+})
+it('rejects malformed required search fields and non-string feed URLs', () => {
+	for (const change of [{ title: null }, { feedUrl: 123 }, { id: null }])
+		expect(searchSchema.safeParse([{ ...lateral[0], ...change }]).success).toBe(
+			false,
+		)
+})
 
 afterEach(() => {
 	vi.restoreAllMocks()

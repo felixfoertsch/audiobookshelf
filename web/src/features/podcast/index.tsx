@@ -20,7 +20,7 @@ import { AdAnalysisStatus } from './AdAnalysisStatus'
 import { EpisodeDescription, EpisodeRow } from './EpisodeRow'
 import { OpmlImport } from './opml'
 
-const searchSchema = z.array(
+export const searchSchema = z.array(
 	z
 		.object({
 			id: z.union([z.string(), z.number()]),
@@ -28,7 +28,7 @@ const searchSchema = z.array(
 			artistName: z.string().optional(),
 			feedUrl: z.string().optional(),
 			pageUrl: z.string().optional(),
-			cover: z.string().optional(),
+			cover: z.string().nullish(),
 			genres: z.array(z.string()).optional(),
 			trackCount: z.number().optional(),
 			explicit: z.boolean().optional(),
@@ -36,11 +36,11 @@ const searchSchema = z.array(
 			releaseDate: z.string().optional(),
 			language: z.string().optional(),
 			type: z.string().optional(),
-			artistId: z.union([z.string(), z.number()]).optional(),
+			artistId: z.union([z.string(), z.number()]).nullish(),
 		})
 		.passthrough(),
 )
-const feedSchema = z.object({
+export const feedSchema = z.object({
 	podcast: z
 		.object({
 			episodes: z.array(z.unknown()).optional(),

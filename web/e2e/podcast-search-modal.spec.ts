@@ -47,6 +47,20 @@ for (const base of ['', '/abs']) {
 			await expect(modal).toBeVisible()
 			await page.goto(`${base}/new/library/podcasts/podcast/search`)
 			await expect(modal).toBeVisible()
+			await modal.getByLabel('Podcast name or RSS URL').fill('Lateral')
+			await modal.getByRole('button', { name: 'Search', exact: true }).click()
+			await expect(
+				modal.getByRole('button', { name: 'Subscribe', exact: true }).first(),
+			).toBeVisible()
+			await modal
+				.getByRole('button', { name: 'Subscribe', exact: true })
+				.first()
+				.click()
+			await expect(modal.getByLabel('Title', { exact: true })).not.toHaveValue(
+				'',
+			)
+			await expect(modal.getByLabel('Destination folder')).toBeVisible()
+			await expect(modal.getByRole('alert')).toHaveCount(0)
 		})
 	}
 }

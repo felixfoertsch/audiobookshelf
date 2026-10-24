@@ -1,0 +1,32 @@
+[
+	{
+		"id": 1092957894,
+		"artistId": null,
+		"title": "Lage der Nation - der Politik-Podcast aus Berlin",
+		"artistName": "Philip Banse & Ulf Buermeyer",
+		"description": "",
+		"descriptionPlain": "",
+		"releaseDate": "2026-10-21T18:29:00Z",
+		"genres": ["Politics", "Podcasts", "News", "Society & Culture"],
+		"cover": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts113/v4/da/72/0b/da720b3e-9cb3-0239-fad9-0f80d5daff10/mza_7473842586054974690.png/600x600bb.jpg",
+		"trackCount": 502,
+		"feedUrl": "https://feeds.lagedernation.org/feeds/ldn-mp3.xml",
+		"pageUrl": "https://podcasts.apple.com/us/podcast/lage-der-nation-der-politik-podcast-aus-berlin/id1092957894?uo=4",
+		"explicit": false
+	},
+	{
+		"id": 1870086709,
+		"artistId": null,
+		"title": "Kennzeichen E - Der Podcast für elektrische Mobilität",
+		"artistName": "Lage der Nation & Christina Kunkel",
+		"description": "",
+		"descriptionPlain": "",
+		"releaseDate": "2026-10-16T13:46:00Z",
+		"genres": ["Business News", "Podcasts", "News", "Tech News"],
+		"cover": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts221/v4/08/c8/87/08c8872f-42a8-7910-e8b6-b44a89ed3c17/mza_12104381563337490898.png/600x600bb.jpg",
+		"trackCount": 20,
+		"feedUrl": "https://feeds.lagedernation.org/feeds/kze-mp3.xml",
+		"pageUrl": "https://podcasts.apple.com/us/podcast/kennzeichen-e-der-podcast-f%C3%BCr-elektrische-mobilit%C3%A4t/id1870086709?uo=4",
+		"explicit": false
+	}
+]

@@ -1009,6 +1009,20 @@ export async function fixtureApi(
 		if (item?.mediaType !== 'podcast') return json({ error: 'Not found' }, 404)
 		return json({ total: 120, unplayed: 117, source: 'feed' })
 	}
+	if (path === '/api/search/podcast' && method === 'GET') {
+		return json(
+			realRecords
+				.filter((r) => r.kind === 'podcast')
+				.map((record) => ({
+					id: record.id,
+					title: record.title,
+					artistId: null,
+					artistName: record.author,
+					feedUrl: record.feedUrl,
+					cover: null,
+				})),
+		)
+	}
 	if (path === '/api/podcasts/feed' && method === 'POST') {
 		if (!admin) return json({ error: 'Forbidden' }, 403)
 		const input = z

@@ -1,0 +1,17 @@
+{
+	"podcast": {
+		"metadata": {
+			"title": "Lateral with Tom Scott",
+			"author": "Tom Scott and David Bodycombe",
+			"description": "Award-winning comedy panel game about weird questions with wonderful answers. Each week, Tom Scott is joined by three guests to ask each other questions with a sideways twist. There's no points or prizes - just reputation and bragging rights on the line. Enquiries and question submissions: https://www.lateralcast.com.\nAd-free shows and bonus content: https://www.lateralcast.com/club.",
+			"descriptionPlain": "Award-winning comedy panel game about weird questions with wonderful answers. Each week, Tom Scott is joined by three guests to ask each other questions with a sideways twist. There's no points or prizes - just reputation and bragging rights on the line. Enquiries and question submissions: https://www.lateralcast.com.\nAd-free shows and bonus content: https://www.lateralcast.com/club.",
+			"feedUrl": "https://feeds.megaphone.fm/lateralcast",
+			"image": "https://megaphone.imgix.net/podcasts/2a3f4416-77e3-11ee-8e56-f7ac65d137ba/image/b722eeab8db682b441e1a0c471c9f92c.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+			"categories": ["Comedy", "Education", "Leisure:Games"],
+			"language": "en",
+			"type": "episodic",
+			"explicit": "no"
+		},
+		"episodes": []
+	}
+}
