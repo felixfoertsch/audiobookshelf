@@ -116,7 +116,7 @@ for (const prefix of ['']) {
 				route.fulfill({
 					json: {
 						episodes: {
-							'podcast-1-ep-0': {
+							'podcast-1-ep-1': {
 								status: 'candidates',
 								version: 'fixture-v1',
 								sourceSha256: 'a'.repeat(64),
