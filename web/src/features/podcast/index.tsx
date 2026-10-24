@@ -13,6 +13,7 @@ import { api, getAuthGeneration, useAuth } from '../../api'
 import { enqueueEpisode, playEpisode, useQueue } from '../../player'
 import { IsoDateTimeField } from '../../shared/components/IsoDateTimeField'
 import { Button } from '../../shared/components/ui/button'
+import { duration } from '../../shared/lib/duration'
 import { useT } from '../i18n'
 import { episodeProgress, refreshProgress } from '../item/progress'
 import { updateProgress } from '../item/service'
@@ -661,14 +662,14 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 					const remaining =
 						e.duration == null || e.duration <= 0
 							? null
-							: Math.ceil(
+							: Math.round(
 									Math.max(
 										0,
 										e.duration -
 											(!progress?.isFinished
 												? (progress?.currentTime ?? 0)
 												: 0),
-									) / 60,
+									),
 								)
 					const title = e.title || 'episode'
 					const queueIndex = queued.findIndex(
@@ -707,7 +708,14 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 							)}
 							<div className="mt-2 flex flex-wrap items-center gap-2">
 								{e.downloaded === false ? (
-									<FeedDownloadAction episode={e} downloads={downloads} />
+									<>
+										<FeedDownloadAction episode={e} downloads={downloads} />
+										{duration(e.duration) && (
+											<span className="text-sm text-muted-foreground">
+												{duration(e.duration)}
+											</span>
+										)}
+									</>
 								) : (
 									<>
 										<Button
@@ -716,7 +724,7 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 											title={
 												remaining == null
 													? 'Play'
-													: `${remaining} min remaining`
+													: `${duration(remaining)} remaining`
 											}
 											onClick={() =>
 												void playEpisode(e.libraryItemId, e.id).catch((error) =>
@@ -729,7 +737,7 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 											}
 										>
 											<Play aria-hidden="true" className="size-4" />
-											{remaining == null ? 'Play' : `${remaining} min`}
+											{remaining == null ? 'Play' : duration(remaining)}
 										</Button>
 										<Button
 											variant="outline"

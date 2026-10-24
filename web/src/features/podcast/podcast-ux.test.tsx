@@ -96,7 +96,7 @@ it('latest shows Play for zero or unknown duration and remaining time for real d
 	).toContain('Play')
 	expect(
 		screen.getByRole('button', { name: 'Play Real duration' }).textContent,
-	).toContain('2 min')
+	).toContain('2:00')
 })
 it('latest previews safe short descriptions without empty disclosure', async () => {
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(
