@@ -74,8 +74,6 @@ it('clips carousel at left content inset while retaining right bleed', () => {
 	)
 	const region = screen.getByRole('region', { name: 'Newest Episodes' })
 	expect(region.className).not.toContain('-ml-')
-	expect(region.className).toContain(
-		'w-[calc(100%+var(--shelf-gutter))]',
-	)
+	expect(region.className).toContain('w-[calc(100%+var(--shelf-gutter))]')
 	expect(region.className).not.toContain('pl-[calc(')
 })

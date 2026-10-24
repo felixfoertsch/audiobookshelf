@@ -124,7 +124,9 @@ it('separates library context from page title and links episode shelf to latest'
 	expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Home')
 	expect(screen.getByText('Podcasts')).toBeTruthy()
 	expect(
-		screen.getByRole('link', { name: 'Recently added downloads' }).getAttribute('href'),
+		screen
+			.getByRole('link', { name: 'Recently added downloads' })
+			.getAttribute('href'),
 	).toBe('/library/lib/podcast/latest')
 })
 it('keeps episode cards to show identity and one release date line', async () => {
