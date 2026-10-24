@@ -1,13 +1,13 @@
 import { expect, test } from '@playwright/test'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	for (const colorScheme of ['light', 'dark'] as const) {
 		test(`sidebar fills scrolled viewport ${prefix || 'root'} ${colorScheme}`, async ({
 			page,
 		}) => {
 			await page.setViewportSize({ width: 1280, height: 800 })
 			await page.emulateMedia({ colorScheme })
-			await page.goto(`${prefix}/new/`)
+			await page.goto(`${prefix}/`)
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -16,7 +16,7 @@ for (const prefix of ['', '/abs']) {
 				['home', '/library/podcasts'],
 				['item', '/item/podcast-1'],
 			]) {
-				await page.goto(`${prefix}/new${route}`)
+				await page.goto(`${prefix}${route}`)
 				await expect(
 					page.getByRole('heading', { level: 1 }).first(),
 				).toBeVisible()

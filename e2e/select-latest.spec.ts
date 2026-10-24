@@ -2,17 +2,17 @@ import { expect, test } from '@playwright/test'
 import { contrast } from './contrast'
 import { chooseTheme, settleAnimations } from './shell-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	for (const width of [390, 1280]) {
 		test(`selection with mini-player ${width} ${prefix || 'root'}`, async ({
 			page,
 		}) => {
 			await page.setViewportSize({ width, height: 900 })
-			await page.goto(`${prefix}/new/`)
+			await page.goto(`${prefix}/`)
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-			await page.goto(`${prefix}/new/item/podcast-1`)
+			await page.goto(`${prefix}/item/podcast-1`)
 			await page
 				.getByRole('button', {
 					name: 'Play The Quiet Observatory',
@@ -76,11 +76,11 @@ for (const prefix of ['', '/abs']) {
 				page,
 			}) => {
 				await page.setViewportSize({ width, height: 900 })
-				await page.goto(`${prefix}/new/`)
+				await page.goto(`${prefix}/`)
 				await page.getByLabel('Username', { exact: true }).fill('listener')
 				await page.getByLabel('Password', { exact: true }).fill('password')
 				await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-				await page.goto(`${prefix}/new/library/podcasts/podcast/latest`)
+				await page.goto(`${prefix}/library/podcasts/podcast/latest`)
 				await chooseTheme(page, theme)
 				await settleAnimations(page)
 				const controls = page.locator(

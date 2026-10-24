@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { closeSidebar, openSidebar } from './shell-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	for (const width of [1280, 390]) {
 		for (const colorScheme of ['light', 'dark'] as const) {
 			test(`Apple material ${prefix || 'root'} ${width} ${colorScheme}`, async ({
@@ -45,7 +45,7 @@ for (const prefix of ['', '/abs']) {
 						},
 					})
 				})
-				await page.goto(`${prefix}/new/`)
+				await page.goto(`${prefix}/`)
 				await page.getByLabel('Username', { exact: true }).fill('admin')
 				await page.getByLabel('Password', { exact: true }).fill('password')
 				await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -58,7 +58,7 @@ for (const prefix of ['', '/abs']) {
 					['item', '/item/podcast-1'],
 					['settings', '/config'],
 				]) {
-					await page.goto(`${prefix}/new${route}`)
+					await page.goto(`${prefix}${route}`)
 					await expect(
 						page.getByRole('heading', { level: 1 }).first(),
 					).toBeVisible()

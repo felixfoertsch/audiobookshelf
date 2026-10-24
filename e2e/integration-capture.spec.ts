@@ -12,18 +12,18 @@ for (const width of [1280, 390]) {
 	for (const theme of ['light', 'dark']) {
 		test(`integrated book capture ${width} ${theme}`, async ({ page }) => {
 			await page.setViewportSize({ width, height: 900 })
-			await page.goto('/new/login')
+			await page.goto('/login')
 			await page.getByLabel('Username', { exact: true }).fill('admin')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 			await page.waitForURL(/library\/podcasts$/)
 			await chooseTheme(page, theme)
 
-			await page.goto('/new/item/book-1')
+			await page.goto('/item/book-1')
 			await settleAnimations(page)
 			await page.screenshot({ path: `${output}/detail-${width}-${theme}.png` })
 
-			await page.goto('/new/item/book-boundaries')
+			await page.goto('/item/book-boundaries')
 			await page
 				.getByRole('button', { name: 'Play audiobook', exact: true })
 				.click()
@@ -66,7 +66,7 @@ for (const width of [1280, 390]) {
 			await settleAnimations(page)
 			await page.screenshot({ path: `${output}/player-${width}-${theme}.png` })
 
-			await page.goto('/new/audiobook/book-1/edit')
+			await page.goto('/audiobook/book-1/edit')
 			await settleAnimations(page)
 			await page.screenshot({ path: `${output}/admin-${width}-${theme}.png` })
 
@@ -88,7 +88,7 @@ for (const width of [1280, 390]) {
 					})
 			})
 			await chooseLibrary(page, 'books')
-			await page.goto('/new/library/books')
+			await page.goto('/library/books')
 			await expect(
 				page.getByRole('heading', { name: 'Continue Listening' }),
 			).toBeVisible()

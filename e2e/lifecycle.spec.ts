@@ -8,19 +8,19 @@ import {
 } from './shell-controls'
 
 async function openBook(page: import('@playwright/test').Page, prefix = '') {
-	await page.goto(`${prefix}/new/`)
+	await page.goto(`${prefix}/`)
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 	await openSidebar(page)
 	await expect(appMenu(page)).toBeVisible()
 	await closeSidebar(page)
-	await page.goto(`${prefix}/new/item/book-1`)
+	await page.goto(`${prefix}/item/book-1`)
 	await expect(
 		page.getByRole('heading', { name: 'The Glass Orchard', exact: true }),
 	).toBeVisible()
 }
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	test(`local logout closes playback before revocation and stays signed out ${prefix || 'root'}`, async ({
 		page,
 	}) => {
@@ -195,8 +195,8 @@ test('failed replacement removes closed controls and retry syncs fresh session',
 
 test('unavailable files and missing detail stay truthful', async ({ page }) => {
 	await openBook(page)
-	await page.goto('/new/items/book-2')
-	await expect(page).toHaveURL('/new/item/book-2')
+	await page.goto('/items/book-2')
+	await expect(page).toHaveURL('/item/book-2')
 	await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
 	await expect(page.getByText(/Use Classic to manage files/)).toHaveCount(0)
 	await expect(
@@ -205,11 +205,11 @@ test('unavailable files and missing detail stay truthful', async ({ page }) => {
 	await expect(
 		page.getByRole('button', { name: 'Play audiobook' }),
 	).toBeDisabled()
-	await page.goto('/new/item/podcast-1')
+	await page.goto('/item/podcast-1')
 	await expect(
 		page.getByRole('button', { name: 'Play A Map of Rain', exact: true }),
 	).toBeDisabled()
-	await page.goto('/new/item/missing')
+	await page.goto('/item/missing')
 	await expect(page.getByRole('alert')).toContainText('Item not found')
 })
 test('unsafe source closes rejected session without stale callback on next playback', async ({

@@ -12,12 +12,12 @@ for (const width of [1280, 390]) {
 	for (const theme of ['light', 'dark']) {
 		test(`book detail contrast ${width} ${theme}`, async ({ page }) => {
 			await page.setViewportSize({ width, height: 900 })
-			await page.goto('/new/login')
+			await page.goto('/login')
 			await page.getByLabel('Username', { exact: true }).fill('admin')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 			await page.waitForURL(/library\/podcasts$/)
-			await page.goto('/new/item/book-1')
+			await page.goto('/item/book-1')
 			await chooseTheme(page, theme)
 			await settleAnimations(page)
 			async function check(name: string, control: Locator, minimum = 4.5) {

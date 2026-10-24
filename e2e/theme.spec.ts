@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test'
 import { appMenu, openSidebar } from './shell-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	for (const initial of ['light', 'dark'] as const) {
 		test(`system theme ${initial} ${prefix || 'root'}`, async ({ page }) => {
 			await page.emulateMedia({ colorScheme: initial })
-			await page.goto(`${prefix}/new/`)
+			await page.goto(`${prefix}/`)
 			expect(
 				await page.evaluate(() => localStorage.getItem('abs-modern-theme')),
 			).toBeNull()
@@ -53,11 +53,11 @@ for (const prefix of ['', '/abs']) {
 	}
 }
 
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	test(`theme text colors meet WCAG AA contrast in light and dark modes ${prefix || 'root'}`, async ({
 		page,
 	}) => {
-		await page.goto(`${prefix}/new/`)
+		await page.goto(`${prefix}/`)
 		await expect(
 			page.getByRole('button', { name: 'Sign in', exact: true }),
 		).toBeVisible()

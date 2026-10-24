@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test'
 import { appMenu } from './shell-controls'
 
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	for (const user of ['listener', 'admin', 'root'])
 		test(`shell preserves ${user} permissions ${prefix || 'root'}`, async ({
 			page,
 		}) => {
-			await page.goto(`${prefix}/new/`)
+			await page.goto(`${prefix}/`)
 			await page.getByLabel('Username', { exact: true }).fill(user)
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -34,7 +34,7 @@ for (const prefix of ['', '/abs'])
 			await expect(page.getByRole('menuitem')).toHaveCount(2)
 			await expect(page.getByRole('menuitemradio')).toHaveCount(3)
 			await page.keyboard.press('Escape')
-			await page.goto(`${prefix}/new/account`)
+			await page.goto(`${prefix}/account`)
 			await expect(appMenu(page)).toBeVisible()
 			await expect(
 				page.getByRole('searchbox', { name: 'Search library', exact: true }),
@@ -44,7 +44,7 @@ for (const prefix of ['', '/abs'])
 			).toBeVisible()
 		})
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`podcast download queue enforces backend permissions ${prefix || 'root'}`, async ({
 		page,
 	}) => {
@@ -53,7 +53,7 @@ for (const prefix of ['', '/abs']) {
 			['admin', 200],
 		] as const) {
 			await page.context().clearCookies()
-			await page.goto(`${prefix}/new/`)
+			await page.goto(`${prefix}/`)
 			await page.evaluate(() => localStorage.clear())
 			await page.reload()
 			await page.getByLabel('Username', { exact: true }).fill(user)
@@ -64,7 +64,7 @@ for (const prefix of ['', '/abs']) {
 					new URL(result.url()).pathname ===
 					`${prefix}/api/libraries/podcasts/episode-downloads`,
 			)
-			await page.goto(`${prefix}/new/library/podcasts/podcast/download-queue`)
+			await page.goto(`${prefix}/library/podcasts/podcast/download-queue`)
 			expect((await response).status()).toBe(status)
 			if (user === 'listener')
 				await expect(page.getByRole('alert')).toContainText(

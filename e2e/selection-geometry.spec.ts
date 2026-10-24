@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { chooseTheme, settleAnimations } from './shell-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	for (const width of [390, 1280]) {
 		for (const library of ['books', 'podcasts']) {
 			for (const view of ['grid', 'list', 'detail']) {
@@ -9,15 +9,13 @@ for (const prefix of ['', '/abs']) {
 					page,
 				}) => {
 					await page.setViewportSize({ width, height: 900 })
-					await page.goto(`${prefix}/new/`)
+					await page.goto(`${prefix}/`)
 					await page.getByLabel('Username', { exact: true }).fill('listener')
 					await page.getByLabel('Password', { exact: true }).fill('password')
 					await page
 						.getByRole('button', { name: 'Sign in', exact: true })
 						.click()
-					await page.goto(
-						`${prefix}/new/library/${library}/bookshelf?view=${view}`,
-					)
+					await page.goto(`${prefix}/library/${library}/bookshelf?view=${view}`)
 					for (const theme of ['light', 'dark'] as const) {
 						await chooseTheme(page, theme)
 						await settleAnimations(page)

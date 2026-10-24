@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test'
 import { chooseTheme, settleAnimations } from './shell-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	for (const role of ['listener', 'admin']) {
 		test(`book progress confirmation and file permissions ${role} ${prefix || 'root'}`, async ({
 			page,
 		}) => {
-			await page.goto(`${prefix}/new/`)
+			await page.goto(`${prefix}/`)
 			await page.getByLabel('Username', { exact: true }).fill(role)
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -26,7 +26,7 @@ for (const prefix of ['', '/abs']) {
 					}),
 				})
 			}, prefix)
-			await page.goto(`${prefix}/new/item/book-1`)
+			await page.goto(`${prefix}/item/book-1`)
 			await expect(page.getByRole('table', { name: 'Audio tracks' }))
 				.toHaveCount(1)
 				.catch(async (error) => {

@@ -40,7 +40,7 @@ async function override(
 	)
 }
 async function signIn(page: Page, prefix: string, username = 'listener') {
-	await page.goto(`${prefix}/new/`)
+	await page.goto(`${prefix}/`)
 	await page.getByLabel('Username', { exact: true }).fill(username)
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -90,9 +90,9 @@ async function escapeReturnsFocus(page: Page, trigger: Locator) {
 // Pairwise-sized visual/overflow coverage, not a viewport × theme × prefix product.
 for (const [width, colorScheme, prefix] of [
 	[320, 'light', ''],
-	[390, 'dark', '/abs'],
+	[390, 'dark', ''],
 	[1036, 'dark', ''],
-	[1280, 'light', '/abs'],
+	[1280, 'light', ''],
 ] as const) {
 	test(`audit compact safe episodes: ${width} ${colorScheme} ${prefix || 'root'}`, async ({
 		page,
@@ -107,7 +107,7 @@ for (const [width, colorScheme, prefix] of [
 		await override(page, prefix, '/api/items/podcast-1', largeShow)
 		await signIn(page, prefix)
 		await chooseTheme(page, colorScheme)
-		await page.goto(`${prefix}/new/item/podcast-1`)
+		await page.goto(`${prefix}/item/podcast-1`)
 		await expect(page.locator('html')).toHaveClass(
 			colorScheme === 'dark' ? /dark/ : /^(?!.*dark)/,
 		)
@@ -216,7 +216,7 @@ for (const [width, colorScheme, prefix] of [
 	})
 }
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`audit shelf identity, honest totals and query labels ${prefix || 'root'}`, async ({
 		page,
 	}, testInfo) => {
@@ -301,7 +301,7 @@ for (const prefix of ['', '/abs']) {
 			page: 0,
 		})
 		await signIn(page, prefix)
-		await page.goto(`${prefix}/new/library/podcasts`)
+		await page.goto(`${prefix}/library/podcasts`)
 		const card = (title: string) =>
 			page.getByRole('article').filter({
 				has: page.getByRole('heading', { name: title, exact: true }),
@@ -329,7 +329,7 @@ for (const prefix of ['', '/abs']) {
 			fullPage: false,
 		})
 		await page.goto(
-			`${prefix}/new/library/podcasts/bookshelf?filter=feed-open&sort=media.metadata.title`,
+			`${prefix}/library/podcasts/bookshelf?filter=feed-open&sort=media.metadata.title`,
 		)
 		await expect(card('Counted show')).toContainText('3/120 (3 %)')
 		await page
@@ -351,7 +351,7 @@ for (const prefix of ['', '/abs']) {
 			body: page.url(),
 			contentType: 'text/plain',
 		})
-		await page.goto(`${prefix}/new/library/books/bookshelf/authors`)
+		await page.goto(`${prefix}/library/books/bookshelf/authors`)
 		await expect(page.getByRole('heading', { level: 1 })).toContainText(
 			'Authors',
 		)
@@ -405,7 +405,7 @@ for (const capability of ['restricted', 'update-only', 'admin'] as const) {
 			}
 		}
 		await signIn(page, '', capability === 'admin' ? 'admin' : 'listener')
-		await page.goto('/new/item/book-1')
+		await page.goto('/item/book-1')
 		await expect(
 			page.getByRole('heading', { level: 1, name: 'The Glass Orchard' }),
 		).toBeVisible()
@@ -438,7 +438,7 @@ test('audit RSS modal focus, loading, error, retry and successful empty', async 
 	})
 	let state: 'pending' | 'error' | 'empty' | 'feed' = 'pending'
 	await page.route(
-		(url) => url.hostname === '127.0.0.1' && url.pathname === '/abs/api/feeds',
+		(url) => url.hostname === '127.0.0.1' && url.pathname === '/api/feeds',
 		async (route) => {
 			if (state === 'pending') await pending
 			if (state === 'error')
@@ -465,8 +465,8 @@ test('audit RSS modal focus, loading, error, retry and successful empty', async 
 			})
 		},
 	)
-	await signIn(page, '/abs', 'admin')
-	await page.goto('/abs/new/config/rss-feeds')
+	await signIn(page, '', 'admin')
+	await page.goto('/config/rss-feeds')
 	await expect(
 		page.getByRole('status').filter({ hasText: /loading/i }),
 	).toBeVisible()
@@ -488,7 +488,7 @@ test('audit RSS modal focus, loading, error, retry and successful empty', async 
 
 for (const [width, prefix] of [
 	[320, ''],
-	[1036, '/abs'],
+	[1036, ''],
 ] as const) {
 	test(`audit Latest long disclosure ${width} ${prefix || 'root'}`, async ({
 		page,
@@ -510,7 +510,7 @@ for (const [width, prefix] of [
 			],
 		})
 		await signIn(page, prefix)
-		await page.goto(`${prefix}/new/library/podcasts/podcast/latest`)
+		await page.goto(`${prefix}/library/podcasts/podcast/latest`)
 		await expect(
 			page.getByRole('heading', { name: longTitle, exact: true }),
 		).toBeVisible()
@@ -544,13 +544,13 @@ for (const [width, prefix] of [
 	})
 }
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`audit audiobook direct tools retain context and return ${prefix || 'root'}`, async ({
 		page,
 	}) => {
 		await signIn(page, prefix, 'admin')
 		for (const section of ['chapters', 'edit', 'manage']) {
-			await page.goto(`${prefix}/new/audiobook/book-1/${section}`)
+			await page.goto(`${prefix}/audiobook/book-1/${section}`)
 			await expect(
 				page.getByRole('heading', {
 					level: 1,
@@ -561,13 +561,13 @@ for (const prefix of ['', '/abs']) {
 			const back = page.getByRole('link', {
 				name: /Return to audiobook The Glass Orchard/,
 			})
-			await expect(back).toHaveAttribute('href', `${prefix}/new/item/book-1`)
+			await expect(back).toHaveAttribute('href', `${prefix}/item/book-1`)
 			if (section === 'chapters')
 				await expect(
 					page.getByRole('heading', { name: 'Cover', exact: true }),
 				).toHaveCount(0)
 			await back.click()
-			await expect(page).toHaveURL(new RegExp(`${prefix}/new/item/book-1$`))
+			await expect(page).toHaveURL(new RegExp(`${prefix}/item/book-1$`))
 			await expect(
 				page.getByRole('button', { name: 'Play audiobook', exact: true }),
 			).toBeVisible()

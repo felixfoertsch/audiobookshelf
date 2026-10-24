@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	for (const width of [390, 1280, 1920])
 		test(`shelves bleed beneath sidebar ${prefix || 'root'} ${width}`, async ({
 			page,
@@ -32,7 +32,7 @@ for (const prefix of ['', '/abs'])
 				},
 			)
 			await page.route(
-				`**${prefix}/api/libraries/podcasts/recent-episodes*`,
+				'**/psb/api/libraries/podcasts/recent-episodes*',
 				async (route) => {
 					const response = await route.fetch()
 					const data = await response.json()
@@ -48,11 +48,11 @@ for (const prefix of ['', '/abs'])
 					})
 				},
 			)
-			await page.goto(`${prefix}/new/`)
+			await page.goto(`${prefix}/`)
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-			await page.goto(`${prefix}/new/library/podcasts`)
+			await page.goto(`${prefix}/library/podcasts`)
 			const scroller = page.locator('.snap-x').first()
 			await expect(scroller.locator('article')).toHaveCount(20)
 			const measure = () =>
@@ -82,7 +82,7 @@ for (const prefix of ['', '/abs'])
 				})
 			expect(before.right).toBe(width)
 			expect(before.first).toBe(before.content)
-			expect(before.left).toBe(0)
+			expect(before.left).toBe(before.content)
 			expect(before.document).toBeLessThanOrEqual(width)
 			await scroller.evaluate((node) => {
 				node.scrollLeft = 176
@@ -91,25 +91,22 @@ for (const prefix of ['', '/abs'])
 				.poll(() => scroller.evaluate((node) => node.scrollLeft))
 				.toBeGreaterThan(0)
 			if (width === 1280) {
-				await expect
-					.poll(() =>
-						scroller
-							.locator('article')
-							.first()
-							.evaluate((node) => node.getBoundingClientRect().left),
-					)
-					.toBeLessThan(before.sidebar)
 				expect(
 					await scroller
 						.locator('article')
 						.first()
 						.evaluate((node) => {
-							const rect = node.getBoundingClientRect()
+							const cardY = node.getBoundingClientRect().top + 20
+							const content = document.querySelector('#content')
+							if (!content) throw new Error('Missing content container')
+							const contentInset =
+								Number.parseFloat(getComputedStyle(content).paddingLeft) +
+								content.getBoundingClientRect().left
 							return !!document
-								.elementFromPoint(Math.max(1, rect.left + 20), rect.top + 20)
-								?.closest('[data-slot="sidebar-container"]')
+								.elementFromPoint(contentInset - 1, cardY)
+								?.closest('article')
 						}),
-				).toBe(true)
+				).toBe(false)
 				console.log(
 					JSON.stringify({
 						prefix,
@@ -154,7 +151,7 @@ for (const prefix of ['', '/abs'])
 						.evaluate((node) => node.getBoundingClientRect().right),
 				)
 				.toBeLessThanOrEqual(width)
-			await page.goto(`${prefix}/new/library/podcasts/podcast/latest`)
+			await page.goto(`${prefix}/library/podcasts/podcast/latest`)
 			await expect(page.getByRole('heading', { level: 1 })).toHaveText(
 				'Latest episodes',
 			)

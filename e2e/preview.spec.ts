@@ -9,7 +9,7 @@ import {
 } from './shell-controls'
 
 async function signIn(page: import('@playwright/test').Page, prefix = '') {
-	await page.goto(`${prefix}/new/`)
+	await page.goto(`${prefix}/`)
 	await expect(
 		page.getByRole('complementary', { name: 'Alpha frontend' }),
 	).toContainText('Modern UI · Classic available for legacy access.')
@@ -22,7 +22,7 @@ async function signIn(page: import('@playwright/test').Page, prefix = '') {
 	await openSidebar(page)
 	await expect(appMenu(page)).toBeVisible()
 	await closeSidebar(page)
-	await expect(page).toHaveURL(new RegExp(`${prefix}/new/library/podcasts$`))
+	await expect(page).toHaveURL(new RegExp(`${prefix}/library/podcasts$`))
 	await expect(
 		page.getByRole('link', { name: 'Open Classic', exact: true }),
 	).toHaveAttribute('href', `${prefix}/?classic=1`)
@@ -31,7 +31,7 @@ async function signIn(page: import('@playwright/test').Page, prefix = '') {
 			'Field Notes',
 		)
 }
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`continue listening hides only selected audiobook ${prefix || 'root'}`, async ({
 		page,
 	}) => {
@@ -66,7 +66,7 @@ for (const prefix of ['', '/abs']) {
 				})
 		}, prefix)
 		const headers = page.getByRole('heading', { name: 'Continue Listening' })
-		await page.goto(`${prefix}/new/library/books`)
+		await page.goto(`${prefix}/library/books`)
 		await expect(headers).toBeVisible()
 		const shelf = page.getByRole('region', {
 			name: 'Continue Listening',
@@ -95,7 +95,7 @@ for (const prefix of ['', '/abs']) {
 		await expect(
 			shelf.getByRole('link', { name: 'The Glass Orchard' }),
 		).toHaveCount(0)
-		await page.goto(`${prefix}/new/library/books/series/series-1`)
+		await page.goto(`${prefix}/library/books/series/series-1`)
 		const readd = page.getByRole('button', {
 			name: 'Re-add series to continue listening',
 		})
@@ -117,7 +117,7 @@ for (const prefix of ['', '/abs']) {
 				body: JSON.stringify({ isFinished: true }),
 			})
 		}, prefix)
-		await page.goto(`${prefix}/new/library/books`)
+		await page.goto(`${prefix}/library/books`)
 		const seriesShelf = page.getByRole('region', {
 			name: 'Continue Series',
 			exact: true,
@@ -136,7 +136,7 @@ for (const prefix of ['', '/abs']) {
 		).toBeVisible()
 	})
 }
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	test(`browse and original audio lifecycle ${prefix || 'root'}`, async ({
 		page,
 		request,
@@ -150,7 +150,7 @@ for (const prefix of ['', '/abs'])
 			.getByRole('link', { name: /^Field Notes/ })
 			.first()
 			.click()
-		await expect(page).toHaveURL(`${prefix}/new/item/podcast-1`)
+		await expect(page).toHaveURL(`${prefix}/item/podcast-1`)
 		await page
 			.getByRole('button', { name: /^Play (?!latest episode)/ })
 			.first()
@@ -260,8 +260,8 @@ for (const prefix of ['', '/abs'])
 	})
 test('permission error and range contract', async ({ page, request }) => {
 	await signIn(page)
-	await page.goto('/new/libraries/forbidden')
-	await expect(page).toHaveURL(/\/new\/library\/forbidden\/bookshelf(?:\?|$)/)
+	await page.goto('/libraries/forbidden')
+	await expect(page).toHaveURL(/\/library\/forbidden\/bookshelf(?:\?|$)/)
 	await expect(page.getByRole('alert').first()).toContainText(
 		'Permission denied',
 	)
@@ -357,7 +357,7 @@ for (const width of [320, 390, 1280])
 			await page
 				.getByRole('link', { name: 'Audiobookshelf', exact: true })
 				.click()
-			await expect(page).toHaveURL('/new/library/books')
+			await expect(page).toHaveURL('/library/books')
 			expect(await mountedAudio.evaluate((node) => node.isConnected)).toBe(true)
 			await expect(page.getByLabel('Audio playback')).toBeAttached()
 			await expect(player).toBeVisible()

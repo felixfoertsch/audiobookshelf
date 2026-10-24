@@ -8,13 +8,13 @@ import {
 	openSidebar,
 } from './shell-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	for (const width of [320, 390, 1036, 1280])
 		test(`single shell ownership, menu keyboard and sidebar ${width} ${prefix || 'root'}`, async ({
 			page,
 		}, testInfo) => {
 			await page.setViewportSize({ width, height: 848 })
-			await page.goto(`${prefix}/new/`)
+			await page.goto(`${prefix}/`)
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -38,7 +38,7 @@ for (const prefix of ['', '/abs']) {
 				'/library/podcasts/bookshelf',
 				'/library/podcasts/search?q=Garden',
 			]) {
-				await page.goto(`${prefix}/new${path}`)
+				await page.goto(`${prefix}${path}`)
 				await openSidebar(page)
 				await expect(
 					page.getByRole('searchbox', { name: 'Search library', exact: true }),
@@ -75,7 +75,7 @@ for (const prefix of ['', '/abs']) {
 			await page.keyboard.press('Escape')
 			await expect(appMenu(page)).toBeFocused()
 			await chooseLibrary(page, 'books')
-			await expect(page).toHaveURL(/\/new\/library\/books$/)
+			await expect(page).toHaveURL(/\/library\/books$/)
 			await openSidebar(page)
 			await expect(page.getByRole('searchbox')).toHaveValue('')
 			await page.getByRole('searchbox').fill('Glass')
@@ -179,13 +179,13 @@ for (const prefix of ['', '/abs']) {
 		})
 }
 
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	test(`200% reflow and rendered glass contrast ${prefix || 'root'}`, async ({
 		page,
 	}) => {
 		// 1280px desktop at 200% zoom has a 640 CSS-pixel layout viewport.
 		await page.setViewportSize({ width: 640, height: 450 })
-		await page.goto(`${prefix}/new/`)
+		await page.goto(`${prefix}/`)
 		await page.getByLabel('Username', { exact: true }).fill('listener')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()

@@ -12,7 +12,7 @@ for (const width of [390, 1280])
 			// immediately before Enter. Under load the chooser can open first.
 			const chooser = page.waitForEvent('filechooser')
 			await page.setViewportSize({ width, height: 848 })
-			await page.route('**/abs/api/feeds', (route) =>
+			await page.route('**/api/feeds', (route) =>
 				route.fulfill({
 					json: {
 						feeds: [
@@ -20,7 +20,7 @@ for (const width of [390, 1280])
 								id: 'audit-layout-feed',
 								slug: 'audit-layout-feed',
 								entityType: 'podcast',
-								feedUrl: 'https://example.invalid/abs/feed/audit-layout-feed',
+								feedUrl: 'https://example.invalid/feed/audit-layout-feed',
 								meta: { title: 'Audit layout feed' },
 								episodes: [{ id: 'episode-1', title: 'The Quiet Observatory' }],
 							},
@@ -28,17 +28,17 @@ for (const width of [390, 1280])
 					},
 				}),
 			)
-			await page.goto('/abs/new/')
+			await page.goto('/')
 			await page.getByLabel('Username', { exact: true }).fill('admin')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-			await expect(page).toHaveURL(/\/abs\/new\/library\/podcasts$/)
+			await expect(page).toHaveURL(/\/library\/podcasts$/)
 			await chooseTheme(page, theme)
 			for (const section of ['chapters', 'edit', 'manage', 'rss-feeds']) {
 				await page.goto(
 					section === 'rss-feeds'
-						? '/abs/new/config/rss-feeds'
-						: `/abs/new/audiobook/book-1/${section}`,
+						? '/config/rss-feeds'
+						: `/audiobook/book-1/${section}`,
 				)
 				if (section === 'rss-feeds') {
 					await page.getByRole('button', { name: 'Audit layout feed' }).click()

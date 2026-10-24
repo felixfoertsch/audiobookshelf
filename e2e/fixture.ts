@@ -1,12 +1,8 @@
 // Synthetic server only. No ABS connection or production writes.
 
 import { once } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { createDebugMiddleware } from 'debug-overlay/express'
 import { z } from 'zod'
 import { items, libraries, playable } from './data'
 import {
@@ -36,7 +32,7 @@ const socketPeers = new Map<FixtureSocket, string>()
 const socketAuthCounts = new Map<string, number>()
 const heldSocketUsers = new Set<string>()
 const cookies = new Map<string, (typeof fixtureUsers)[number]>()
-let initialized = process.env.FIXTURE_UNINITIALIZED !== '1'
+const initialized = process.env.FIXTURE_UNINITIALIZED !== '1'
 const json = (data: unknown, status = 200, headers: HeadersInit = {}) =>
 	Response.json(data, { status, headers })
 const sessions = new Map<
@@ -127,35 +123,12 @@ async function fileResponse(
 }
 async function handleRequest(request: Request) {
 	const url = new URL(request.url)
-	const prefix = url.pathname.startsWith('/audiobookshelf/')
-		? '/audiobookshelf'
-		: url.pathname.startsWith('/classic/')
-			? '/classic'
-			: url.pathname.startsWith('/abs/')
-				? '/abs'
-				: ''
-	const path = url.pathname.slice(prefix.length)
-	const nativeClassic = process.env.CLASSIC_NATIVE_DIST_PATH
-	if (
-		nativeClassic &&
-		path === '/' &&
-		request.method === 'GET' &&
-		url.searchParams.get('classic') !== '1'
-	)
-		return new Response(null, {
-			status: 302,
-			headers: {
-				location: `${prefix}/new/${url.search}`,
-				'cache-control': 'no-store',
-			},
-		})
+	const path = url.pathname
 	if (path === '/health') return new Response('ok')
 	if (path === '/__fixture/observations') return json(observations)
 	if (
 		(path === '/status' && request.method !== 'GET') ||
-		(path === '/login' &&
-			request.method !== 'POST' &&
-			!((prefix === '/classic' || nativeClassic) && request.method === 'GET'))
+		(path === '/login' && request.method !== 'POST')
 	)
 		return new Response('Method not allowed', {
 			status: 405,
@@ -169,29 +142,7 @@ async function handleRequest(request: Request) {
 			authMethods: ['local'],
 			serverVersion: 'synthetic',
 		})
-	if (path === '/init') {
-		if (request.method !== 'POST')
-			return new Response('Method not allowed', { status: 405 })
-		if (initialized) return new Response('Already initialized', { status: 500 })
-		const input = z
-			.object({
-				newRoot: z
-					.object({
-						username: z.string().trim().min(1),
-						password: z.string().min(1),
-					})
-					.strict(),
-			})
-			.strict()
-			.safeParse(await request.json().catch(() => null))
-		if (!input.success) return json({ error: 'Invalid newRoot' }, 400)
-		const root = fixtureUsers.find((user) => user.type === 'root')
-		if (!root) throw new Error('Missing fixture root')
-		root.username = input.data.newRoot.username
-		fixturePasswords.set(root.id, input.data.newRoot.password)
-		initialized = true
-		return new Response('OK')
-	}
+	if (path === '/init') return new Response('Not found', { status: 404 })
 	if (path === '/login' && request.method === 'POST') {
 		if (!initialized) return json({ error: 'Fixture not initialized' }, 403)
 		const input = z
@@ -420,7 +371,7 @@ async function handleRequest(request: Request) {
 			'tracks' in item.media
 				? item.media.tracks.map((track) => ({
 						...track,
-						contentUrl: `${prefix}/public/share/${share.slug}/track/${track.index}`,
+						contentUrl: `/public/share/${share.slug}/track/${track.index}`,
 					}))
 				: []
 		const duration = audioTracks.reduce((n, t) => n + t.duration, 0)
@@ -533,20 +484,6 @@ async function handleRequest(request: Request) {
 	const detail = /^\/api\/items\/([^/]+)$/.exec(path)
 	if (detail) {
 		const item = catalog.find((item) => item.id === detail[1])
-		// Classic's downloaded-episode queue requires audioFile.duration for every row.
-		// Metadata-only synthetic episodes remain available to modern unavailable-file tests.
-		if (
-			prefix === '/classic' &&
-			item?.mediaType === 'podcast' &&
-			'episodes' in item.media
-		)
-			return json({
-				...item,
-				media: {
-					...item.media,
-					episodes: item.media.episodes?.filter((episode) => episode.audioFile),
-				},
-			})
 		return item ? json(item) : json({ error: 'Item not found' }, 404)
 	}
 	const cover = /^\/api\/items\/([^/]+)\/cover$/.exec(path)
@@ -627,7 +564,7 @@ async function handleRequest(request: Request) {
 			audioTracks: syntheticTracks
 				? syntheticTracks.map((track, index) => ({
 						index: track.index,
-						contentUrl: `${prefix}/media/boundary-${index + 1}`,
+						contentUrl: `/media/boundary-${index + 1}`,
 						mimeType: 'audio/wav',
 						duration: track.duration,
 						startOffset: track.startOffset,
@@ -635,7 +572,7 @@ async function handleRequest(request: Request) {
 				: bookRecord
 					? bookRecord.tracks.map((track, index, tracks) => ({
 							index: index + 1,
-							contentUrl: `${prefix}/media/${encodeURIComponent(index === 0 ? item.id : track.id)}`,
+							contentUrl: `/media/${encodeURIComponent(index === 0 ? item.id : track.id)}`,
 							mimeType: 'audio/mpeg',
 							duration: track.duration,
 							startOffset: tracks
@@ -645,7 +582,7 @@ async function handleRequest(request: Request) {
 					: [
 							{
 								index: 1,
-								contentUrl: `${prefix}/media/${encodeURIComponent(key)}`,
+								contentUrl: `/media/${encodeURIComponent(key)}`,
 								mimeType: audio.mimeType,
 								duration,
 								startOffset: 0,
@@ -726,118 +663,43 @@ async function handleRequest(request: Request) {
 			file = Bun.file(new URL(audio.fallbackFile, mediaRoot))
 		return fileResponse(request, file, audio.mimeType)
 	}
-	if (
-		(prefix === '/classic' || (nativeClassic && !path.startsWith('/new'))) &&
-		!path.startsWith('/api/')
-	) {
-		const relative = decodeURIComponent(path).replace(/^\/+/, '')
-		if (
-			relative.split('/').some((part) => part === '..') ||
-			relative.includes('\\')
-		)
-			return new Response('Invalid path', { status: 400 })
-		const classicDist = nativeClassic
-			? new URL(
-					`file://${nativeClassic.replace(/\/$/, '')}${process.env.CLASSIC_PRODUCTION_BASE === '1' ? '/production' : prefix || '/root'}/`,
-				)
-			: new URL('../../client/dist/', import.meta.url)
-		const staticFile = Bun.file(new URL(relative || 'index.html', classicDist))
-		if (await staticFile.exists()) return fileResponse(request, staticFile)
-		if (path.startsWith('/_nuxt/') || /\.[a-z0-9]+$/i.test(path))
-			return new Response('Missing Classic asset', { status: 404 })
-		if (
-			request.method === 'GET' &&
-			request.headers.get('accept')?.includes('text/html')
-		)
-			return fileResponse(request, Bun.file(new URL('200.html', classicDist)))
-	}
-	if (path.includes('/assets/'))
-		return fileResponse(
-			request,
-			Bun.file(new URL(`assets/${path.split('/assets/')[1]}`, dist)),
-		)
-	if (path === '/new/manifest.webmanifest' || path.startsWith('/new/icons/')) {
+	if (path === '/manifest.webmanifest' || path.startsWith('/icons/')) {
 		if (request.method !== 'GET' && request.method !== 'HEAD')
 			return new Response('Method not allowed', { status: 405 })
-		const installFiles: Record<string, string> = {
-			'/new/manifest.webmanifest': 'application/manifest+json',
-			'/new/icons/icon.svg': 'image/svg+xml',
-			'/new/icons/icon192.png': 'image/png',
-			'/new/icons/icon512.png': 'image/png',
-			'/new/icons/apple-touch-icon.png': 'image/png',
-		}
-		const mime = installFiles[path]
-		if (!mime) return new Response('Missing install asset', { status: 404 })
-		const response = await fileResponse(
-			request,
-			Bun.file(new URL(path.slice('/new/'.length), dist)),
-			mime,
-		)
-		response.headers.set('cache-control', 'no-store')
-		return response
+		const asset =
+			path === '/manifest.webmanifest' ? 'manifest.webmanifest' : path.slice(1)
+		return fileResponse(request, Bun.file(new URL(asset, dist)))
 	}
-	if (path.startsWith('/new')) {
+	if (path.startsWith('/assets/'))
+		return fileResponse(
+			request,
+			Bun.file(new URL(`assets/${path.slice('/assets/'.length)}`, dist)),
+		)
+	if (path.startsWith('/e2e/media/')) {
+		const relative = path.slice('/e2e/media/'.length)
+		if (relative.split('/').some((part) => part === '..' || part === ''))
+			return new Response('Invalid fixture asset path', { status: 400 })
+		return fileResponse(request, Bun.file(new URL(relative, mediaRoot)))
+	}
+	if (
+		request.method === 'GET' &&
+		request.headers.get('accept')?.includes('text/html')
+	) {
 		let html = await Bun.file(new URL('index.html', dist)).text()
 		html = html.replace(
 			'<head>',
-			`<head><base href="${prefix}/new/"><script>window.__ABS_WEB_CONFIG__=${JSON.stringify({ basePath: `${prefix}/new`, apiBasePath: prefix })}</script>`,
+			`<head><script>window.__ABS_WEB_CONFIG__=${JSON.stringify({ basePath: '', apiBasePath: '' })}</script>`,
 		)
-		return new Response(html, { headers: { 'content-type': 'text/html' } })
+		return new Response(html, {
+			headers: { 'content-type': 'text/html', 'cache-control': 'no-store' },
+		})
 	}
 	return new Response('Not found', { status: 404 })
 }
 
-const debugDirectory = mkdtempSync(join(tmpdir(), 'abs-debug-browser-'))
-const debugAdapter = createDebugMiddleware({
-	dbPath: join(debugDirectory, 'debug-overlay.sqlite'),
-	authorize: (request) => {
-		const token = request.headers.authorization?.replace(/^Bearer /, '')
-		return fixtureUsers.some(
-			(user) =>
-				user.accessToken === token &&
-				['admin', 'root'].includes(user.type) &&
-				user.isActive,
-		)
-	},
-	routes: ['/', '/debug/issues', '/item/book-1', '/library/books'],
-})
 const server = createServer(async (incoming, outgoing) => {
-	const debugMatch = /^\/(?:abs\/)?api\/debug(?=\/|\?|$)/.exec(
-		incoming.url || '',
-	)
-	if (debugMatch) {
-		incoming.url = incoming.url?.slice(debugMatch[0].length) || '/'
-		await debugAdapter(incoming, outgoing, () => {
-			outgoing.writeHead(503)
-			outgoing.end('Debug unavailable')
-		})
-		return
-	}
 	try {
 		const method = incoming.method || 'GET'
-		const rawPath = (incoming.url || '/').split('?')[0]
-		if (/^\/(?:abs\/)?new\/icons\//.test(rawPath)) {
-			let filename: string
-			try {
-				filename = decodeURIComponent(
-					rawPath.slice(rawPath.indexOf('/icons/') + '/icons/'.length),
-				)
-			} catch {
-				outgoing.writeHead(400)
-				outgoing.end('Invalid install asset path')
-				return
-			}
-			if (
-				filename.includes('/') ||
-				filename.includes('\\') ||
-				filename === '..' ||
-				filename === '.'
-			) {
-				outgoing.writeHead(400)
-				outgoing.end('Invalid install asset path')
-				return
-			}
-		}
 		const headers = new Headers()
 		for (const [name, value] of Object.entries(incoming.headers)) {
 			if (Array.isArray(value))
@@ -924,15 +786,13 @@ type SocketConstructor = new (
 	},
 ) => FixtureSocketServer
 let SocketServer: SocketConstructor | undefined
-if (process.env.CLASSIC_COMPARE === '1' || process.env.FIXTURE_SOCKET === '1') {
+if (process.env.FIXTURE_SOCKET === '1') {
 	const require = createRequire(import.meta.url)
 	let packageExports: unknown
 	try {
-		packageExports = require('../../node_modules/socket.io')
+		packageExports = require('socket.io')
 	} catch {
-		throw new Error(
-			'CLASSIC_COMPARE=1 requires existing backend socket.io installation; run root npm ci first. Web-only fixture works without comparison flag.',
-		)
+		throw new Error('FIXTURE_SOCKET=1 requires the socket.io dependency.')
 	}
 	const exportsSchema = z.object({
 		Server: z.custom<SocketConstructor>((value) => typeof value === 'function'),
@@ -943,16 +803,7 @@ if (process.env.CLASSIC_COMPARE === '1' || process.env.FIXTURE_SOCKET === '1') {
 			: packageExports,
 	).Server
 }
-const socketServers = (
-	SocketServer
-		? [
-				'/socket.io',
-				'/classic/socket.io',
-				'/abs/socket.io',
-				'/audiobookshelf/socket.io',
-			]
-		: []
-).map((path) => {
+const socketServers = (SocketServer ? ['/socket.io'] : []).map((path) => {
 	if (!SocketServer) throw new Error('Socket.IO comparison constructor missing')
 	const io = new SocketServer(server, {
 		path,
@@ -1005,12 +856,13 @@ onFixtureUserUpdated((user) => {
 	for (const io of socketServers)
 		io.to(user.id).emit('user_updated', browserUser(user))
 })
-server.listen(Number(process.env.FIXTURE_PORT || 4179), '127.0.0.1')
+server.listen(
+	Number(process.env.FIXTURE_PORT || 4179),
+	process.env.FIXTURE_HOST || '127.0.0.1',
+)
 function shutdown() {
 	for (const io of socketServers) io.disconnectSockets(true)
 	server.close(() => {
-		debugAdapter.close()
-		rmSync(debugDirectory, { recursive: true, force: true })
 		process.exit(0)
 	})
 	server.closeAllConnections()

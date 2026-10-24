@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('sidebar text meets AA over worst-case cover colors', async ({ page }) => {
-	await page.goto('/new/')
+	await page.goto('/')
 	const results = await page.evaluate(() => {
 		const canvas = document.createElement('canvas')
 		canvas.width = canvas.height = 1

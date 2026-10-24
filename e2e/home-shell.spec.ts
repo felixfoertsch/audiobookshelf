@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test'
 import { chooseTheme, settleAnimations } from './shell-controls'
 
 async function signIn(page: Page, base = '') {
-	await page.goto(`${base}/new/`)
+	await page.goto(`${base}/`)
 	await page.getByLabel('Username', { exact: true }).fill('admin')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -11,17 +11,17 @@ async function signIn(page: Page, base = '') {
 	).toBeVisible()
 }
 
-test('route-independent Add podcast modal preserves route, history and focus under root and /abs', async ({
+test('route-independent Add podcast modal preserves route, history and focus under root and ', async ({
 	page,
 }) => {
 	await signIn(page)
-	for (const base of ['', '/abs']) {
+	for (const base of ['']) {
 		for (const path of [
 			'/library/podcasts/bookshelf',
 			'/library/podcasts/podcast/latest',
 			'/library/podcasts/podcast/download-queue',
 		]) {
-			await page.goto(`${base}/new${path}`)
+			await page.goto(`${base}${path}`)
 			const trigger = page.getByRole('link', {
 				name: 'Add podcast',
 				exact: true,
@@ -48,7 +48,7 @@ test('route-independent Add podcast modal preserves route, history and focus und
 			await expect(modal).toHaveCount(0)
 			await expect
 				.poll(() => page.evaluate(() => location.pathname))
-				.toBe(`${base}/new${path}`)
+				.toBe(`${base}${path}`)
 			await expect
 				.poll(() =>
 					page.evaluate(() =>
@@ -88,7 +88,7 @@ for (const width of [1280, 390]) {
 					})
 				await route.fulfill({ response, json: shelves })
 			})
-			await page.goto('/new/library/podcasts')
+			await page.goto('/library/podcasts')
 			await expect(
 				page.getByRole('heading', { name: 'Home', exact: true }),
 			).toBeVisible()
@@ -136,7 +136,7 @@ for (const width of [1280, 390]) {
 				path: `/private/tmp/opencode/home-shell/home-${width}-${theme}.png`,
 				fullPage: true,
 			})
-			await page.goto('/new/library/podcasts/bookshelf')
+			await page.goto('/library/podcasts/bookshelf')
 			const trigger = page.getByRole('link', {
 				name: 'Add podcast',
 				exact: true,
@@ -172,7 +172,7 @@ test('podcast episode count card height stays stable while summary pending', asy
 		await pending
 		await route.continue()
 	})
-	await page.goto('/new/library/podcasts/bookshelf')
+	await page.goto('/library/podcasts/bookshelf')
 	const fallback = page.getByText(/downloaded · checking feed/).first()
 	await expect(fallback).toBeVisible()
 	const card = page.locator('article').first()

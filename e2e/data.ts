@@ -80,19 +80,6 @@ const episodes = (show: string, audible = false) =>
 			description: 'Original fixture episode. No external source material.',
 			enclosure: null,
 			guid: `${show}-guid-${index + 1}`,
-			adAnalysis:
-				index === 0
-					? {
-							status: 'candidates',
-							segments: [{ start: 2.1, end: 3.8, category: 'sponsor' }],
-						}
-					: index === 1
-						? {
-								status: 'stale',
-								segments: [{ start: 4, end: 7, category: 'sponsor' }],
-								updatedAt: date(4),
-							}
-						: { status: 'inconclusive', segments: [] },
 			pubDate: new Date(date(index * 7)).toISOString(),
 			chapters: [{ id: 0, start: 0, end: duration, title: 'Episode' }],
 			audioFile: isNarrated
@@ -392,7 +379,6 @@ export const realItems = realRecords.map((record) => {
 			size: source.size,
 			audioFile: tracks[index],
 			audioTrack: tracks[index],
-			adAnalysis: undefined,
 			chapters: [],
 			playableFallback: source.file,
 		}))

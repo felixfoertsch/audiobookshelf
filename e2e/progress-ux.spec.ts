@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { items } from './data'
 import { closeSidebar, openSidebar } from './shell-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	for (const width of [320, 390, 1036, 1280]) {
 		for (const colorScheme of ['light', 'dark'] as const) {
 			test(`episode progress loop ${prefix || 'root'} ${width} ${colorScheme}`, async ({
@@ -57,7 +57,7 @@ for (const prefix of ['', '/abs']) {
 						})
 					await route.fulfill({ body: 'OK' })
 				})
-				await page.goto(`${prefix}/new/`)
+				await page.goto(`${prefix}/`)
 				await page.getByLabel('Username', { exact: true }).fill('admin')
 				await page.getByLabel('Password', { exact: true }).fill('password')
 				await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -66,7 +66,7 @@ for (const prefix of ['', '/abs']) {
 					page.getByRole('searchbox', { name: 'Search library' }),
 				).toBeVisible()
 				await closeSidebar(page)
-				await page.goto(`${prefix}/new/item/podcast-1`)
+				await page.goto(`${prefix}/item/podcast-1`)
 				await page
 					.getByRole('button', { name: 'Next episodes', exact: true })
 					.click()
@@ -84,8 +84,8 @@ for (const prefix of ['', '/abs']) {
 					})
 					.click()
 				await expect(row.getByText('Finished', { exact: true })).toBeVisible()
-				await page.goto(`${prefix}/new/`)
-				await page.goto(`${prefix}/new/item/podcast-1`)
+				await page.goto(`${prefix}/`)
+				await page.goto(`${prefix}/item/podcast-1`)
 				await page
 					.getByRole('button', { name: 'Next episodes', exact: true })
 					.click()
@@ -117,11 +117,11 @@ for (const prefix of ['', '/abs']) {
 test('library selection stays compact until explicit action sheet; cover opens show', async ({
 	page,
 }) => {
-	await page.goto('/new/')
+	await page.goto('/')
 	await page.getByLabel('Username', { exact: true }).fill('admin')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-	await page.goto('/new/library/podcasts/bookshelf')
+	await page.goto('/library/podcasts/bookshelf')
 	await expect(
 		page.getByRole('button', { name: 'Select', exact: true }),
 	).toBeVisible()

@@ -1,0 +1,136 @@
+server {
+	listen 8080;
+	server_name _;
+	root /usr/share/nginx/html;
+	index index.html;
+
+	location = /health { access_log off; return 200 "ok\\n"; }
+	location ^~ /init { return 404; }
+	location = /login {
+		error_page 418 = @abs_login;
+		if ($request_method = POST) { return 418; }
+		if ($request_method != GET) { return 405; }
+		try_files /index.html =404;
+		add_header Cache-Control "no-store";
+	}
+	location @abs_login {
+		proxy_pass ${ABS_UPSTREAM};
+		proxy_set_header Host ${ABS_UPSTREAM_HOST};
+		proxy_ssl_server_name on;
+		proxy_ssl_name ${ABS_UPSTREAM_HOST};
+		proxy_ssl_verify on;
+		proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+		proxy_set_header X-Forwarded-Proto ${EXTERNAL_SCHEME};
+		proxy_set_header X-Forwarded-Host "";
+		proxy_set_header Forwarded "";
+		proxy_set_header X-Forwarded-For $remote_addr;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_cache off;
+		proxy_cookie_flags ~.* secure httponly samesite=lax;
+		add_header Cache-Control "no-store" always;
+	}
+	location = /logout {
+		limit_except POST { deny all; }
+		proxy_pass ${ABS_UPSTREAM};
+		proxy_set_header Host ${ABS_UPSTREAM_HOST};
+		proxy_ssl_server_name on;
+		proxy_ssl_name ${ABS_UPSTREAM_HOST};
+		proxy_ssl_verify on;
+		proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+		proxy_set_header X-Forwarded-Proto ${EXTERNAL_SCHEME};
+		proxy_set_header X-Forwarded-Host "";
+		proxy_set_header Forwarded "";
+		proxy_set_header X-Forwarded-For $remote_addr;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_cache off;
+		proxy_cookie_flags ~.* secure httponly samesite=lax;
+		add_header Cache-Control "no-store" always;
+	}
+	location ^~ /psb/ {
+		proxy_pass ${PSB_UPSTREAM}/;
+		proxy_set_header Authorization $http_authorization;
+		proxy_set_header Cookie "";
+		proxy_hide_header Set-Cookie;
+		proxy_set_header Host ${PSB_UPSTREAM_HOST};
+		proxy_set_header X-Forwarded-Proto ${EXTERNAL_SCHEME};
+		proxy_set_header X-Forwarded-Host "";
+		proxy_set_header Forwarded "";
+		proxy_ssl_server_name on;
+		proxy_ssl_name ${PSB_UPSTREAM_HOST};
+		proxy_ssl_verify on;
+		proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+		proxy_cache off;
+		proxy_buffering off;
+		add_header Cache-Control "no-store" always;
+	}
+	location ~ ^/(api|auth|socket\.io|public|hls|feed)(/|$) {
+		proxy_pass ${ABS_UPSTREAM};
+		proxy_http_version 1.1;
+		proxy_set_header Host ${ABS_UPSTREAM_HOST};
+		proxy_set_header Upgrade $http_upgrade;
+		proxy_set_header Connection $connection_upgrade;
+		proxy_ssl_server_name on;
+		proxy_ssl_name ${ABS_UPSTREAM_HOST};
+		proxy_ssl_verify on;
+		proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+		proxy_set_header X-Forwarded-Proto ${EXTERNAL_SCHEME};
+		proxy_set_header X-Forwarded-Host "";
+		proxy_set_header Forwarded "";
+		proxy_set_header X-Forwarded-For $remote_addr;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header Range $http_range;
+		proxy_set_header If-Range $http_if_range;
+		proxy_buffering off;
+		proxy_cache off;
+		proxy_cookie_flags ~.* secure httponly samesite=lax;
+		proxy_read_timeout 3600s;
+		add_header Cache-Control "no-store" always;
+	}
+	location ^~ /internal-api { return 404; }
+	location ~ ^/(api|auth|socket\.io|public|hls|feed|psb)$ { return 404; }
+	location ~ ^/(status|ping|healthcheck)$ {
+		limit_except GET { deny all; }
+		proxy_pass ${ABS_UPSTREAM};
+		proxy_http_version 1.1;
+		proxy_set_header Host ${ABS_UPSTREAM_HOST};
+		proxy_set_header Upgrade $http_upgrade;
+		proxy_set_header Connection $connection_upgrade;
+		proxy_ssl_server_name on;
+		proxy_ssl_name ${ABS_UPSTREAM_HOST};
+		proxy_ssl_verify on;
+		proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+		proxy_set_header X-Forwarded-Proto ${EXTERNAL_SCHEME};
+		proxy_set_header X-Forwarded-Host "";
+		proxy_set_header Forwarded "";
+		proxy_set_header X-Forwarded-For $remote_addr;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header Range $http_range;
+		proxy_set_header If-Range $http_if_range;
+		proxy_buffering off;
+		proxy_cache off;
+		proxy_cookie_flags ~.* secure httponly samesite=lax;
+		proxy_read_timeout 3600s;
+		add_header Cache-Control "no-store" always;
+	}
+	location ~ ^/assets/.+-[A-Za-z0-9_-]{8,}\.(?:js|mjs|css|map|png|jpe?g|gif|svg|ico|woff2?|wasm)$ {
+		try_files $uri =404;
+		add_header Cache-Control "public, max-age=31536000, immutable";
+	}
+	location /assets/ {
+		try_files $uri =404;
+		add_header Cache-Control "no-store";
+	}
+	location ~* \.(?:js|mjs|css|map|png|jpe?g|gif|svg|ico|webmanifest|woff2?|wasm)$ {
+		try_files $uri =404;
+		add_header Cache-Control "no-store";
+	}
+	location ~ ^/(?:$|account$|batch$|upload$|oops$|debug/issues$|config(?:/|$)|audiobook/|author/|collection/|item/|items/|libraries/|library/|playlist/|share/) {
+		try_files $uri /index.html;
+		add_header Cache-Control "no-store";
+	}
+	location / {
+		try_files $uri =404;
+		add_header Cache-Control "no-store";
+	}
+}
+map $http_upgrade $connection_upgrade { default upgrade; '' close; }

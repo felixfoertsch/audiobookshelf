@@ -12,13 +12,13 @@ for (const width of [320, 390])
 			page,
 		}, testInfo) => {
 			await page.setViewportSize({ width, height: 844 })
-			await page.goto('/new/login')
+			await page.goto('/login')
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 			await openSidebar(page)
 			await expect(appMenu(page).first()).toBeVisible()
-			await page.goto('/new/item/book-1')
+			await page.goto('/item/book-1')
 			await chooseTheme(page, theme)
 			const assertTheme = async () => {
 				expect(

@@ -23,17 +23,17 @@ for (const width of [390, 1280]) {
 					},
 				}),
 			)
-			await page.goto('/new/')
+			await page.goto('/')
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-			await expect(page).toHaveURL(/\/new\/library\/podcasts$/)
+			await expect(page).toHaveURL(/\/library\/podcasts$/)
 			for (const [name, path] of [
-				['home', '/new/library/podcasts'],
-				['library', '/new/library/podcasts/bookshelf'],
-				['podcast', '/new/item/podcast-1'],
-				['latest', '/new/library/podcasts/podcast/latest'],
-				['playing', '/new/item/podcast-1'],
+				['home', '/library/podcasts'],
+				['library', '/library/podcasts/bookshelf'],
+				['podcast', '/item/podcast-1'],
+				['latest', '/library/podcasts/podcast/latest'],
+				['playing', '/item/podcast-1'],
 			]) {
 				await page.goto(path)
 				await expect(page.getByRole('heading', { level: 1 })).toBeVisible()

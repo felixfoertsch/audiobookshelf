@@ -5,7 +5,7 @@ for (const width of [390, 1280])
 	for (const theme of ['light', 'dark'])
 		test(`listening shell home ${width} ${theme}`, async ({ page }) => {
 			await page.setViewportSize({ width, height: 848 })
-			await page.goto('/new/')
+			await page.goto('/')
 			await page.getByLabel('Username', { exact: true }).fill('admin')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()

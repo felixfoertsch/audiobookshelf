@@ -8,14 +8,14 @@ import {
 	settleAnimations,
 } from './shell-controls'
 
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	for (const width of [1280, 390])
 		for (const theme of ['light', 'dark']) {
 			test(`settings navigation, account and library affordance ${prefix || 'root'} ${width} ${theme}`, async ({
 				page,
 			}) => {
 				await page.setViewportSize({ width, height: 900 })
-				await page.goto(`${prefix}/new/`)
+				await page.goto(`${prefix}/`)
 				await page.getByLabel('Username', { exact: true }).fill('admin')
 				await page.getByLabel('Password', { exact: true }).fill('password')
 				await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -165,7 +165,7 @@ for (const prefix of ['', '/abs'])
 				).toBeVisible()
 				await capture('admin-settings')
 				if (width === 390) {
-					await page.goto(`${prefix}/new/config/log`)
+					await page.goto(`${prefix}/config/log`)
 					const active = page
 						.getByRole('navigation', { name: 'Admin settings', exact: true })
 						.getByRole('link', { name: 'Logs', exact: true })

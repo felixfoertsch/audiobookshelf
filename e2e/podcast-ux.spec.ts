@@ -4,14 +4,14 @@ import { items } from './data'
 test('podcast settings preserve unsaved draft across Escape and reopen', async ({
 	page,
 }) => {
-	await page.goto('/new/')
+	await page.goto('/')
 	await page.getByLabel('Username', { exact: true }).fill('admin')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 	await expect(
 		page.getByRole('searchbox', { name: 'Search library' }),
 	).toBeVisible()
-	await page.goto('/new/item/podcast-1')
+	await page.goto('/item/podcast-1')
 	const trigger = page.getByRole('button', {
 		name: 'Podcast settings',
 		exact: true,
@@ -64,14 +64,14 @@ for (const locale of ['en-US', 'de-DE']) {
 					return route.fulfill({ json: { updated: true } })
 				},
 			)
-			await page.goto('/new/')
+			await page.goto('/')
 			await page.getByLabel('Username', { exact: true }).fill('admin')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 			await expect(
 				page.getByRole('searchbox', { name: 'Search library' }),
 			).toBeVisible()
-			await page.goto('/new/item/podcast-1')
+			await page.goto('/item/podcast-1')
 			await page
 				.getByRole('button', { name: 'Podcast settings', exact: true })
 				.click()

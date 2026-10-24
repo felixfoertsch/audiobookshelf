@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { closeSidebar, openSidebar } from './shell-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`compact player ${prefix || 'root'}`, async ({
 		page,
 		browserName,
@@ -27,7 +27,7 @@ for (const prefix of ['', '/abs']) {
 			]
 			await route.fulfill({ response, json: data })
 		})
-		await page.goto(`${prefix}/new/`)
+		await page.goto(`${prefix}/`)
 		await page.getByLabel('Username', { exact: true }).fill('listener')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()

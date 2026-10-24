@@ -1,14 +1,14 @@
 import { expect, test } from '@playwright/test'
 import { signIn } from './socket-controls'
 
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	test(`bookshelf Back restores query and scroll ${prefix || 'root'}`, async ({
 		page,
 	}) => {
 		await page.setViewportSize({ width: 390, height: 400 })
 		await signIn(page, prefix)
 		await page.goto(
-			`${prefix}/new/library/podcasts/bookshelf?sort=media.metadata.title&desc=1&filter=all`,
+			`${prefix}/library/podcasts/bookshelf?sort=media.metadata.title&desc=1&filter=all`,
 		)
 		const item = page.getByRole('main').getByRole('link').last()
 		await item.scrollIntoViewIfNeeded()

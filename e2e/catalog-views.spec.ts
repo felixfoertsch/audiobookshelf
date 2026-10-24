@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	for (const width of [390, 1280]) {
 		for (const library of ['books', 'podcasts']) {
 			for (const view of ['grid', 'list', 'detail']) {
@@ -8,13 +8,13 @@ for (const prefix of ['', '/abs']) {
 					page,
 				}) => {
 					await page.setViewportSize({ width, height: 900 })
-					await page.goto(`${prefix}/new/`)
+					await page.goto(`${prefix}/`)
 					await page.getByLabel('Username', { exact: true }).fill('listener')
 					await page.getByLabel('Password', { exact: true }).fill('password')
 					await page
 						.getByRole('button', { name: 'Sign in', exact: true })
 						.click()
-					await page.goto(`${prefix}/new/library/${library}/bookshelf`)
+					await page.goto(`${prefix}/library/${library}/bookshelf`)
 					await page
 						.getByRole('button', { name: 'View options', exact: true })
 						.click()
@@ -111,13 +111,13 @@ for (const prefix of ['', '/abs']) {
 			page,
 		}) => {
 			await page.setViewportSize({ width, height: 900 })
-			await page.goto(`${prefix}/new/`)
+			await page.goto(`${prefix}/`)
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 			for (const section of ['series', 'authors', 'collections', 'playlists']) {
 				await page.goto(
-					`${prefix}/new/library/books/bookshelf/${section}?view=detail`,
+					`${prefix}/library/books/bookshelf/${section}?view=detail`,
 				)
 				const entry = page.getByRole('article').first()
 				await expect(entry.getByRole('heading')).toBeVisible()

@@ -6,7 +6,7 @@ import {
 	openSidebar,
 } from './shell-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`portable multi-track chapters, sleep and native bookmark CRUD ${prefix || 'root'}`, async ({
 		page,
 	}) => {
@@ -15,14 +15,14 @@ for (const prefix of ['', '/abs']) {
 			if (/\/session\/.*\/(sync|close)$/.test(new URL(request.url()).pathname))
 				writes.push({ path: request.url(), body: request.postDataJSON() })
 		})
-		await page.goto(`${prefix}/new/login`)
+		await page.goto(`${prefix}/login`)
 		await page.getByLabel('Username', { exact: true }).fill('listener')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 		await openSidebar(page)
 		await expect(appMenu(page).first()).toBeVisible()
 		const start = async () => {
-			await page.goto(`${prefix}/new/item/book-boundaries`)
+			await page.goto(`${prefix}/item/book-boundaries`)
 			await page
 				.getByRole('button', { name: 'Play audiobook', exact: true })
 				.click()
@@ -184,14 +184,14 @@ for (const width of [390, 1280])
 	for (const theme of ['light', 'dark'])
 		test(`chapter mode screenshot ${width} ${theme}`, async ({ page }) => {
 			await page.setViewportSize({ width, height: 900 })
-			await page.goto('/new/login')
+			await page.goto('/login')
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 			await openSidebar(page)
 			await expect(appMenu(page).first()).toBeVisible()
 			await chooseTheme(page, theme)
-			await page.goto('/new/item/book-boundaries')
+			await page.goto('/item/book-boundaries')
 			await page
 				.getByRole('button', { name: 'Play audiobook', exact: true })
 				.click()

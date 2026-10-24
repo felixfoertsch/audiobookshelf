@@ -10,7 +10,7 @@ const sender = `(() => {
  customElements.define('google-cast-launcher', class extends HTMLElement {});
  window.__onGCastApiAvailable(true);
 })();`
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	for (const enabled of [false, true]) {
 		test(`authenticated Cast bootstrap ${prefix || 'root'} enabled=${enabled}`, async ({
 			page,
@@ -54,13 +54,13 @@ for (const prefix of ['', '/abs'])
 						})
 					},
 				)
-			await page.goto(`${prefix}/new/login`)
+			await page.goto(`${prefix}/login`)
 			expect(sdkRequests).toBe(0)
 			await expect(page.locator('script[src*="cast_sender.js"]')).toHaveCount(0)
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-			await page.waitForURL(`${prefix}/new/library/podcasts`)
+			await page.waitForURL(`${prefix}/library/podcasts`)
 			await expect(appMenu(page).first()).toBeVisible()
 			if (enabled) {
 				// Login uses location.assign: sender may start in outgoing document too.

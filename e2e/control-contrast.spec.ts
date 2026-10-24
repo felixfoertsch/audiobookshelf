@@ -4,12 +4,12 @@ import { appMenu, chooseTheme, settleAnimations } from './shell-controls'
 
 for (const theme of ['light', 'dark']) {
 	test(`player and sidebar control contrast ${theme}`, async ({ page }) => {
-		await page.goto('/new/login')
+		await page.goto('/login')
 		await page.getByLabel('Username', { exact: true }).fill('listener')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 		await expect(appMenu(page)).toBeVisible()
-		await page.goto('/new/item/podcast-1')
+		await page.goto('/item/podcast-1')
 		await page
 			.getByRole('button', { name: 'Play The Quiet Observatory', exact: true })
 			.click()

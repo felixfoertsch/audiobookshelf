@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import { signIn } from './socket-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	for (const width of [1280, 390]) {
 		for (const theme of ['light', 'dark'] as const) {
 			test(`feed episode download ${prefix || 'root'} ${width} ${theme}`, async ({
@@ -11,7 +11,7 @@ for (const prefix of ['', '/abs']) {
 				await page.setViewportSize({ width, height: 900 })
 				await page.emulateMedia({ colorScheme: theme })
 				await signIn(page, prefix, 'admin')
-				await page.goto(`${prefix}/new/library/podcasts/podcast/latest`)
+				await page.goto(`${prefix}/library/podcasts/podcast/latest`)
 				const row = page.getByRole('listitem').filter({
 					has: page.getByRole('heading', {
 						name: 'Feed-only fixture episode',
@@ -86,14 +86,14 @@ for (const prefix of ['', '/abs']) {
 		page,
 	}) => {
 		await signIn(page, prefix, 'admin')
-		await page.goto(`${prefix}/new/library/podcasts`)
+		await page.goto(`${prefix}/library/podcasts`)
 		const card = page.getByRole('article').filter({
 			has: page.getByRole('heading', { name: 'Feed-only fixture episode' }),
 		})
 		await expect(card).toBeVisible()
 		await expect(card.getByRole('link').first()).toHaveAttribute(
 			'href',
-			`${prefix}/new/item/podcast-1`,
+			`${prefix}/item/podcast-1`,
 		)
 		await expect(
 			card.getByRole('button', { name: 'Play', exact: true }),
@@ -106,7 +106,7 @@ for (const prefix of ['', '/abs']) {
 		page,
 	}) => {
 		await signIn(page, prefix)
-		await page.goto(`${prefix}/new/library/podcasts/podcast/latest`)
+		await page.goto(`${prefix}/library/podcasts/podcast/latest`)
 		await expect(
 			page.getByRole('button', { name: 'Play Feed-only fixture episode' }),
 		).toHaveCount(0)

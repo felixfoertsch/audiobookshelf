@@ -2,7 +2,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test'
 import { appMenu } from './shell-controls'
 
 async function openReader(page: Page, id: string) {
-	await page.goto('/new/')
+	await page.goto('/')
 	await expect(
 		page
 			.getByRole('button', { name: 'Sign in', exact: true })
@@ -21,7 +21,7 @@ async function openReader(page: Page, id: string) {
 		await login
 		await expect(appMenu(page)).toBeVisible()
 	}
-	await page.goto(`/new/item/${id}`)
+	await page.goto(`/item/${id}`)
 	await page.getByRole('button', { name: 'Read ebook', exact: true }).click()
 	await expect(page.getByRole('dialog', { name: 'Ebook reader' })).toBeVisible()
 }

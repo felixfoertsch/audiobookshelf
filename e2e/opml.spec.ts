@@ -4,7 +4,7 @@ import { appMenu, closeSidebar, openSidebar } from './shell-controls'
 const text =
 	'<opml><body><outline type="rss" title="Private original feed" xmlUrl="http://192.168.1.2/feed"/></body></opml>'
 async function signIn(page: Page, prefix: string) {
-	await page.goto(`${prefix}/new/login`)
+	await page.goto(`${prefix}/login`)
 	await page.getByLabel('Username', { exact: true }).fill('admin')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	const login = page.waitForResponse(
@@ -18,7 +18,7 @@ async function signIn(page: Page, prefix: string) {
 	await openSidebar(page)
 	await expect(appMenu(page)).toBeVisible()
 	await closeSidebar(page)
-	await page.goto(`${prefix}/new/library/podcasts/podcast/search`)
+	await page.goto(`${prefix}/library/podcasts/podcast/search`)
 	await expect(page.getByLabel('Import OPML', { exact: true })).toBeEnabled()
 }
 async function upload(page: Page) {
@@ -28,7 +28,7 @@ async function upload(page: Page) {
 		buffer: Buffer.from(text),
 	})
 }
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	test(`OPML native parse/review/import ${prefix || 'root'}`, async ({
 		page,
 	}) => {

@@ -1,14 +1,14 @@
 import { expect, test } from '@playwright/test'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`playlist create dialog persists and delete returns to parent ${prefix || 'root'}`, async ({
 		page,
 	}) => {
-		await page.goto(`${prefix}/new/`)
+		await page.goto(`${prefix}/`)
 		await page.getByLabel('Username', { exact: true }).fill('listener')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-		await page.goto(`${prefix}/new/library/books/bookshelf/playlists`)
+		await page.goto(`${prefix}/library/books/bookshelf/playlists`)
 		const trigger = page.getByRole('button', {
 			name: 'Create playlist',
 			exact: true,

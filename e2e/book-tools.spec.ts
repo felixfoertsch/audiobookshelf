@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { items } from './data'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`book tools native task lifecycle ${prefix || 'root'}`, async ({
 		page,
 	}) => {
@@ -41,11 +41,11 @@ for (const prefix of ['', '/abs']) {
 				return route.fulfill({ body: 'OK' })
 			},
 		)
-		await page.goto(`${prefix}/new/`)
+		await page.goto(`${prefix}/`)
 		await page.getByLabel('Username', { exact: true }).fill('admin')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-		await page.goto(`${prefix}/new/audiobook/book-1/manage`)
+		await page.goto(`${prefix}/audiobook/book-1/manage`)
 		await expect(
 			page.getByText('Metadata preview title', { exact: true }),
 		).toBeVisible()

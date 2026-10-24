@@ -3,12 +3,12 @@ import { openSidebar } from './shell-controls'
 
 test('collapsed desktop sidebar stays recoverable', async ({ page }) => {
 	await page.setViewportSize({ width: 1280, height: 848 })
-	await page.goto('/new/')
+	await page.goto('/')
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 	await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-	await page.goto('/new/item/podcast-1')
+	await page.goto('/item/podcast-1')
 	await page.getByRole('button', { name: 'Play latest episode' }).click()
 	const player = page.getByRole('region', { name: 'Audio player' })
 	await expect(player).toBeVisible()
@@ -31,11 +31,11 @@ test('320 px selection wraps and search submit has visible keyboard focus', asyn
 	page,
 }) => {
 	await page.setViewportSize({ width: 320, height: 848 })
-	await page.goto('/new/')
+	await page.goto('/')
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-	await page.goto('/new/library/podcasts/bookshelf')
+	await page.goto('/library/podcasts/bookshelf')
 	await page.getByRole('button', { name: 'Select', exact: true }).click()
 	await page.getByRole('button', { name: 'Select page', exact: true }).click()
 	expect(

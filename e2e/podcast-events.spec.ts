@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test'
 import { signIn, socketControl } from './socket-controls'
 
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	test(`download socket lifecycle ${prefix || 'root'}`, async ({ page }) => {
 		await signIn(page, prefix, 'admin')
-		await page.goto(`${prefix}/new/library/podcasts/podcast/download-queue`)
+		await page.goto(`${prefix}/library/podcasts/podcast/download-queue`)
 		await expect(
 			page.getByRole('heading', { name: 'Podcast download queue' }),
 		).toBeVisible()

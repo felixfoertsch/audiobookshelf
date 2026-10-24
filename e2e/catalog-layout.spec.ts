@@ -9,13 +9,13 @@ for (const width of [390, 1280])
 			await page.addInitScript((value) => {
 				localStorage.setItem('abs-modern-theme', value)
 			}, theme)
-			await page.goto('/new/')
+			await page.goto('/')
 			await page.getByLabel('Username', { exact: true }).fill('listener')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 			for (const [view, path] of [
-				['home', '/new/library/podcasts'],
-				['library', '/new/library/podcasts/bookshelf'],
+				['home', '/library/podcasts'],
+				['library', '/library/podcasts/bookshelf'],
 			]) {
 				await page.goto(path)
 				await expect(page.getByRole('heading', { level: 1 })).toHaveText(

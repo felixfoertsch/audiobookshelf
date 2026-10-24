@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`native home-screen metadata scoped to ${prefix || 'root'} preview`, async ({
 		page,
 	}) => {
-		await page.goto(`${prefix}/new/login`)
-		const mount = new URL(`${prefix}/new/`, page.url()).href
+		await page.goto(`${prefix}/login`)
+		const mount = new URL(`${prefix}/`, page.url()).href
 		const manifestUrl = await page
 			.locator('link[rel="manifest"]')
 			.evaluate((link: HTMLLinkElement) => link.href)

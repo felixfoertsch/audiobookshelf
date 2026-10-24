@@ -6,12 +6,17 @@ export default defineConfig({
 	testMatch: '**/*.spec.ts',
 	fullyParallel: false,
 	workers: 1,
-	use: { baseURL: `http://127.0.0.1:${port}`, headless: true },
-	webServer: {
-		command: 'bun e2e/fixture.ts',
-		env: { FIXTURE_PORT: String(port), FIXTURE_SOCKET: '1' },
-		url: `http://127.0.0.1:${port}/health`,
-		reuseExistingServer: false,
-		timeout: 30000,
+	use: {
+		baseURL: process.env.BUILT_BASE_URL ?? `http://127.0.0.1:${port}`,
+		headless: true,
 	},
+	webServer: process.env.BUILT_BASE_URL
+		? undefined
+		: {
+				command: 'bun e2e/fixture.ts',
+				env: { FIXTURE_PORT: String(port), FIXTURE_SOCKET: '1' },
+				url: `http://127.0.0.1:${port}/health`,
+				reuseExistingServer: false,
+				timeout: 30000,
+			},
 })

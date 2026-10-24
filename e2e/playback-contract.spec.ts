@@ -4,7 +4,7 @@ import { contrast } from './contrast'
 import { appMenu, chooseTheme, settleAnimations } from './shell-controls'
 
 async function login(page: Page, prefix: string) {
-	await page.goto(`${prefix}/new/login`)
+	await page.goto(`${prefix}/login`)
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -12,7 +12,7 @@ async function login(page: Page, prefix: string) {
 }
 async function start(page: Page, prefix: string) {
 	await login(page, prefix)
-	await page.goto(`${prefix}/new/item/podcast-1`)
+	await page.goto(`${prefix}/item/podcast-1`)
 	await page
 		.getByRole('button', { name: 'Play The Quiet Observatory', exact: true })
 		.click()
@@ -48,7 +48,7 @@ async function action(page: Page, name: string, details = {}) {
 		[name, details] as const,
 	)
 }
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test.describe(`${prefix || 'root'} playback contracts`, () => {
 		test('MediaSession actions drive real playback and next queued item', async ({
 			page,
@@ -115,13 +115,6 @@ for (const prefix of ['', '/abs']) {
 			await page.route('**/api/items/podcast-1/play/*', async (route) => {
 				const response = await route.fetch()
 				const body = await response.json()
-				const episode = body.libraryItem.media.episodes.find(
-					(item: { id: string }) => item.id === 'podcast-1-ep-1',
-				)
-				episode.adAnalysis = {
-					status: 'candidates',
-					segments: [{ start: 4, end: 10 }],
-				}
 				if (!route.request().postDataJSON().forceTranscode) {
 					body.audioTracks[0].contentUrl = `${prefix}/broken-audio`
 				} else {
@@ -151,7 +144,7 @@ for (const prefix of ['', '/abs']) {
 				}),
 			)
 			await login(page, prefix)
-			await page.goto(`${prefix}/new/item/podcast-1`)
+			await page.goto(`${prefix}/item/podcast-1`)
 			await page
 				.getByRole('button', {
 					name: 'Play The Quiet Observatory',
@@ -292,7 +285,7 @@ for (const prefix of ['', '/abs']) {
 					syncRequests.push(request.postData() ?? '')
 			})
 			await login(page, prefix)
-			await page.goto(`${prefix}/new/item/book-1`)
+			await page.goto(`${prefix}/item/book-1`)
 			await page
 				.getByRole('button', { name: 'Play audiobook', exact: true })
 				.click()
@@ -346,7 +339,7 @@ for (const prefix of ['', '/abs']) {
 				}),
 			)
 			await page.reload()
-			await page.goto(`${prefix}/new/item/book-1`)
+			await page.goto(`${prefix}/item/book-1`)
 			const hlsResponse = page.waitForResponse(
 				(response) =>
 					response.url().endsWith('/api/items/book-1/play') && response.ok(),

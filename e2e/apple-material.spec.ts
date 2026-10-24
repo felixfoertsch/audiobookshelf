@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`glass bounds and accessibility ${prefix || 'root'}`, async ({
 		page,
 	}) => {
-		await page.goto(`${prefix}/new/`)
+		await page.goto(`${prefix}/`)
 		await expect(page.getByLabel('Username', { exact: true })).toBeVisible()
 		const results = await page.evaluate(() => {
 			const canvas = document.createElement('canvas')

@@ -19,7 +19,7 @@ const ready =
 		}),
 	)
 async function login(page: Page, prefix: string) {
-	await page.goto(`${prefix}/new/login`)
+	await page.goto(`${prefix}/login`)
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -57,7 +57,7 @@ test.describe('local real-media browser playback', () => {
 		!ready,
 		'Local real-media cache absent/incomplete; populate ignored manifest and files first',
 	)
-	for (const prefix of ['', '/abs']) {
+	for (const prefix of ['']) {
 		for (const id of ['real-low', 'real-end-world']) {
 			test(`${prefix || 'root'} ${id}: episode metadata, playback and range seek`, async ({
 				page,
@@ -81,7 +81,7 @@ test.describe('local real-media browser playback', () => {
 				})
 				await login(page, prefix)
 				authenticated = true
-				await page.goto(`${prefix}/new/item/${record.id}`)
+				await page.goto(`${prefix}/item/${record.id}`)
 				await expect(
 					page.getByText(record.title, { exact: true }).first(),
 				).toBeVisible()
@@ -151,7 +151,7 @@ test.describe('local real-media browser playback', () => {
 			})
 			await login(page, prefix)
 			authenticated = true
-			await page.goto(`${prefix}/new/item/${book.id}`)
+			await page.goto(`${prefix}/item/${book.id}`)
 			await expect(
 				page.getByText(book.title, { exact: true }).first(),
 			).toBeVisible()

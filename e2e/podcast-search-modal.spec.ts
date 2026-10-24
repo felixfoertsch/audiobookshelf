@@ -1,20 +1,20 @@
 import { expect, test } from '@playwright/test'
 import { chooseTheme, settleAnimations } from './shell-controls'
 
-for (const base of ['', '/abs']) {
+for (const base of ['']) {
 	for (const width of [1280, 390]) {
 		test(`podcast search modal traps focus and supports history ${base || 'root'} ${width}`, async ({
 			page,
 		}) => {
 			await page.setViewportSize({ width, height: 900 })
-			await page.goto(`${base}/new/`)
+			await page.goto(`${base}/`)
 			await page.getByLabel('Username', { exact: true }).fill('admin')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 			await expect(
 				page.getByRole('heading', { name: 'Home', exact: true }),
 			).toBeVisible()
-			await page.goto(`${base}/new/library/podcasts`)
+			await page.goto(`${base}/library/podcasts`)
 			if (width === 390)
 				await page
 					.getByRole('button', { name: 'Toggle Sidebar', exact: true })
@@ -40,12 +40,10 @@ for (const base of ['', '/abs']) {
 				await expect(
 					page.getByRole('link', { name: 'Add podcast', exact: true }),
 				).toBeFocused()
-			await expect(page).toHaveURL(
-				new RegExp(`${base}/new/library/podcasts/?$`),
-			)
+			await expect(page).toHaveURL(new RegExp(`${base}/library/podcasts/?$`))
 			await page.goForward()
 			await expect(modal).toBeVisible()
-			await page.goto(`${base}/new/library/podcasts/podcast/search`)
+			await page.goto(`${base}/library/podcasts/podcast/search`)
 			await expect(modal).toBeVisible()
 			await modal.getByLabel('Podcast name or RSS URL').fill('Lateral')
 			await modal.getByRole('button', { name: 'Search', exact: true }).click()
@@ -68,7 +66,7 @@ for (const base of ['', '/abs']) {
 test('podcast cards render downloaded fallback while summaries remain pending', async ({
 	page,
 }) => {
-	await page.goto('/new/')
+	await page.goto('/')
 	await page.getByLabel('Username', { exact: true }).fill('admin')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -84,7 +82,7 @@ test('podcast cards render downloaded fallback while summaries remain pending', 
 		await route.continue()
 	})
 	try {
-		await page.goto('/new/library/podcasts/bookshelf')
+		await page.goto('/library/podcasts/bookshelf')
 		await expect(
 			page.getByText(/downloaded · checking feed/).first(),
 		).toBeVisible()
@@ -103,7 +101,7 @@ for (const width of [1280, 390])
 	for (const theme of ['light', 'dark']) {
 		test(`podcast UX captures ${width} ${theme}`, async ({ page }) => {
 			await page.setViewportSize({ width, height: 1000 })
-			await page.goto('/new/')
+			await page.goto('/')
 			await page.getByLabel('Username', { exact: true }).fill('admin')
 			await page.getByLabel('Password', { exact: true }).fill('password')
 			await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -117,7 +115,7 @@ for (const width of [1280, 390])
 				['latest', '/library/podcasts/podcast/latest'],
 				['search', '/library/podcasts/podcast/search'],
 			]) {
-				await page.goto(`/new${path}`)
+				await page.goto(`${path}`)
 				await expect(
 					page.getByRole('heading', {
 						name:

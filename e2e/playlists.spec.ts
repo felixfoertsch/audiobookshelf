@@ -1,19 +1,19 @@
 import { expect, test } from '@playwright/test'
 import { chooseTheme, settleAnimations } from './shell-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	for (const width of [390, 1280]) {
 		for (const theme of ['light', 'dark'] as const) {
 			test(`playlist detail ${width}px ${theme} ${prefix || 'root'}`, async ({
 				page,
 			}) => {
 				await page.setViewportSize({ width, height: 900 })
-				await page.goto(`${prefix}/new/`)
+				await page.goto(`${prefix}/`)
 				await page.getByLabel('Username', { exact: true }).fill('listener')
 				await page.getByLabel('Password', { exact: true }).fill('password')
 				await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 				await page.goto(
-					`${prefix}/new/library/books/bookshelf/playlists?view=detail`,
+					`${prefix}/library/books/bookshelf/playlists?view=detail`,
 				)
 				await chooseTheme(page, theme)
 				const capture = async (view: string) => {

@@ -108,7 +108,7 @@ test.describe('prepared semantic Classic/modern slices', () => {
 				data,
 				`PARITY_CASES requires explicit route-role mapping for ${key}`,
 			).toBeTruthy()
-			for (const prefix of ['/classic', '/new']) {
+			for (const prefix of ['/classic', '']) {
 				const context = await browser.newContext({
 					baseURL,
 					serviceWorkers: 'block',

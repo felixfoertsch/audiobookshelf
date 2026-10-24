@@ -4,19 +4,22 @@ import { appMenu, chooseLibrary, openPlayerOptions } from './shell-controls'
 test('cached page candidates never override fresh stale session', async ({
 	page,
 }) => {
-	await page.route(
-		'**/api/items/podcast-1/play/podcast-1-ep-1',
-		async (route) => {
-			const response = await route.fetch()
-			const data = await response.json()
-			data.libraryItem.media.episodes[0].adAnalysis = {
-				status: 'stale',
-				segments: [],
-			}
-			await route.fulfill({ response, json: data })
-		},
+	await page.route('**/psb/api/items/podcast-1/analysis', (route) =>
+		route.fulfill({
+			json: {
+				episodes: {
+					'podcast-1-ep-1': {
+						status: 'stale',
+						version: null,
+						sourceSha256: null,
+						segments: [],
+						adAnalysisEnabled: true,
+					},
+				},
+			},
+		}),
 	)
-	await page.goto('/new/')
+	await page.goto('/')
 	await page.getByLabel('Username', { exact: true }).fill('listener')
 	await page.getByLabel('Password', { exact: true }).fill('password')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -26,7 +29,7 @@ test('cached page candidates never override fresh stale session', async ({
 		.getByRole('link', { name: /^Field Notes/ })
 		.first()
 		.click()
-	await expect(page).toHaveURL('/new/item/podcast-1')
+	await expect(page).toHaveURL('/item/podcast-1')
 	await page
 		.getByRole('button', { name: 'Play latest episode', exact: true })
 		.click()

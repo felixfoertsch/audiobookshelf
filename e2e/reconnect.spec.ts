@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test'
 import { signIn, socketControl } from './socket-controls'
 
-for (const prefix of ['', '/abs'])
+for (const prefix of [''])
 	test(`real socket reconnect revalidates once ${prefix || 'root'}`, async ({
 		page,
 	}) => {
 		await signIn(page, prefix)
-		await page.goto(`${prefix}/new/item/podcast-1`)
+		await page.goto(`${prefix}/item/podcast-1`)
 		await expect(
 			page.getByRole('heading', { name: 'Field Notes', exact: true }),
 		).toBeVisible()

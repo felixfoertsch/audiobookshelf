@@ -1,4 +1,4 @@
-name: Publish fork image
+name: Publish audiobookshelf-modern-ui image
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: fork-image-${{ github.ref }}
+  group: audiobookshelf-modern-ui-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   publish:
-    if: github.repository == 'felixfoertsch/audiobookshelf' && github.ref == 'refs/heads/main'
+    if: github.repository == 'felixfoertsch/audiobookshelf-modern-ui' && github.ref == 'refs/heads/main'
     runs-on: linux-builder
     container: gitea/runner-images@sha256:0e62e56b382ebf485bff1e51a05cbe27c708545a2e91425467fd31eb3e249521
     timeout-minutes: 60
@@ -24,81 +24,32 @@ jobs:
         shell: bash
     env:
       REGISTRY: git.felixfoertsch.de
-      IMAGE: git.felixfoertsch.de/felixfoertsch/audiobookshelf
+      IMAGE: git.felixfoertsch.de/felixfoertsch/audiobookshelf-modern-ui
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-
-      - name: Check modern frontend
+      - name: Build runtime and E2E images
         run: |
           set -euo pipefail
-          node scripts/check-build-contract.cjs
-          docker buildx create --name fork --driver remote docker-container://linux-builder-buildkit --use
-          docker buildx build --builder fork --platform linux/amd64 --target check-web .
-
-      # ponytail: linux/amd64 only (FFUNRAID); rootless builder has no QEMU. Add arm64 with a native arm64 runner.
-      - name: Build runtime image
-        run: |
-          set -euo pipefail
-          docker buildx build --builder fork --platform linux/amd64 --load \
+          docker buildx create --name frontend --driver remote docker-container://linux-builder-buildkit --use
+          docker buildx build --builder frontend --platform linux/amd64 --target check .
+          docker buildx build --builder frontend --platform linux/amd64 --load --target runtime \
             --label org.opencontainers.image.source=https://git.felixfoertsch.de/${{ github.repository }} \
             --label org.opencontainers.image.revision=${{ github.sha }} \
-            -t abs-smoke:local .
-
-      - name: Check FFmpeg and full-duration Chromaprint runtime
-        run: |
-          set -euo pipefail
-          docker run --rm -i --network none --entrypoint node abs-smoke:local <<'NODE'
-          const assert = require('node:assert/strict')
-          const { execFileSync } = require('node:child_process')
-          const fs = require('node:fs')
-          const os = require('node:os')
-          const path = require('node:path')
-          const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'abs-smoke-'))
-          try {
-            assert.match(execFileSync('fpcalc', ['-version'], { encoding: 'utf8', timeout: 5000 }), /fpcalc version 1\.(5|6)\./)
-            const pcm = path.join(dir, 'sample.pcm')
-            execFileSync('ffmpeg', ['-nostdin', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=125', '-ac', '1', '-ar', '11025', '-f', 's16le', pcm], { timeout: 30000 })
-            const data = JSON.parse(execFileSync('fpcalc', ['-format', 's16le', '-rate', '11025', '-channels', '1', '-algorithm', '2', '-length', '0', '-raw', '-json', pcm], { encoding: 'utf8', timeout: 30000 }))
-            assert.ok(Array.isArray(data.fingerprint) && data.fingerprint.length > 0)
-            assert.ok(data.fingerprint.every((n) => Number.isInteger(n) && n >= 0 && n <= 0xffffffff))
-            assert.ok(Math.abs(data.fingerprint.length * 1365 / 11025 + (19 * 1365 + 2731) / 11025 - 125) < 1, 'fingerprint must cover full sample, not default 120 s')
-            console.log('FFmpeg and full-duration Chromaprint smoke passed')
-          } finally {
-            fs.rmSync(dir, { recursive: true, force: true })
-          }
-          assert.ok(process.env.NUSQLITE3_PATH, 'NUSQLITE3_PATH must be set')
-          const db = new (require('sqlite3').Database)(':memory:', (err) => {
-            assert.ifError(err)
-            db.loadExtension(process.env.NUSQLITE3_PATH, (err) => {
-              assert.ifError(err)
-              db.close((err) => {
-                assert.ifError(err)
-                console.log('SQLite native binding and nusqlite extension smoke passed')
-              })
-            })
-          })
-          NODE
-
-      - name: Check native candidate boundaries on runtime
-        run: |
-          set -euo pipefail
-          docker buildx build --builder fork --platform linux/amd64 --target check-runtime .
-
-      - name: Check full backend and modern-serving HTTP contracts
-        run: |
-          set -euo pipefail
-          docker buildx build --builder fork --platform linux/amd64 --target check-backend .
-
+            -t modern-ui-e2e:frontend .
+          docker buildx build --builder frontend --platform linux/amd64 --load --target e2e-abs-mock -t modern-ui-e2e:abs .
+          docker buildx build --builder frontend --platform linux/amd64 --load --target e2e-psb-mock -t modern-ui-e2e:psb .
+          docker buildx build --builder frontend --platform linux/amd64 --load --target e2e-runner -t modern-ui-e2e:runner .
+      - name: Run full Playwright suite against built proxy image
+        run: e2e/run-container-suite.sh
       - name: Publish image
-        if: github.ref == 'refs/heads/main'
         env:
           TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
           set -euo pipefail
           echo "$TOKEN" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
-          docker tag abs-smoke:local "$IMAGE:main"
-          docker tag abs-smoke:local "$IMAGE:sha-${{ github.sha }}"
+          docker tag modern-ui-e2e:frontend "$IMAGE:main"
+          docker tag modern-ui-e2e:frontend "$IMAGE:sha-${{ github.sha }}"
           docker push "$IMAGE:main"
           docker push "$IMAGE:sha-${{ github.sha }}"

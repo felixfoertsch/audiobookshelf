@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { items } from './data'
 import { closeSidebar } from './shell-controls'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`book editor series, selective match, chapters and tracks ${prefix || 'root'}`, async ({
 		page,
 	}) => {
@@ -134,12 +134,12 @@ for (const prefix of ['', '/abs']) {
 				await route.continue()
 			},
 		)
-		await page.goto(`${prefix}/new/`)
+		await page.goto(`${prefix}/`)
 		await page.getByLabel('Username', { exact: true }).fill('admin')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 		await closeSidebar(page)
-		await page.goto(`${prefix}/new/audiobook/book-1/edit`)
+		await page.goto(`${prefix}/audiobook/book-1/edit`)
 		await page.getByLabel('Series sequence 1').fill('2.5')
 		await page.getByRole('button', { name: 'Add series', exact: true }).click()
 		await page.getByLabel('Series name 2').fill('Second saga')
@@ -183,7 +183,7 @@ for (const prefix of ['', '/abs']) {
 			path: `/private/tmp/opencode/book-manage/editor-${prefix ? 'abs' : 'root'}.png`,
 			fullPage: true,
 		})
-		await page.goto(`${prefix}/new/audiobook/book-1/chapters`)
+		await page.goto(`${prefix}/audiobook/book-1/chapters`)
 		await page
 			.getByLabel('Title', { exact: true })
 			.first()

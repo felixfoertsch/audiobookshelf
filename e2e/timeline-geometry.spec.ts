@@ -13,16 +13,16 @@ const sender = `(() => {
  window.__onGCastApiAvailable(true);
 })();`
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`local compact and expanded timeline pixel geometry ${prefix || 'root'}`, async ({
 		page,
 	}) => {
-		await page.goto(`${prefix}/new/login`)
+		await page.goto(`${prefix}/login`)
 		await page.getByLabel('Username', { exact: true }).fill('listener')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 		await expect(appMenu(page).first()).toBeVisible()
-		await page.goto(`${prefix}/new/item/podcast-1`)
+		await page.goto(`${prefix}/item/podcast-1`)
 		await page
 			.getByRole('button', { name: 'Play The Quiet Observatory', exact: true })
 			.click()
@@ -149,7 +149,7 @@ for (const prefix of ['', '/abs']) {
 					})
 				},
 			)
-		await page.goto(`${prefix}/new/login`)
+		await page.goto(`${prefix}/login`)
 		await page.getByLabel('Username', { exact: true }).fill('listener')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.route('**/api/items/podcast-1/play/*', async (route) => {
@@ -174,7 +174,7 @@ for (const prefix of ['', '/abs']) {
 		})
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 		await expect(appMenu(page).first()).toBeVisible()
-		await page.goto(`${prefix}/new/item/podcast-1`)
+		await page.goto(`${prefix}/item/podcast-1`)
 		await page
 			.getByRole('button', { name: 'Play The Quiet Observatory', exact: true })
 			.click()

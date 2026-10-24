@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { items } from './data'
 
-for (const prefix of ['', '/abs']) {
+for (const prefix of ['']) {
 	test(`episode analysis states, tooltip and admin queue use synthetic API ${prefix || '/'}`, async ({
 		page,
 	}) => {
@@ -15,7 +15,6 @@ for (const prefix of ['', '/abs']) {
 			route.fulfill({
 				json: {
 					...source,
-					adAnalysisEnabled: true,
 					media: {
 						...source.media,
 						episodes: [
@@ -24,28 +23,18 @@ for (const prefix of ['', '/abs']) {
 								id: 'ads',
 								title: 'Three breaks',
 								audioFile: {},
-								adAnalysis: {
-									status: 'candidates',
-									segments: [
-										{ start: 2, end: 5 },
-										{ start: 10, end: 20 },
-										{ start: 30, end: 40 },
-									],
-								},
 							},
 							{
 								...episode,
 								id: 'same',
 								title: 'Compared copies',
 								audioFile: {},
-								adAnalysis: { status: 'no_difference', segments: [] },
 							},
 							{
 								...episode,
 								id: 'new',
 								title: 'Fresh episode',
 								audioFile: {},
-								adAnalysis: null,
 							},
 						],
 					},
@@ -53,21 +42,50 @@ for (const prefix of ['', '/abs']) {
 			}),
 		)
 		let queued = 0
+		const completed = (segments: { start: number; end: number }[]) => ({
+			status: 'complete',
+			version: 'fixture-v1',
+			sourceSha256: 'a'.repeat(64),
+			segments,
+			adAnalysisEnabled: true,
+		})
+		const notAnalysed = {
+			status: 'disabled',
+			version: null,
+			sourceSha256: null,
+			segments: [],
+			adAnalysisEnabled: true,
+		}
+		await page.route('**/psb/api/items/podcast-1/analysis', (route) =>
+			route.fulfill({
+				json: {
+					episodes: {
+						ads: completed([
+							{ start: 2, end: 5 },
+							{ start: 10, end: 20 },
+							{ start: 30, end: 40 },
+						]),
+						same: completed([]),
+						new: notAnalysed,
+					},
+				},
+			}),
+		)
 		await page.route(
-			'**/api/podcasts/podcast-1/episode/new/ad-analysis',
+			'**/psb/api/items/podcast-1/episodes/new/analysis/enqueue',
 			(route) => {
 				queued++
-				return route.fulfill({ status: 202, json: {} })
+				return route.fulfill({ status: 202, json: { queued: true } })
 			},
 		)
-		await page.goto(`${prefix}/new/`)
+		await page.goto(`${prefix}/`)
 		await page.getByLabel('Username', { exact: true }).fill('admin')
 		await page.getByLabel('Password', { exact: true }).fill('password')
 		await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 		await expect(
 			page.getByRole('searchbox', { name: 'Search library' }),
 		).toBeVisible()
-		await page.goto(`${prefix}/new/item/podcast-1`)
+		await page.goto(`${prefix}/item/podcast-1`)
 		await expect(
 			page.getByRole('img', {
 				name: 'Inserted audio found: 3 breaks, 23 seconds',
@@ -92,19 +110,20 @@ for (const prefix of ['', '/abs']) {
 			page.getByRole('img', { name: 'Analysis queued' }),
 		).toBeVisible()
 		expect(queued).toBe(1)
-		await page.evaluate(() =>
-			window.dispatchEvent(
-				new CustomEvent('abs:socket', {
-					detail: {
-						event: 'episode_ad_analysis',
-						payload: {
-							libraryItemId: 'podcast-1',
-							episodeId: 'new',
-							adAnalysis: { status: 'no_difference' },
+		await page.route('**/psb/api/items/podcast-1/analysis', (route) =>
+			route.fulfill({
+				json: {
+					episodes: {
+						new: {
+							status: 'complete',
+							version: 'fixture-v1',
+							sourceSha256: 'b'.repeat(64),
+							segments: [],
+							adAnalysisEnabled: true,
 						},
 					},
-				}),
-			),
+				},
+			}),
 		)
 		await expect(
 			page.getByRole('img', { name: 'No inserted ads found' }),
