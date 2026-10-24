@@ -242,7 +242,7 @@ for (const prefix of ['']) {
 			await override(page, prefix, `/psb/api/podcasts/${id}/episode-summary`, {
 				...fixtures.summary,
 				total: 120,
-				unplayed: 3,
+				unplayed: 117,
 			})
 		await override(
 			page,
