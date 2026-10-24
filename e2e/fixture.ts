@@ -133,7 +133,12 @@ async function handleRequest(request: Request) {
 	if (path === '/__fixture/observations') return json(observations)
 	if (
 		(path === '/status' && request.method !== 'GET') ||
-		(path === '/login' && request.method !== 'POST')
+		(path === '/login' &&
+			request.method !== 'POST' &&
+			!(
+				request.method === 'GET' &&
+				request.headers.get('accept')?.includes('text/html')
+			))
 	)
 		return new Response('Method not allowed', {
 			status: 405,
