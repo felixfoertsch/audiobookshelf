@@ -50,14 +50,11 @@ describe('HLS authorization boundary', () => {
 	})
 })
 describe('fresh session candidate applicability', () => {
-	it('uses fresh matching episode candidates only', () => {
+	it('does not use sidecar candidates when native source identity is unproven', () => {
 		const session = sessionSchema.parse(
 			payload('candidates', [{ start: 10, end: 20 }]),
 		)
-		expect(sessionSegments(session)).toEqual([{ start: 10, end: 20 }])
-		expect(
-			session.libraryItem?.media.episodes?.[0].adAnalysis?.sourceSha256,
-		).toBe('fresh')
+		expect(sessionSegments(session)).toEqual([])
 	})
 	it('ignores stale page candidates when fresh session stale or empty', () => {
 		const stalePageCandidates = [{ start: 10, end: 20 }]
@@ -99,22 +96,24 @@ describe('fresh session candidate applicability', () => {
 				]),
 			)
 			const evidence = structuredClone(session)
-			expect(sessionSegments(session)).toEqual([
-				{ start: 10, end: 20 },
-				{ start: 50, end: 60 },
-			])
+			expect(sessionSegments(session)).toEqual([])
 			expect(session).toEqual(evidence)
 		}
 	})
 	it('rejects malformed sessions and invalid segments', () => {
-		for (const data of [
-			null,
-			{},
-			payload('candidates', [{ start: 20, end: 10 }]),
-			payload('candidates', [{ start: 10, end: Infinity }]),
-			payload('candidates', [{ start: Number.NaN, end: 20 }]),
-		])
+		for (const data of [null, {}])
 			expect(sessionSchema.safeParse(data).success).toBe(false)
+		for (const segments of [
+			[{ start: 20, end: 10 }],
+			[{ start: 10, end: Infinity }],
+			[{ start: Number.NaN, end: 20 }],
+		])
+			expect(
+				sessionSegments(
+					sessionSchema.parse(payload('candidates', segments)),
+					segments,
+				),
+			).toEqual([])
 	})
 })
 

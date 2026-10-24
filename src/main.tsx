@@ -6,11 +6,10 @@ import { initializeAuth, setAuthSocket, useAuth } from './api'
 import { applyProgressSocket } from './features/item/progress'
 import { initializeCast } from './features/player/cast'
 import { Login } from './login'
-import { AlphaNotice } from './routes/__root'
 import { routeTree } from './routeTree.gen'
 import './theme.css'
 
-const basePath = window.__ABS_WEB_CONFIG__?.basePath || '/new'
+const basePath = window.__ABS_WEB_CONFIG__?.basePath || ''
 ;(
 	window as Window & { __ABS_SOCKET__?: ReturnType<typeof io> }
 ).__ABS_SOCKET__ = undefined
@@ -77,7 +76,6 @@ function App() {
 			'item_removed',
 			'items_updated',
 			'items_added',
-			'episode_ad_analysis',
 			'user_updated',
 			'user_online',
 			'user_offline',
@@ -179,7 +177,6 @@ function App() {
 	)
 		return (
 			<>
-				<AlphaNotice />
 				{startupError && (
 					<p role="alert" className="p-4 text-destructive">
 						{startupError}

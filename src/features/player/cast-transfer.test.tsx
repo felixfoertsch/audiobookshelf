@@ -18,11 +18,12 @@ test('transfer failure survives closing and reopening options while pending', as
 	vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
 	vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
 	let reject!: (error: Error) => void
-	const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(
-		() =>
-			new Promise<Response>((_, fail) => {
-				reject = fail
-			}),
+	const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation((url) =>
+		String(url).startsWith('/psb/')
+			? Promise.resolve(Response.json({ episodes: {} }))
+			: new Promise<Response>((_, fail) => {
+					reject = fail
+				}),
 	)
 	useCast.setState({ connected: true, available: true })
 	usePlayer.getState().set(
@@ -41,7 +42,7 @@ test('transfer failure survives closing and reopening options while pending', as
 	fireEvent.click(
 		screen.getByRole('button', { name: 'Transfer audio to Cast' }),
 	)
-	await vi.waitFor(() => expect(fetcher).toHaveBeenCalled())
+	await vi.waitFor(() => expect(typeof reject).toBe('function'))
 	fireEvent.click(screen.getByRole('button', { name: /^Close$/ }))
 	fireEvent.click(screen.getByRole('button', { name: 'Player options' }))
 	expect(
@@ -66,7 +67,7 @@ test('transfer failure survives closing and reopening options while pending', as
 	fireEvent.click(
 		screen.getByRole('button', { name: 'Transfer audio to Cast' }),
 	)
-	await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3))
+	await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(4))
 	// Session replacement removes options before its play request settles.
 	expect(screen.queryByRole('dialog')).toBeNull()
 	await act(async () => reject(new Error('Late play request failure')))

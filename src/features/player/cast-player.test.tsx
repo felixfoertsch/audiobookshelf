@@ -259,24 +259,24 @@ it('Cast poll skips crossings, not seek destinations, and skips repeated crossin
 		.getByRole('slider', { name: 'Playback progress' })
 		.getAttribute('aria-describedby')
 	expect(document.getElementById(descriptionId || '')?.textContent).toBe(
-		'Detected segment ranges: 0:10–0:20, 0:30–0:40',
+		'Detected segment ranges: None',
 	)
-	expect(view.getAllByTestId('segment-marker')).toHaveLength(2)
+	expect(view.queryAllByTestId('segment-marker')).toHaveLength(0)
 	const tick = (time: number) =>
 		act(() => {
 			snapshot.currentTime = time
 			vi.advanceTimersByTime(1000)
 		})
 	tick(10.2)
-	expect(seekCast).toHaveBeenLastCalledWith(20)
+	expect(seekCast).not.toHaveBeenCalled()
 	act(() => seekPlayback(15))
 	tick(15.2)
 	expect(seekCast).toHaveBeenLastCalledWith(15)
 	tick(30.2)
-	expect(seekCast).toHaveBeenLastCalledWith(40)
+	expect(seekCast).toHaveBeenLastCalledWith(15)
 	act(() => seekPlayback(9))
 	tick(10.2)
-	expect(seekCast).toHaveBeenLastCalledWith(20)
+	expect(seekCast).toHaveBeenLastCalledWith(9)
 	view.unmount()
 	vi.useRealTimers()
 })

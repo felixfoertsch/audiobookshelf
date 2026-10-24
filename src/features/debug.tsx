@@ -6,10 +6,11 @@ import {
 	disableDebug,
 	useDebugEnabled,
 } from 'debug-overlay/client'
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { z } from 'zod'
-import { api, useAuth } from '../api'
+import { useAuth } from '../api'
 import { usePlayer } from '../player'
+import { psbApi } from '../psb-api'
 import { Button } from '../shared/components/ui/button'
 import { Switch } from '../shared/components/ui/switch'
 import 'debug-overlay/styles.css'
@@ -18,7 +19,7 @@ const transport = (
 	path: string,
 	{ method, body }: { method?: string; body?: unknown },
 ) =>
-	api(`/debug${path}`, z.unknown(), {
+	psbApi(`/api/debug${path}`, z.unknown(), {
 		method,
 		...(body === undefined ? {} : { body: JSON.stringify(body) }),
 	})
@@ -41,15 +42,44 @@ useAuth.subscribe(() => {
 })
 window.addEventListener('abs:logout-start', () => configure(false))
 const modernBase = () =>
-	(window.__ABS_WEB_CONFIG__?.basePath || '/new').replace(/\/$/, '')
+	(window.__ABS_WEB_CONFIG__?.basePath || '').replace(/\/$/, '')
 const href = (path: string) => `${modernBase()}${path}`
 const renderLink = (mapped: string, label: string) => (
 	<Link to={mapped.slice(modernBase().length) || '/'}>{label}</Link>
 )
 
+function useDebugAvailable() {
+	const user = useAuth((state) => state.user)
+	const owner =
+		user && ['admin', 'root'].includes(String(user.type))
+			? `${user.id}:${user.type}`
+			: ''
+	const [available, setAvailable] = useState('')
+	useEffect(() => {
+		if (!owner) return
+		let active = true
+		void psbApi('/api/debug/auth', z.object({ ok: z.literal(true) }))
+			.then(() => {
+				if (active) setAvailable(owner)
+			})
+			.catch(() => {
+				if (active) {
+					setAvailable('')
+					configure(false)
+				}
+			})
+		return () => {
+			active = false
+		}
+	}, [owner])
+	return !!owner && available === owner
+}
+
 export function DebugMenu() {
 	const id = useId()
 	const enabled = useDebugEnabled()
+	const available = useDebugAvailable()
+	if (!available) return null
 	return (
 		<label htmlFor={id} className="flex items-center gap-2 text-xs font-medium">
 			Debug
@@ -100,9 +130,11 @@ export function RouteDebugOverlay({ path }: { path: string }) {
 }
 export function DebugIssues() {
 	const enabled = useDebugEnabled()
+	const available = useDebugAvailable()
 	const user = useAuth((state) => state.user)
 	if (!user || !['admin', 'root'].includes(String(user.type)))
 		return <p role="alert">Permission denied.</p>
+	if (!available) return <p role="status">Debug sidecar unavailable.</p>
 	if (!enabled)
 		return (
 			<section className="space-y-4">

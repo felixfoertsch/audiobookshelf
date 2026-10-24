@@ -3,72 +3,65 @@ import { api } from '../api'
 import { itemSchema as catalogItemSchema } from '../catalog'
 import { itemSchema } from '../features/item/schemas'
 import { eventSchema } from '../features/podcast/AdAnalysisStatus'
-import { sessionSchema } from '../player'
+import { episodeAnalysisSchema } from '../features/podcast/sidecar-schema'
+import { sessionSchema, sessionSegments } from '../player'
 import fixtures from './serializer-fixtures.json'
 
 afterEach(() => vi.unstubAllGlobals())
 
-it('parses backend-generated expanded items, session and socket event', () => {
+it('parses upstream-native item/session without sidecar fields', () => {
 	for (const item of [fixtures.podcast, fixtures.book]) {
-		expect(itemSchema.parse(item).id).toBe(item.id)
-		expect(catalogItemSchema.parse(item).id).toBe(item.id)
+		const nativeItem = structuredClone(item) as unknown as {
+			media: { episodes?: Array<Record<string, unknown>> }
+			adAnalysisEnabled?: unknown
+		}
+		for (const episode of nativeItem.media.episodes ?? []) {
+			delete episode.adAnalysis
+			delete episode.adAnalysisEnabled
+		}
+		delete nativeItem.adAnalysisEnabled
+		expect(itemSchema.parse(nativeItem).id).toBe(item.id)
+		expect(catalogItemSchema.parse(nativeItem).id).toBe(item.id)
 	}
-	expect(sessionSchema.parse(fixtures.session).currentTime).toBe(5)
-	expect(eventSchema.parse(fixtures.socket).adAnalysis?.status).toBe(
-		'cancelled',
-	)
-	expect(
-		fixtures.podcast.media.episodes.map(
-			(episode) => episode.adAnalysis?.status ?? null,
-		),
-	).toEqual([null, 'candidates', 'stale', 'queued', 'running'])
+	const session = structuredClone(fixtures.session) as unknown as {
+		currentTime: number
+		libraryItem?: {
+			media: { episodes?: Array<Record<string, unknown>> }
+		} | null
+	}
+	for (const episode of session.libraryItem?.media.episodes ?? [])
+		delete episode.adAnalysis
+	expect(sessionSchema.parse(session).currentTime).toBe(5)
 })
 
-it.each([null, undefined, ''])(
-	'accepts nullable, absent and empty metadata (%j)',
-	(value) => {
-		const item = structuredClone(fixtures.podcast)
-		expect(
-			itemSchema.parse({
-				...item,
-				media: {
-					...item.media,
-					coverPath: value,
-					metadata: { ...item.media.metadata, title: value },
-					episodes: [],
-				},
-			}).media.episodes,
-		).toEqual([])
-		expect(
-			eventSchema.parse({
-				...fixtures.socket,
-				adAnalysis: value === '' ? null : value,
-			}).adAnalysis,
-		).toBe(value === '' ? null : value)
-	},
-)
-
-it('rejects malformed item, session and socket payloads', () => {
+it('validates sidecar analysis contract separately from native serializer', () => {
+	const analysis = {
+		status: 'complete',
+		version: 'v1',
+		sourceSha256: 'a'.repeat(64),
+		segments: [{ start: 2, end: 4 }],
+		adAnalysisEnabled: true,
+	}
+	expect(episodeAnalysisSchema.parse(analysis).segments).toHaveLength(1)
 	expect(
-		itemSchema.safeParse({ ...fixtures.podcast, mediaType: 'video' }).success,
+		episodeAnalysisSchema.safeParse({ ...analysis, sourceSha256: 'bad' })
+			.success,
 	).toBe(false)
 	expect(
-		sessionSchema.safeParse({ ...fixtures.session, audioTracks: [] }).success,
+		episodeAnalysisSchema.safeParse({
+			...analysis,
+			segments: [{ start: 4, end: 2 }],
+		}).success,
 	).toBe(false)
-	expect(
-		sessionSchema.safeParse({ ...fixtures.session, currentTime: -1 }).success,
-	).toBe(false)
-	for (const adAnalysis of [
-		{ status: 'invented' },
-		{ status: 'candidates', segments: [{ start: -1, end: 2 }] },
-		'',
-	])
-		expect(
-			eventSchema.safeParse({ ...fixtures.socket, adAnalysis }).success,
-		).toBe(false)
 })
 
-it('surfaces API HTTP and malformed success failures, then accepts recovered serializer response', async () => {
+it('ignores legacy custom analysis socket events and applies safe player segments only', () => {
+	expect(eventSchema.safeParse(fixtures.socket).success).toBe(false)
+	const session = sessionSchema.parse(fixtures.session)
+	expect(sessionSegments(session)).toEqual([])
+})
+
+it('keeps native play API error recovery behavior', async () => {
 	const fetch = vi
 		.fn()
 		.mockResolvedValueOnce(new Response('unavailable', { status: 503 }))

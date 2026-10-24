@@ -17,10 +17,14 @@ Complete downloaded show detail may sort its loaded episodes by `publishedAt`; t
 
 # Verification limits
 
+Local checks: 435 unit tests passed across 100 files; typecheck, Biome and production build passed. Playwright discovery lists 205 tests across 55 files; discovery is not execution. Proxy entrypoint URL self-check passed.
+
+Container fixtures remain incomplete: sidecar mock lacks full debug dashboard, feed-only lifecycle and corpus state. These are acceptance blockers, not passing coverage. Existing specs retained but cannot be certified until built-container run exposes and repairs fixture mismatches.
+
 Container runtime unavailable in local runner. Built-container proxy acceptance and authenticated stable smoke remain blocked, not passed. No stable credentials read, no stable login/session created during blocked smoke. Frontend source build alone does not certify proxy behavior.
 
 # Contract reconciliation
 
-Sidecar `contract/api.ts` originally advertised item-scoped consent/enqueue and global corpus paths while `src/app.ts` implemented podcast-scoped routes. Runtime paths, not proposed documentation, govern outgoing requests. Sidecar store emits `applicable`; contract originally omitted it. Hash presence alone is not source applicability. Player must fail closed unless explicitly applicable, consent enabled, complete result, finite in-duration ordered segments.
+Sidecar `contract/api.ts` originally advertised item-scoped consent/enqueue and global corpus paths while `src/app.ts` implemented podcast-scoped routes. Runtime paths, not proposed documentation, govern outgoing requests. Sidecar store emits `applicable`; contract originally omitted it. Hash presence alone is not source applicability. Current player disables automatic skip and markers entirely; source identity cannot be proved from native playback payload. Restore only after contract defines verifiable applicability, consent and finite in-duration ordered segments. Debug uses runtime mount `/psb/api/debug`, probed through `/auth` before showing switch. Episode tooltip fetches episode-scoped corpus inventory; `totalBytes` describes whole corpus, not episode bytes. Podcast-wide inventory does not exist.
 
 Stable smoke script: `STABLE_SMOKE_ORIGIN=http://127.0.0.1:8080 bun e2e/stable-smoke.ts`, only after built proxy is running with default stable upstream. Script keeps restricted credentials and browser state in memory, never writes traces/HAR/storage state, never reads administrator credentials. No attempt performed without container runtime.

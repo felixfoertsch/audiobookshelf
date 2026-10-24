@@ -11,6 +11,7 @@ import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { api, getAuthGeneration, useAuth } from '../../api'
 import { enqueueEpisode, playEpisode, useQueue } from '../../player'
+import { psbApi } from '../../psb-api'
 import { IsoDateTimeField } from '../../shared/components/IsoDateTimeField'
 import { Button } from '../../shared/components/ui/button'
 import { duration } from '../../shared/lib/duration'
@@ -615,8 +616,10 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 	const downloads = useEpisodeDownloads(libraryId, refreshEpisodes)
 	useEffect(() => {
 		let active = true
-		void api(
-			`/api/libraries/${encodeURIComponent(libraryId)}/recent-episodes?limit=50&page=0&includeFeed=1&revision=${revision}`,
+		setEpisodes([])
+		setError('')
+		void psbApi(
+			`/api/libraries/${encodeURIComponent(libraryId)}/recent-episodes?includeFeed=1&limit=50&page=0&revision=${revision}`,
 			latestSchema,
 		)
 			.then((x) => {
@@ -631,9 +634,22 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 					)
 				}
 			})
-			.catch((e) => {
-				if (active)
-					setError(e instanceof Error ? e.message : 'Could not load episodes')
+			.catch(async () => {
+				try {
+					const value = await api(
+						`/api/libraries/${encodeURIComponent(libraryId)}/recent-episodes?limit=50&page=0`,
+						latestSchema,
+					)
+					if (active) {
+						setEpisodes(value.episodes)
+						setFeedWarning(
+							'Sidecar unavailable. Showing downloaded episodes only.',
+						)
+					}
+				} catch (e) {
+					if (active)
+						setError(e instanceof Error ? e.message : 'Could not load episodes')
+				}
 			})
 			.finally(() => {
 				if (active) setBusy(false)
@@ -998,6 +1014,7 @@ export function PodcastManagementSettings({
 	const [lastCheck, setLastCheck] = useState('')
 	const [keep, setKeep] = useState(0)
 	const [limit, setLimit] = useState(3)
+	const [analysisEnabled, setAnalysisEnabled] = useState(false)
 	const [episodes, setEpisodes] = useState<
 		z.infer<typeof feedEpisodesSchema>['episodes']
 	>([])
@@ -1008,6 +1025,20 @@ export function PodcastManagementSettings({
 		setItem(null)
 		setError('')
 		if (!admin) return
+		void psbApi(
+			`/api/podcasts/${encodeURIComponent(itemId)}/ad-analysis`,
+			z.object({ enabled: z.boolean() }),
+		)
+			.then((consent) => {
+				if (active && generation === getAuthGeneration()) {
+					setAnalysisEnabled(consent.enabled)
+				}
+			})
+			.catch(() => {
+				if (active) {
+					setAnalysisEnabled(false)
+				}
+			})
 		void getPodcast(itemId)
 			.then((value) => {
 				if (!active || generation !== getAuthGeneration()) return
@@ -1030,6 +1061,30 @@ export function PodcastManagementSettings({
 			active = false
 		}
 	}, [itemId, admin])
+	async function saveAnalysisConsent(value: boolean) {
+		setBusy(true)
+		setError('')
+		try {
+			const result = await psbApi(
+				`/api/podcasts/${encodeURIComponent(itemId)}/ad-analysis`,
+				z.object({ enabled: z.boolean() }),
+				{
+					method: 'POST',
+					body: JSON.stringify({ enabled: value }),
+				},
+			)
+			setAnalysisEnabled(result.enabled)
+			setMessage('Ad analysis consent saved.')
+		} catch (cause) {
+			setError(
+				cause instanceof Error
+					? cause.message
+					: 'Could not save analysis consent',
+			)
+		} finally {
+			setBusy(false)
+		}
+	}
 	async function save() {
 		setBusy(true)
 		setError('')
@@ -1109,6 +1164,24 @@ export function PodcastManagementSettings({
 			<p role="status">{message}</p>
 			{item && (
 				<>
+					<fieldset className="space-y-2 rounded border p-3">
+						<legend className="px-1">Podcast ad analysis</legend>
+						<label className="flex items-center gap-2">
+							<input
+								type="checkbox"
+								checked={analysisEnabled}
+								disabled={!admin || busy}
+								onChange={(event) =>
+									void saveAnalysisConsent(event.target.checked)
+								}
+							/>
+							Allow analysis for this podcast
+						</label>
+						<p role="status">
+							Corpus inventory requires an episode; podcast-wide totals
+							unavailable.
+						</p>
+					</fieldset>
 					<label className="flex items-center gap-2">
 						<input
 							type="checkbox"

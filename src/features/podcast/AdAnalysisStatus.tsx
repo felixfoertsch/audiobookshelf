@@ -10,7 +10,8 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
-import { ApiError, api, useAuth } from '../../api'
+import { ApiError, useAuth } from '../../api'
+import { psbApi } from '../../psb-api'
 import { Button } from '../../shared/components/ui/button'
 import {
 	Tooltip,
@@ -20,36 +21,14 @@ import {
 } from '../../shared/components/ui/tooltip'
 import { duration } from '../../shared/lib/duration'
 import { useT } from '../i18n'
+import { episodeAnalysisSchema } from './sidecar-schema'
 
-const resultSchema = z.object({
-	status: z.enum([
-		'queued',
-		'running',
-		'candidates',
-		'no_difference',
-		'inconclusive',
-		'unsupported',
-		'failed',
-		'cancelled',
-		'stale',
-	]),
-	reason: z.string().nullish(),
-	segments: z
-		.array(
-			z.object({
-				start: z.number().nonnegative(),
-				end: z.number().nonnegative(),
-			}),
-		)
-		.optional(),
-})
-export const eventSchema = z.object({
+export const eventSchema = episodeAnalysisSchema.extend({
 	libraryItemId: z.string(),
 	episodeId: z.string(),
-	adAnalysis: resultSchema.nullish(),
-	adAnalysisEnabled: z.boolean().optional(),
 })
 const labels = {
+	cancelled: 'Analysis cancelled',
 	notAnalysed: 'Not analysed',
 	queued: 'Analysis queued',
 	running: 'Analysis running',
@@ -76,57 +55,117 @@ type Props = {
 		adAnalysis?: unknown
 		audioFile?: unknown
 		adAnalysisEnabled?: unknown
+		duration?: number | null
 	}
 	enabled?: boolean
+}
+const statusFor = (result: z.infer<typeof episodeAnalysisSchema> | null) => {
+	if (!result) return 'notAnalysed'
+	if (result.status === 'complete')
+		return result.segments.length ? 'candidates' : 'no_difference'
+	if (result.status === 'error' || result.status === 'interrupted')
+		return 'failed'
+	if (result.status === 'disabled') return 'notAnalysed'
+	return result.status
 }
 export function AdAnalysisStatus({ itemId, episode, enabled }: Props) {
 	const t = useT()
 	const user = useAuth((state) => state.user)
+	const userId = user?.id
 	const admin = user?.type === 'admin' || user?.type === 'root'
 	const [live, setLive] = useState<z.infer<typeof eventSchema> | null>(null)
 	const [busy, setBusy] = useState(false)
 	const [error, setError] = useState('')
-	// biome-ignore lint/correctness/useExhaustiveDependencies: New server snapshot or row identity supersedes transient socket state.
+	const [corpus, setCorpus] = useState('')
+	const on =
+		live?.adAnalysisEnabled ?? enabled ?? episode.adAnalysisEnabled === true
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Episode identity and consent changes invalidate displayed sidecar state.
 	useEffect(() => {
 		setLive(null)
 		setError('')
 	}, [itemId, episode.id, episode.adAnalysis, enabled])
 	useEffect(() => {
-		const receive = (event: Event) => {
-			if (
-				!(event instanceof CustomEvent) ||
-				event.detail?.event !== 'episode_ad_analysis'
-			)
+		let active = true
+		let delay = 5_000
+		let timer = 0
+		let controller: AbortController | undefined
+		if (!userId) return
+		const poll = async () => {
+			if (document.hidden) {
+				timer = window.setTimeout(poll, 30_000)
 				return
-			const parsed = eventSchema.safeParse(event.detail.payload)
-			if (
-				parsed.success &&
-				parsed.data.libraryItemId === itemId &&
-				parsed.data.episodeId === episode.id
-			)
-				setLive(parsed.data)
+			}
+			controller = new AbortController()
+			try {
+				const response = await psbApi(
+					`/api/items/${encodeURIComponent(itemId)}/analysis`,
+					z.object({ episodes: z.record(z.string(), episodeAnalysisSchema) }),
+					{ signal: controller.signal },
+				)
+				if (!active) return
+				const value = response.episodes[episode.id]
+				if (value)
+					setLive({ ...value, libraryItemId: itemId, episodeId: episode.id })
+				delay =
+					value?.status === 'queued' || value?.status === 'running'
+						? 5_000
+						: 30_000
+			} catch {
+				setLive(null)
+				if (!active || controller.signal.aborted) return
+				delay = Math.min(delay * 2, 30_000)
+			} finally {
+				if (active)
+					timer = window.setTimeout(poll, document.hidden ? 30_000 : delay)
+			}
 		}
-		window.addEventListener('abs:socket', receive)
-		return () => window.removeEventListener('abs:socket', receive)
-	}, [itemId, episode.id])
-	const on =
-		live?.adAnalysisEnabled ?? enabled ?? episode.adAnalysisEnabled === true
+		const visibility = () => {
+			if (!document.hidden) {
+				window.clearTimeout(timer)
+				void poll()
+			} else controller?.abort()
+		}
+		void poll()
+		document.addEventListener('visibilitychange', visibility)
+		return () => {
+			active = false
+			window.clearTimeout(timer)
+			controller?.abort()
+			document.removeEventListener('visibilitychange', visibility)
+		}
+	}, [itemId, episode.id, userId])
+	useEffect(() => {
+		let active = true
+		setCorpus('')
+		if (!admin || !on) return
+		void psbApi(
+			`/api/podcasts/${encodeURIComponent(itemId)}/episode/${encodeURIComponent(episode.id)}/ad-analysis/corpus`,
+			z.object({
+				count: z.number().int().nonnegative(),
+				totalBytes: z.number().nonnegative(),
+				collectionPaused: z.boolean(),
+			}),
+		)
+			.then((value) => {
+				if (active)
+					setCorpus(
+						`Corpus: ${value.count} versions; ${value.totalBytes.toLocaleString()} bytes across corpus${value.collectionPaused ? '; collection paused' : ''}.`,
+					)
+			})
+			.catch(() => {
+				if (active) setCorpus('Corpus unavailable.')
+			})
+		return () => {
+			active = false
+		}
+	}, [admin, on, itemId, episode.id])
 	if (!on) return null
-	const parsed = resultSchema.safeParse(
-		live ? live.adAnalysis : episode.adAnalysis,
-	)
+	const parsed = episodeAnalysisSchema.safeParse(live ?? episode.adAnalysis)
 	const result = parsed.success ? parsed.data : null
-	const raw = result?.status
-	const state = !episode.audioFile
-		? 'unsupported'
-		: raw === 'cancelled'
-			? 'failed'
-			: raw && raw in labels
-				? (raw as keyof typeof labels)
-				: 'notAnalysed'
+	const state = !episode.audioFile ? 'unsupported' : statusFor(result)
 	const segments = result?.segments ?? []
 	const seconds = Math.round(
-		segments.reduce((sum, s) => sum + Math.max(0, s.end - s.start), 0),
+		segments.reduce((sum, s) => sum + s.end - s.start, 0),
 	)
 	const label = t(
 		`AdAnalysis.${state}`,
@@ -168,24 +207,26 @@ export function AdAnalysisStatus({ itemId, episode, enabled }: Props) {
 		/>
 	)
 	const queue = async () => {
-		const previous = live
 		setBusy(true)
 		setError('')
 		try {
-			await api(
+			await psbApi(
 				`/api/podcasts/${encodeURIComponent(itemId)}/episode/${encodeURIComponent(episode.id)}/ad-analysis`,
-				z.object({}).passthrough(),
-				{ method: 'POST', body: '{}' },
+				z.object({ queued: z.boolean() }),
+				{
+					method: 'POST',
+					body: JSON.stringify({}),
+				},
 			)
-			setLive((current) =>
-				current !== previous
-					? current
-					: {
-							libraryItemId: itemId,
-							episodeId: episode.id,
-							adAnalysis: { status: 'queued' },
-						},
-			)
+			setLive({
+				status: 'queued',
+				version: null,
+				sourceSha256: null,
+				segments: [],
+				adAnalysisEnabled: true,
+				libraryItemId: itemId,
+				episodeId: episode.id,
+			})
 		} catch (cause) {
 			setError(
 				cause instanceof ApiError && cause.status === 409
@@ -217,7 +258,7 @@ export function AdAnalysisStatus({ itemId, episode, enabled }: Props) {
 					) : (
 						<span
 							role="img"
-							// biome-ignore lint/a11y/noNoninteractiveTabindex: Read-only status needs keyboard access to explanatory tooltip.
+							// biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need focus to read analysis tooltip.
 							tabIndex={0}
 							aria-label={label}
 							className={`inline-flex items-center gap-1 ${color}`}
@@ -230,6 +271,7 @@ export function AdAnalysisStatus({ itemId, episode, enabled }: Props) {
 					)}
 				</TooltipTrigger>
 				<TooltipContent className="max-w-xs">
+					{corpus && <p>{corpus}</p>}
 					{label}.{' '}
 					{state === 'no_difference' ? (
 						t('AdAnalysis.caveat', [], labels.caveat)

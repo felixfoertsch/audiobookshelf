@@ -1,13 +1,42 @@
 import { z } from 'zod'
-import { api } from '../../api'
+import { ApiError, api, getAuthGeneration } from '../../api'
+import { psbApi } from '../../psb-api'
+import { episodeAnalysisSchema } from '../podcast/sidecar-schema'
 import { refreshProgress } from './progress'
 import { emptySchema, feedSchema, itemSchema, progressSchema } from './schemas'
 
-export const getItem = (id: string) =>
-	api(
+export const getItem = async (id: string) => {
+	const generation = getAuthGeneration()
+	const item = await api(
 		`/api/items/${encodeURIComponent(id)}?expanded=1&include=downloads,rssfeed,share,progress`,
 		itemSchema,
 	)
+	if (item.mediaType !== 'podcast') return item
+	try {
+		const { episodes } = await psbApi(
+			`/api/items/${encodeURIComponent(id)}/analysis`,
+			z.object({ episodes: z.record(z.string(), episodeAnalysisSchema) }),
+		)
+		const joined: typeof item = {
+			...item,
+			media: {
+				...item.media,
+				episodes: item.media.episodes?.map(
+					(episode) =>
+						({
+							...episode,
+							adAnalysis: episodes[episode.id] ?? null,
+						}) as (typeof item.media.episodes)[number],
+				),
+			},
+		}
+		return joined
+	} catch {
+		if (generation !== getAuthGeneration())
+			throw new ApiError('Session changed. Retry signing in.', 401)
+		return item
+	}
+}
 export const updateMedia = (id: string, payload: unknown) =>
 	api(`/api/items/${encodeURIComponent(id)}/media`, emptySchema, {
 		method: 'PATCH',
@@ -21,10 +50,7 @@ export const writeProgress = (
 	api(
 		`/api/me/progress/${encodeURIComponent(id)}${episodeId ? `/${encodeURIComponent(episodeId)}` : ''}`,
 		progressSchema,
-		{
-			method: 'PATCH',
-			body: JSON.stringify(payload),
-		},
+		{ method: 'PATCH', body: JSON.stringify(payload) },
 	).then((result) => {
 		window.dispatchEvent(
 			new CustomEvent('abs:progress-changed', {
@@ -68,7 +94,6 @@ export async function resetProgress(progressId: string, itemId: string) {
 		}
 	}
 }
-
 export const checkPodcastFeed = (id: string) =>
 	api(`/api/podcasts/${encodeURIComponent(id)}/checknew`, zEpisodes, {})
 const zEpisodes = z.object({ episodes: z.array(z.unknown()) })

@@ -10,7 +10,7 @@ vi.mock('../api', async (importOriginal) => ({
 }))
 afterEach(cleanup)
 
-it('ignores malformed and unrelated socket events, applies emitted serializer fixture', () => {
+it('ignores all legacy analysis socket events', () => {
 	render(
 		<AdAnalysisStatus
 			itemId={fixtures.socket.libraryItemId}
@@ -35,7 +35,7 @@ it('ignores malformed and unrelated socket events, applies emitted serializer fi
 		expect(screen.getByRole('button', { name: 'Not analysed' })).toBeTruthy()
 	}
 	dispatch(fixtures.socket)
-	// Production cancellation payload disables analysis for this show.
-	expect(screen.queryByRole('button')).toBeNull()
+	// Stable never emits this fork event; only sidecar polling may change state.
+	expect(screen.getByRole('button', { name: 'Not analysed' })).toBeTruthy()
 	expect(screen.queryByRole('img')).toBeNull()
 })

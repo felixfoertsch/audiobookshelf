@@ -45,6 +45,7 @@ import {
 	originalTime,
 	trackAt,
 } from './features/player/timeline'
+import { psbApi } from './psb-api'
 import { Button } from './shared/components/ui/button'
 import {
 	DropdownMenu,
@@ -68,16 +69,7 @@ import {
 import { Slider } from './shared/components/ui/slider'
 import { duration } from './shared/lib/duration'
 
-const segment = z
-	.object({ start: z.number().nonnegative(), end: z.number().positive() })
-	.refine((s) => s.end > s.start)
-const analysis = z
-	.object({
-		status: z.string(),
-		sourceSha256: z.string().nullish(),
-		segments: z.array(segment).optional(),
-	})
-	.passthrough()
+const analysis = z.unknown()
 export const sessionSchema = z
 	.object({
 		id: z.string().min(1),
@@ -122,15 +114,26 @@ export const sessionSchema = z
 	})
 	.passthrough()
 type Session = z.infer<typeof sessionSchema>
-export function sessionSegments(session: Session) {
-	const result = session.libraryItem?.media.episodes?.find(
-		(e) => e.id === session.episodeId,
-	)?.adAnalysis
-	return result?.status === 'candidates'
-		? (result.segments ?? [])
-				.filter((s) => s.start < session.duration)
-				.map((s) => ({ ...s, end: Math.min(s.end, session.duration) }))
-		: []
+export function sessionSegments(
+	session: Session,
+	sidecar: { start: number; end: number }[] = [],
+) {
+	// ponytail: contract lacks stable audio identity in native play payload; disable skip until source-hash match is provable.
+	const candidates = sidecar
+	if (!Number.isFinite(session.duration) || session.duration <= 0) return []
+	let previousEnd = 0
+	return candidates.filter((segment) => {
+		if (
+			!Number.isFinite(segment.start) ||
+			!Number.isFinite(segment.end) ||
+			segment.start < previousEnd ||
+			segment.end <= segment.start ||
+			segment.end > session.duration
+		)
+			return false
+		previousEnd = segment.end
+		return true
+	})
 }
 export const usePlayer = create<{
 	session: Session | null
@@ -148,7 +151,7 @@ export function authorizeHlsRequest(xhr: XMLHttpRequest, source: string) {
 		!['http:', 'https:'].includes(url.protocol)
 	) {
 		xhr.abort()
-		throw new Error('Unsafe audio stream URL. Use Classic.')
+		throw new Error('Unsafe audio stream URL.')
 	}
 	for (const [key, value] of Object.entries(authHeaders()))
 		xhr.setRequestHeader(key, value)
@@ -646,7 +649,33 @@ export function Player() {
 	const t = useT()
 	const markerDescription = useId()
 	const previousPosition = useRef<number | null>(null)
-	const segments = session ? sessionSegments(session) : []
+	const [sidecarSegments, setSidecarSegments] = useState<
+		{ start: number; end: number }[]
+	>([])
+	const segments = session ? sessionSegments(session, sidecarSegments) : []
+	useEffect(() => {
+		let active = true
+		setSidecarSegments([])
+		if (!session?.libraryItemId || !session.episodeId) return
+		const controller = new AbortController()
+		void psbApi(
+			`/api/items/${encodeURIComponent(session.libraryItemId)}/analysis`,
+			z.object({ episodes: z.record(z.string(), z.unknown()) }),
+			{ signal: controller.signal },
+		)
+			.then(({ episodes }) => {
+				// ponytail: contract lacks stable audio identity in native play payload; no skip until source-hash match is provable.
+				void episodes
+				if (active) setSidecarSegments([])
+			})
+			.catch(() => {
+				if (active) setSidecarSegments([])
+			})
+		return () => {
+			active = false
+			controller.abort()
+		}
+	}, [session?.episodeId, session?.libraryItemId])
 	useEffect(() => {
 		previousPosition.current =
 			session && session.currentTime > 0.5
@@ -684,7 +713,7 @@ export function Player() {
 				url.origin !== window.location.origin ||
 				!['http:', 'https:'].includes(url.protocol)
 			)
-				throw new Error('Server returned unsafe audio URL. Use Classic.')
+				throw new Error('Server returned unsafe audio URL.')
 		} catch (cause) {
 			usePlayer.setState({
 				session: null,

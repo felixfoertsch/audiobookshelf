@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
-import { api, useAuth } from '../../api'
+import { useAuth } from '../../api'
+import { psbApi } from '../../psb-api'
 
 const summarySchema = z.object({
 	total: z.number().int().nonnegative(),
@@ -27,7 +28,7 @@ export function PodcastEpisodeCount({
 		setSummary(null)
 		setUnavailable(false)
 		const reload = () => {
-			void api(
+			void psbApi(
 				`/api/podcasts/${encodeURIComponent(itemId)}/episode-summary`,
 				summarySchema,
 				{ signal: controller.signal },

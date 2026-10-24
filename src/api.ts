@@ -96,7 +96,7 @@ export class ApiError extends Error {
 	}
 }
 
-async function refresh(): Promise<string | null> {
+export async function refreshSession(): Promise<string | null> {
 	if (!refreshPromise)
 		refreshPromise = (async () => {
 			const generation = authGeneration
@@ -190,7 +190,7 @@ async function request(
 		generation === authGeneration &&
 		!['/auth/refresh', '/login', '/status', '/init'].includes(pathname)
 	) {
-		await refresh()
+		await refreshSession()
 		if (generation !== authGeneration)
 			throw new ApiError('Session changed. Retry signing in.', 401)
 		response = await send()
@@ -313,7 +313,7 @@ export async function initializeAuth() {
 			return response
 		}
 		try {
-			await refresh()
+			await refreshSession()
 		} catch (error) {
 			if (!(error instanceof ApiError && error.status === 401)) throw error
 		}

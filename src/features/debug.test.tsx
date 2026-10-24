@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useDebugEnabled } from 'debug-overlay/client'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { logout, useAuth } from '../api'
 import {
 	DropdownMenu,
@@ -22,11 +22,18 @@ function Probe() {
 		</>
 	)
 }
+beforeEach(() =>
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => Response.json({ ok: true })),
+	),
+)
 afterEach(() => {
+	vi.unstubAllGlobals()
 	cleanup()
 	act(() => useAuth.getState().set(null))
 })
-it('gates ordinary users and resets immediately on identity, role and logout changes', () => {
+it('gates ordinary users and resets immediately on identity, role and logout changes', async () => {
 	act(() =>
 		useAuth.getState().set({
 			id: 'listener',
@@ -36,7 +43,7 @@ it('gates ordinary users and resets immediately on identity, role and logout cha
 		}),
 	)
 	render(<Probe />)
-	fireEvent.click(screen.getByRole('switch'))
+	expect(screen.queryByRole('switch')).toBeNull()
 	expect(screen.getByText('false')).toBeTruthy()
 	act(() =>
 		useAuth.getState().set({
@@ -46,7 +53,7 @@ it('gates ordinary users and resets immediately on identity, role and logout cha
 			type: 'admin',
 		}),
 	)
-	fireEvent.click(screen.getByRole('switch'))
+	fireEvent.click(await screen.findByRole('switch'))
 	expect(screen.getByText('true')).toBeTruthy()
 	act(() =>
 		useAuth.getState().set({
@@ -59,20 +66,46 @@ it('gates ordinary users and resets immediately on identity, role and logout cha
 	expect(screen.getByText('true')).toBeTruthy()
 	act(() => window.dispatchEvent(new Event('abs:logout-start')))
 	expect(screen.getByText('false')).toBeTruthy()
-	fireEvent.click(screen.getByRole('switch'))
+	fireEvent.click(await screen.findByRole('switch'))
 	act(() =>
 		useAuth
 			.getState()
 			.set({ id: 'root', username: 'Root', accessToken: 'test', type: 'root' }),
 	)
 	expect(screen.getByText('false')).toBeTruthy()
-	fireEvent.click(screen.getByRole('switch'))
+	fireEvent.click(await screen.findByRole('switch'))
 	act(() =>
 		useAuth
 			.getState()
 			.set({ id: 'root', username: 'Root', accessToken: 'test', type: 'user' }),
 	)
 	expect(screen.getByText('false')).toBeTruthy()
+})
+
+it('hides debug switch when sidecar auth probe fails', async () => {
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => new Response('', { status: 503 })),
+	)
+	act(() =>
+		useAuth.getState().set({
+			id: 'admin',
+			username: 'Admin',
+			accessToken: 'test',
+			type: 'admin',
+		}),
+	)
+	render(
+		<>
+			<Probe />
+			<DebugIssues />
+		</>,
+	)
+	expect(await screen.findByText('Debug sidecar unavailable.')).toBeTruthy()
+	await act(async () => {
+		await Promise.resolve()
+	})
+	expect(screen.queryByRole('switch')).toBeNull()
 })
 
 it('fresh dashboard explains disabled state and direct logout disables before network completes', async () => {
@@ -90,8 +123,8 @@ it('fresh dashboard explains disabled state and direct logout disables before ne
 			<DebugIssues />
 		</>,
 	)
-	expect(screen.getByText('Debug is disabled.')).toBeTruthy()
-	fireEvent.click(screen.getByRole('switch'))
+	expect(await screen.findByText('Debug is disabled.')).toBeTruthy()
+	fireEvent.click(await screen.findByRole('switch'))
 	let finish!: (response: Response) => void
 	vi.stubGlobal(
 		'fetch',

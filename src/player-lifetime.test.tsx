@@ -13,7 +13,7 @@ afterEach(() => {
 	usePlayer.getState().set(null)
 	vi.restoreAllMocks()
 })
-test('mounted player skips crossings again after seek-back and tracks fresh sessions', () => {
+test('mounted player preserves ordinary playback for unverified native analysis across sessions', () => {
 	vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
 	vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -53,7 +53,7 @@ test('mounted player skips crossings again after seek-back and tracks fresh sess
 		fireEvent.timeUpdate(audio)
 		return audio.currentTime
 	}
-	expect(tick()).toBe(20)
+	expect(tick()).toBe(11)
 	const stream = (id: string, percent: string) =>
 		act(() => {
 			window.dispatchEvent(
@@ -71,17 +71,17 @@ test('mounted player skips crossings again after seek-back and tracks fresh sess
 	act(() => seekPlayback(11))
 	expect(tick()).toBe(11)
 	act(() => seekPlayback(9))
-	expect(tick()).toBe(20)
+	expect(tick()).toBe(11)
 	act(() => usePlayer.getState().set(session('reload')))
-	expect(tick()).toBe(20)
+	expect(tick()).toBe(11)
 	act(() =>
 		usePlayer.getState().set(session('other-episode', 'podcast', 'other')),
 	)
-	expect(tick()).toBe(20)
+	expect(tick()).toBe(11)
 	act(() =>
 		usePlayer.getState().set(session('other-item', 'different', 'other')),
 	)
-	expect(tick()).toBe(20)
+	expect(tick()).toBe(11)
 	act(() => useAuth.setState({ user: null }))
 	act(() =>
 		useAuth.setState({
@@ -91,5 +91,5 @@ test('mounted player skips crossings again after seek-back and tracks fresh sess
 	act(() =>
 		usePlayer.getState().set(session('new-account', 'different', 'other')),
 	)
-	expect(tick()).toBe(20)
+	expect(tick()).toBe(11)
 })
