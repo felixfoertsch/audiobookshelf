@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { recentFeedSchema } from '../../../contract/api'
 import { api } from '../../api'
 import { episodeSchema, itemSchema } from '../../catalog'
 import { psbApi } from '../../psb-api'
@@ -125,7 +126,7 @@ export function loadHome(library: string) {
 		shelvesSchema,
 	)
 }
-export const recentFeedEpisodesSchema = z.object({
+export const recentFeedEpisodesSchema = recentFeedSchema.extend({
 	episodes: z.array(
 		episodeSchema.extend({
 			libraryItemId: z.string(),
@@ -135,7 +136,7 @@ export const recentFeedEpisodesSchema = z.object({
 })
 export function loadRecentFeedEpisodes(library: string, revision = 0) {
 	return psbApi(
-		`/api/libraries/${encodeURIComponent(library)}/recent-episodes?limit=12&page=0&revision=${revision}`,
+		`/api/libraries/${encodeURIComponent(library)}/recent-episodes?includeFeed=1&limit=12&page=0&revision=${revision}`,
 		recentFeedEpisodesSchema,
 	)
 }

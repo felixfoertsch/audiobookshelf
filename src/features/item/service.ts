@@ -1,7 +1,7 @@
 import { z } from 'zod'
+import { analysisSchema } from '../../../contract/api'
 import { ApiError, api, getAuthGeneration } from '../../api'
 import { psbApi } from '../../psb-api'
-import { episodeAnalysisSchema } from '../podcast/sidecar-schema'
 import { refreshProgress } from './progress'
 import { emptySchema, feedSchema, itemSchema, progressSchema } from './schemas'
 
@@ -15,7 +15,7 @@ export const getItem = async (id: string) => {
 	try {
 		const { episodes } = await psbApi(
 			`/api/items/${encodeURIComponent(id)}/analysis`,
-			z.object({ episodes: z.record(z.string(), episodeAnalysisSchema) }),
+			analysisSchema,
 		)
 		const joined: typeof item = {
 			...item,

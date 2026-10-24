@@ -15,6 +15,7 @@ import {
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { z } from 'zod'
 import { create } from 'zustand'
+import { analysisSchema, episodeAnalysisSchema } from '../contract/api'
 import {
 	api,
 	authHeaders,
@@ -114,11 +115,18 @@ export const sessionSchema = z
 	})
 	.passthrough()
 type Session = z.infer<typeof sessionSchema>
+export function applicableSegments(value: unknown) {
+	const parsed = episodeAnalysisSchema.safeParse(value)
+	return parsed.success &&
+		parsed.data.applicable === true &&
+		['candidates', 'no_difference'].includes(parsed.data.status)
+		? parsed.data.segments
+		: []
+}
 export function sessionSegments(
 	session: Session,
 	sidecar: { start: number; end: number }[] = [],
 ) {
-	// ponytail: contract lacks stable audio identity in native play payload; disable skip until source-hash match is provable.
 	const candidates = sidecar
 	if (!Number.isFinite(session.duration) || session.duration <= 0) return []
 	let previousEnd = 0
@@ -653,26 +661,34 @@ export function Player() {
 		{ start: number; end: number }[]
 	>([])
 	const segments = session ? sessionSegments(session, sidecarSegments) : []
+	const segmentsRef = useRef(segments)
+	segmentsRef.current = segments
 	useEffect(() => {
 		let active = true
 		setSidecarSegments([])
 		if (!session?.libraryItemId || !session.episodeId) return
 		const controller = new AbortController()
-		void psbApi(
-			`/api/items/${encodeURIComponent(session.libraryItemId)}/analysis`,
-			z.object({ episodes: z.record(z.string(), z.unknown()) }),
-			{ signal: controller.signal },
-		)
-			.then(({ episodes }) => {
-				// ponytail: contract lacks stable audio identity in native play payload; no skip until source-hash match is provable.
-				void episodes
+		const itemId = session.libraryItemId
+		const episodeId = session.episodeId
+		let timer: ReturnType<typeof setTimeout>
+		const poll = async () => {
+			try {
+				const { episodes } = await psbApi(
+					`/api/items/${encodeURIComponent(itemId)}/analysis`,
+					analysisSchema,
+					{ signal: controller.signal },
+				)
+				if (active) setSidecarSegments(applicableSegments(episodes[episodeId]))
+			} catch {
 				if (active) setSidecarSegments([])
-			})
-			.catch(() => {
-				if (active) setSidecarSegments([])
-			})
+			} finally {
+				if (active) timer = setTimeout(poll, 5000)
+			}
+		}
+		void poll()
 		return () => {
 			active = false
+			clearTimeout(timer)
 			controller.abort()
 		}
 	}, [session?.episodeId, session?.libraryItemId])
@@ -957,7 +973,7 @@ export function Player() {
 					if (!snapshot.paused) {
 						listened += Math.min((now - lastTick) / 1000, 2)
 						const target = skipTarget(
-							sessionSegments(session),
+							segmentsRef.current,
 							previousPosition.current,
 							remotePosition,
 							session.duration,

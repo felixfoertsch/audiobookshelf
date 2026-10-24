@@ -61,6 +61,10 @@ it('latest shows Play for zero or unknown duration and remaining time for real d
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(
 		new Response(
 			JSON.stringify({
+				limit: 50,
+				page: 0,
+				feedUnavailable: false,
+				feedTruncated: false,
 				episodes: [
 					{
 						id: 'zero',
@@ -102,6 +106,10 @@ it('latest previews safe short descriptions without empty disclosure', async () 
 	vi.spyOn(globalThis, 'fetch').mockResolvedValue(
 		new Response(
 			JSON.stringify({
+				limit: 50,
+				page: 0,
+				feedUnavailable: false,
+				feedTruncated: false,
 				episodes: [
 					{
 						id: 'e',

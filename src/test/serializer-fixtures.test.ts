@@ -1,9 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest'
+import { episodeAnalysisSchema } from '../../contract/api'
 import { api } from '../api'
 import { itemSchema as catalogItemSchema } from '../catalog'
 import { itemSchema } from '../features/item/schemas'
 import { eventSchema } from '../features/podcast/AdAnalysisStatus'
-import { episodeAnalysisSchema } from '../features/podcast/sidecar-schema'
 import { sessionSchema, sessionSegments } from '../player'
 import fixtures from './serializer-fixtures.json'
 
@@ -41,6 +41,7 @@ it('validates sidecar analysis contract separately from native serializer', () =
 		sourceSha256: 'a'.repeat(64),
 		segments: [{ start: 2, end: 4 }],
 		adAnalysisEnabled: true,
+		applicable: true,
 	}
 	expect(episodeAnalysisSchema.parse(analysis).segments).toHaveLength(1)
 	expect(

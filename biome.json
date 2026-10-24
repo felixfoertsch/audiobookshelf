@@ -12,7 +12,8 @@
 			"!src/shared/components/ui",
 			"!src/features/reader/legacy",
 			"!src/features/i18n/strings",
-			"!contract/api.ts"
+			"!contract/api.ts",
+			"!contract/fixtures.json"
 		]
 	},
 	"formatter": { "indentStyle": "tab" },

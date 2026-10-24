@@ -10,6 +10,12 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
+import {
+	analysisSchema,
+	episodeAnalysisSchema,
+	jobStatusSchema,
+	paths,
+} from '../../../contract/api'
 import { ApiError, useAuth } from '../../api'
 import { psbApi } from '../../psb-api'
 import { Button } from '../../shared/components/ui/button'
@@ -21,7 +27,6 @@ import {
 } from '../../shared/components/ui/tooltip'
 import { duration } from '../../shared/lib/duration'
 import { useT } from '../i18n'
-import { episodeAnalysisSchema } from './sidecar-schema'
 
 export const eventSchema = episodeAnalysisSchema.extend({
 	libraryItemId: z.string(),
@@ -99,15 +104,48 @@ export function AdAnalysisStatus({ itemId, episode, enabled }: Props) {
 			try {
 				const response = await psbApi(
 					`/api/items/${encodeURIComponent(itemId)}/analysis`,
-					z.object({ episodes: z.record(z.string(), episodeAnalysisSchema) }),
+					analysisSchema,
 					{ signal: controller.signal },
 				)
 				if (!active) return
 				const value = response.episodes[episode.id]
+				let jobs: z.infer<typeof jobStatusSchema> = { jobs: [] }
+				try {
+					jobs = await psbApi(
+						paths.status.replace(':itemId', encodeURIComponent(itemId)),
+						jobStatusSchema,
+						{ signal: controller.signal },
+					)
+				} catch {
+					if (!active || controller.signal.aborted) return
+				}
+				const analysisJob = jobs.jobs.find(
+					(job) =>
+						job.kind === 'analysis' &&
+						job.itemId === itemId &&
+						job.episodeId === episode.id,
+				)
 				if (value)
 					setLive({ ...value, libraryItemId: itemId, episodeId: episode.id })
+				else if (
+					analysisJob &&
+					(analysisJob.status === 'queued' || analysisJob.status === 'running')
+				)
+					setLive({
+						status: analysisJob.status,
+						version: null,
+						sourceSha256: null,
+						segments: [],
+						adAnalysisEnabled: true,
+						applicable: false,
+						libraryItemId: itemId,
+						episodeId: episode.id,
+					})
 				delay =
-					value?.status === 'queued' || value?.status === 'running'
+					analysisJob?.status === 'queued' ||
+					analysisJob?.status === 'running' ||
+					value?.status === 'queued' ||
+					value?.status === 'running'
 						? 5_000
 						: 30_000
 			} catch {
@@ -170,7 +208,7 @@ export function AdAnalysisStatus({ itemId, episode, enabled }: Props) {
 	const label = t(
 		`AdAnalysis.${state}`,
 		{ count: segments.length, seconds },
-		labels[state],
+		labels[state as keyof typeof labels],
 	)
 	const retry =
 		admin &&
@@ -224,6 +262,7 @@ export function AdAnalysisStatus({ itemId, episode, enabled }: Props) {
 				sourceSha256: null,
 				segments: [],
 				adAnalysisEnabled: true,
+				applicable: false,
 				libraryItemId: itemId,
 				episodeId: episode.id,
 			})

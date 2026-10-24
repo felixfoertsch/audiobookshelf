@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { z } from 'zod'
+import { consentSchema, recentFeedSchema } from '../../../contract/api'
 import { api, getAuthGeneration, useAuth } from '../../api'
 import { enqueueEpisode, playEpisode, useQueue } from '../../player'
 import { psbApi } from '../../psb-api'
@@ -134,12 +135,9 @@ const episodeSchema = z
 			.passthrough(),
 	})
 	.passthrough()
-const latestSchema = z.object({
-	feedUnavailable: z.boolean().optional(),
-	feedTruncated: z.boolean().optional(),
+const nativeLatestSchema = z.object({ episodes: z.array(episodeSchema) })
+const latestSchema = recentFeedSchema.extend({
 	episodes: z.array(episodeSchema),
-	limit: z.union([z.string(), z.number()]).optional(),
-	page: z.union([z.string(), z.number()]).optional(),
 })
 const downloadSchema = z
 	.object({
@@ -638,7 +636,7 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 				try {
 					const value = await api(
 						`/api/libraries/${encodeURIComponent(libraryId)}/recent-episodes?limit=50&page=0`,
-						latestSchema,
+						nativeLatestSchema,
 					)
 					if (active) {
 						setEpisodes(value.episodes)
@@ -1027,7 +1025,7 @@ export function PodcastManagementSettings({
 		if (!admin) return
 		void psbApi(
 			`/api/podcasts/${encodeURIComponent(itemId)}/ad-analysis`,
-			z.object({ enabled: z.boolean() }),
+			consentSchema,
 		)
 			.then((consent) => {
 				if (active && generation === getAuthGeneration()) {
@@ -1067,7 +1065,7 @@ export function PodcastManagementSettings({
 		try {
 			const result = await psbApi(
 				`/api/podcasts/${encodeURIComponent(itemId)}/ad-analysis`,
-				z.object({ enabled: z.boolean() }),
+				consentSchema,
 				{
 					method: 'POST',
 					body: JSON.stringify({ enabled: value }),

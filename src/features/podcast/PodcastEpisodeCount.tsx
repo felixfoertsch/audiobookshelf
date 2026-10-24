@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react'
-import { z } from 'zod'
+import type { z } from 'zod'
+import { summarySchema } from '../../../contract/api'
 import { useAuth } from '../../api'
 import { psbApi } from '../../psb-api'
-
-const summarySchema = z.object({
-	total: z.number().int().nonnegative(),
-	unplayed: z.number().int().nonnegative(),
-	source: z.enum(['feed', 'downloaded']),
-})
 
 // Feed totals count downloadable RSS entries; missing feeds expose downloaded counts only.
 export function PodcastEpisodeCount({

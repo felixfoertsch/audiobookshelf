@@ -1,5 +1,7 @@
 # Audiobookshelf Modern UI
 
+`contract/api.ts` and `contract/fixtures.json` are byte-copied from podcast-sponsorblock commit `d3944b747a24a10b06ee90dbaf21a9eb8acec072`.
+
 Standalone Modern UI for stock [Audiobookshelf](https://github.com/advplyr/audiobookshelf) 2.37.1. Derived from Audiobookshelf by advplyr and contributors; original GPL-3.0 license and history retained. Backend and Classic UI are not included.
 
 ```sh

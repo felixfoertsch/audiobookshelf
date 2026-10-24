@@ -11,7 +11,13 @@ import { AdAnalysisStatus } from './AdAnalysisStatus'
 
 const mocks = vi.hoisted(() => ({
 	type: 'admin',
-	api: vi.fn(async (): Promise<unknown> => ({ queued: true })),
+	api: vi.fn(
+		async (
+			_path: string,
+			_schema: unknown,
+			_options?: { method?: string },
+		): Promise<unknown> => ({ episodes: {} }),
+	),
 }))
 vi.mock('../../api', async (importOriginal) => ({
 	...(await importOriginal<typeof import('../../api')>()),
@@ -38,7 +44,7 @@ vi.mock('../i18n', () => ({
 afterEach(() => {
 	cleanup()
 	mocks.type = 'admin'
-	mocks.api.mockReset().mockResolvedValue({ queued: true })
+	mocks.api.mockReset().mockResolvedValue({ episodes: {} })
 })
 const show = (adAnalysis: unknown = null, extra = {}) =>
 	render(
@@ -51,6 +57,7 @@ const show = (adAnalysis: unknown = null, extra = {}) =>
 	)
 const result = {
 	status: 'complete',
+	applicable: true,
 	version: 'v1',
 	sourceSha256: 'a'.repeat(64),
 	segments: [
@@ -88,8 +95,11 @@ it('keeps retry read-only for listeners', () => {
 	show()
 	expect(screen.queryByRole('button')).toBeNull()
 })
-it('polls item analysis and applies returned episode status', async () => {
-	mocks.api.mockResolvedValueOnce({ episodes: { ep: result } })
+it('polls item analysis and status endpoint and applies returned episode status', async () => {
+	mocks.api
+		.mockResolvedValueOnce({ episodes: { ep: result } })
+		.mockResolvedValueOnce({ jobs: [] })
+		.mockResolvedValue({ jobs: [] })
 	show()
 	await screen.findByRole('img', {
 		name: 'Inserted audio found: 2 breaks, 6 seconds',
@@ -99,12 +109,22 @@ it('polls item analysis and applies returned episode status', async () => {
 		expect.anything(),
 		expect.anything(),
 	)
+	expect(mocks.api).toHaveBeenCalledWith(
+		'/api/items/show/analysis/status',
+		expect.anything(),
+		expect.anything(),
+	)
 })
 it('enqueues through contract path and displays queued state', async () => {
-	mocks.api
-		.mockResolvedValueOnce({ episodes: {} })
-		.mockResolvedValueOnce({ count: 0, totalBytes: 0, collectionPaused: false })
-		.mockResolvedValueOnce({ queued: true })
+	mocks.api.mockImplementation(
+		async (path: string, _schema: unknown, options?: { method?: string }) => {
+			if (options?.method === 'POST') return { queued: true }
+			if (path.endsWith('/analysis/status')) return { jobs: [] }
+			if (path.endsWith('/corpus'))
+				return { count: 0, totalBytes: 0, collectionPaused: false }
+			return { episodes: {} }
+		},
+	)
 	show()
 	fireEvent.click(screen.getByRole('button', { name: 'Not analysed' }))
 	await waitFor(() =>
@@ -117,10 +137,15 @@ it('enqueues through contract path and displays queued state', async () => {
 	await screen.findByRole('img', { name: 'Analysis queued' })
 })
 it('surfaces queue conflict and preserves retry', async () => {
-	mocks.api
-		.mockResolvedValueOnce({ episodes: {} })
-		.mockResolvedValueOnce({ count: 0, totalBytes: 0, collectionPaused: false })
-		.mockRejectedValueOnce(new ApiError('busy', 409))
+	mocks.api.mockImplementation(
+		async (path: string, _schema: unknown, options?: { method?: string }) => {
+			if (options?.method === 'POST') throw new ApiError('busy', 409)
+			if (path.endsWith('/analysis/status')) return { jobs: [] }
+			if (path.endsWith('/corpus'))
+				return { count: 0, totalBytes: 0, collectionPaused: false }
+			return { episodes: {} }
+		},
+	)
 	show()
 	fireEvent.click(screen.getByRole('button', { name: 'Not analysed' }))
 	expect((await screen.findByRole('alert')).textContent).toContain(
