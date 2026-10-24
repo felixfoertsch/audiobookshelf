@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { useAuth } from '../../api'
 import { FeedDownloadAction } from './FeedDownloadAction'
@@ -134,4 +134,6 @@ it('blocks repeated download starts before rerender and while queued', async () 
 	expect(
 		api.mock.calls.filter(([path]) => path.endsWith('/download-episodes')),
 	).toHaveLength(1)
+	// Drain the mocked request and React update before jsdom tears down window.
+	await act(async () => {})
 })
