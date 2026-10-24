@@ -54,6 +54,9 @@ it('queues feed enclosure through native download endpoint and refreshes after s
 	await waitFor(() => expect(api).toHaveBeenCalled())
 	fireEvent.click(screen.getByRole('button', { name: 'Download Feed episode' }))
 	await screen.findByText('Queued')
+	expect(
+		screen.queryByRole('button', { name: 'Download Feed episode' }),
+	).toBeNull()
 	expect(api).toHaveBeenCalledWith(
 		'/api/podcasts/podcast-1/download-episodes',
 		expect.anything(),
@@ -74,6 +77,10 @@ it('queues feed enclosure through native download endpoint and refreshes after s
 		}),
 	)
 	await screen.findByText('Downloading')
+	expect(
+		screen.queryByRole('button', { name: 'Download Feed episode' }),
+	).toBeNull()
+	expect(screen.getByRole('status').getAttribute('aria-live')).toBe('polite')
 	window.dispatchEvent(
 		new CustomEvent('abs:socket', {
 			detail: { event: 'episode_download_finished', payload: {} },
@@ -95,4 +102,36 @@ it('shows not downloaded state without action for listener', async () => {
 	expect(
 		screen.queryByRole('button', { name: 'Download Feed episode' }),
 	).toBeNull()
+})
+
+it('blocks repeated download starts before rerender and while queued', async () => {
+	function Repeat() {
+		const downloads = useEpisodeDownloads('podcasts', refresh)
+		return (
+			<button
+				type="button"
+				onClick={() => {
+					void downloads.start(episode)
+					void downloads.start(episode)
+				}}
+			>
+				Repeat
+			</button>
+		)
+	}
+	render(<Repeat />)
+	await waitFor(() => expect(api).toHaveBeenCalled())
+	fireEvent.click(screen.getByRole('button', { name: 'Repeat' }))
+	window.dispatchEvent(
+		new CustomEvent('abs:socket', {
+			detail: {
+				event: 'episode_download_finished',
+				payload: { libraryItemId: 'another', guid: 'another' },
+			},
+		}),
+	)
+	fireEvent.click(screen.getByRole('button', { name: 'Repeat' }))
+	expect(
+		api.mock.calls.filter(([path]) => path.endsWith('/download-episodes')),
+	).toHaveLength(1)
 })

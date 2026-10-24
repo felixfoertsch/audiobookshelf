@@ -648,144 +648,137 @@ export function PodcastLatest({ libraryId }: { libraryId: string }) {
 								<EpisodeDescription text={e.description || e.subtitle || ''} />
 							)}
 							<div className="mt-2 flex flex-wrap items-center gap-2">
-								<Button
-									className="min-h-11 min-w-11 rounded-full"
-									aria-label={`Play ${title}`}
-									disabled={e.downloaded === false}
-									title={
-										e.downloaded === false
-											? 'Not downloaded'
-											: remaining == null
-												? 'Play'
-												: `${remaining} min remaining`
-									}
-									onClick={() =>
-										void playEpisode(e.libraryItemId, e.id).catch((error) =>
-											setError(
-												error instanceof Error
-													? error.message
-													: 'Playback failed',
-											),
-										)
-									}
-								>
-									<Play aria-hidden="true" className="size-4" />
-									{e.downloaded === false
-										? 'Not downloaded'
-										: remaining == null
-											? 'Play'
-											: `${remaining} min`}
-								</Button>
-								<Button
-									variant="outline"
-									className="min-h-11"
-									aria-pressed={!!progress?.isFinished}
-									disabled={
-										e.downloaded === false ||
-										progressBusy ||
-										progressUnavailable ||
-										!!warning ||
-										!!user?.progressWarning
-									}
-									aria-label={`${progress?.isFinished ? 'Mark unfinished' : 'Mark finished'}: ${title}`}
-									title={
-										progressUnavailable
-											? 'Listening status unavailable'
-											: progress?.isFinished
-												? 'Finished · Mark unfinished'
-												: progress?.currentTime || progress?.progress
-													? 'In progress · Mark finished'
-													: 'Unplayed · Mark finished'
-									}
-									onClick={() => {
-										if (
-											progress?.isFinished &&
-											(progress.currentTime || 0) > 0 &&
-											!window.confirm(
-												'Mark unfinished? This resets the saved listening position to the beginning.',
-											)
-										)
-											return
-										const userId = user?.id
-										setProgressBusy(true)
-										void updateProgress(
-											e.libraryItemId,
-											{ isFinished: !progress?.isFinished },
-											e.id,
-										)
-											.then((result) => {
-												if (useAuth.getState().user?.id === userId)
-													setWarning(result?.refreshWarning || '')
-											})
-											.catch((error: unknown) => {
-												if (useAuth.getState().user?.id === userId)
-													setError(
-														error instanceof Error
-															? error.message
-															: 'Progress update failed',
-													)
-											})
-											.finally(() => {
-												if (useAuth.getState().user?.id === userId)
-													setProgressBusy(false)
-											})
-									}}
-								>
-									{progress?.isFinished ? (
-										<CircleCheck aria-hidden="true" />
-									) : progress?.currentTime || progress?.progress ? (
-										<Clock aria-hidden="true" />
-									) : (
-										<Circle aria-hidden="true" />
-									)}
-									<span className="sr-only">
-										{progress?.isFinished
-											? 'Finished'
-											: progress?.currentTime || progress?.progress
-												? 'In progress'
-												: 'Unplayed'}
-									</span>
-								</Button>
-								<Button
-									variant="outline"
-									className="min-h-11"
-									aria-label={
-										queueIndex >= 0
-											? `Remove ${title} from player queue`
-											: `Add ${title} to player queue`
-									}
-									disabled={e.downloaded === false}
-									aria-pressed={queueIndex >= 0}
-									title={
-										queueIndex >= 0
-											? 'Remove from player queue'
-											: 'Add to player queue'
-									}
-									onClick={() =>
-										queueIndex >= 0
-											? useQueue.getState().remove(queueIndex)
-											: enqueueEpisode(
-													e.libraryItemId,
-													e.id,
-													e.title || 'Podcast episode',
-												)
-									}
-								>
-									<ListPlus aria-hidden="true" />
-								</Button>
 								{e.downloaded === false ? (
 									<FeedDownloadAction episode={e} downloads={downloads} />
 								) : (
-									<span
-										className="inline-flex min-h-11 items-center gap-1 text-xs text-muted-foreground"
-										title="Downloaded on server"
-									>
-										<Download aria-hidden="true" className="size-4" />
-										Downloaded
-									</span>
-								)}
-								{e.downloaded !== false && (
-									<AdAnalysisStatus itemId={e.libraryItemId} episode={e} />
+									<>
+										<Button
+											className="min-h-11 min-w-11 rounded-full"
+											aria-label={`Play ${title}`}
+											title={
+												remaining == null
+													? 'Play'
+													: `${remaining} min remaining`
+											}
+											onClick={() =>
+												void playEpisode(e.libraryItemId, e.id).catch((error) =>
+													setError(
+														error instanceof Error
+															? error.message
+															: 'Playback failed',
+													),
+												)
+											}
+										>
+											<Play aria-hidden="true" className="size-4" />
+											{remaining == null ? 'Play' : `${remaining} min`}
+										</Button>
+										<Button
+											variant="outline"
+											className="min-h-11"
+											aria-pressed={!!progress?.isFinished}
+											disabled={
+												progressBusy ||
+												progressUnavailable ||
+												!!warning ||
+												!!user?.progressWarning
+											}
+											aria-label={`${progress?.isFinished ? 'Mark unfinished' : 'Mark finished'}: ${title}`}
+											title={
+												progressUnavailable
+													? 'Listening status unavailable'
+													: progress?.isFinished
+														? 'Finished · Mark unfinished'
+														: progress?.currentTime || progress?.progress
+															? 'In progress · Mark finished'
+															: 'Unplayed · Mark finished'
+											}
+											onClick={() => {
+												if (
+													progress?.isFinished &&
+													(progress.currentTime || 0) > 0 &&
+													!window.confirm(
+														'Mark unfinished? This resets the saved listening position to the beginning.',
+													)
+												)
+													return
+												const userId = user?.id
+												setProgressBusy(true)
+												void updateProgress(
+													e.libraryItemId,
+													{ isFinished: !progress?.isFinished },
+													e.id,
+												)
+													.then((result) => {
+														if (useAuth.getState().user?.id === userId)
+															setWarning(result?.refreshWarning || '')
+													})
+													.catch((error: unknown) => {
+														if (useAuth.getState().user?.id === userId)
+															setError(
+																error instanceof Error
+																	? error.message
+																	: 'Progress update failed',
+															)
+													})
+													.finally(() => {
+														if (useAuth.getState().user?.id === userId)
+															setProgressBusy(false)
+													})
+											}}
+										>
+											{progress?.isFinished ? (
+												<CircleCheck aria-hidden="true" />
+											) : progress?.currentTime || progress?.progress ? (
+												<Clock aria-hidden="true" />
+											) : (
+												<Circle aria-hidden="true" />
+											)}
+											<span className="sr-only">
+												{progress?.isFinished
+													? 'Finished'
+													: progress?.currentTime || progress?.progress
+														? 'In progress'
+														: 'Unplayed'}
+											</span>
+										</Button>
+										<Button
+											variant="outline"
+											className="min-h-11"
+											aria-label={
+												queueIndex >= 0
+													? `Remove ${title} from player queue`
+													: `Add ${title} to player queue`
+											}
+											aria-pressed={queueIndex >= 0}
+											title={
+												queueIndex >= 0
+													? 'Remove from player queue'
+													: 'Add to player queue'
+											}
+											onClick={() =>
+												queueIndex >= 0
+													? useQueue.getState().remove(queueIndex)
+													: enqueueEpisode(
+															e.libraryItemId,
+															e.id,
+															e.title || 'Podcast episode',
+														)
+											}
+										>
+											<ListPlus aria-hidden="true" />
+										</Button>
+										{
+											<span
+												className="inline-flex min-h-11 items-center gap-1 text-xs text-muted-foreground"
+												title="Downloaded on server"
+											>
+												<Download aria-hidden="true" className="size-4" />
+												Downloaded
+											</span>
+										}
+										<AdAnalysisStatus itemId={e.libraryItemId} episode={e} />
+									</>
 								)}
 							</div>
 						</EpisodeRow>

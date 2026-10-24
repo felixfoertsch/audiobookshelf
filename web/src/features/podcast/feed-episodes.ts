@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import { api, useAuth } from '../../api'
 
@@ -52,6 +52,7 @@ export function useEpisodeDownloads(libraryId: string, refresh: () => void) {
 	const user = useAuth((s) => s.user)
 	const [downloads, setDownloads] = useState<z.infer<typeof download>[]>([])
 	const [pending, setPending] = useState<string[]>([])
+	const requested = useRef(new Map<string, FeedEpisode>())
 	const [error, setError] = useState('')
 	useEffect(() => {
 		if (!user?.id || !libraryId) return
@@ -96,7 +97,23 @@ export function useEpisodeDownloads(libraryId: string, refresh: () => void) {
 						'reconnect',
 					].includes(detail.event)
 				) {
-					setPending([])
+					if (detail.event === 'episode_download_queue_cleared') {
+						requested.current.clear()
+						setPending([])
+					} else if (detail.event === 'episode_download_finished') {
+						const finished = download.safeParse(detail.payload)
+						if (finished.success) {
+							for (const [id, episode] of requested.current) {
+								if (
+									finished.data.libraryItemId === episode.libraryItemId &&
+									((episode.guid && finished.data.guid === episode.guid) ||
+										finished.data.url === episode.enclosure?.url)
+								)
+									requested.current.delete(id)
+							}
+							setPending([...requested.current.keys()])
+						}
+					}
 					refresh()
 				}
 				if (
@@ -132,7 +149,19 @@ export function useEpisodeDownloads(libraryId: string, refresh: () => void) {
 					: null
 		},
 		async start(episode: FeedEpisode) {
-			if (!canDownloadEpisodes(user) || !episode.enclosure?.url) return
+			if (
+				!canDownloadEpisodes(user) ||
+				!episode.enclosure?.url ||
+				requested.current.has(episode.id) ||
+				downloads.some(
+					(d) =>
+						d.libraryItemId === episode.libraryItemId &&
+						((episode.guid && d.guid === episode.guid) ||
+							d.url === episode.enclosure?.url),
+				)
+			)
+				return
+			requested.current.set(episode.id, episode)
 			setPending((ids) => [...ids, episode.id])
 			setError('')
 			try {
@@ -145,6 +174,7 @@ export function useEpisodeDownloads(libraryId: string, refresh: () => void) {
 					},
 				)
 			} catch (error) {
+				requested.current.delete(episode.id)
 				setPending((ids) => ids.filter((id) => id !== episode.id))
 				setError(error instanceof Error ? error.message : 'Download failed')
 			}

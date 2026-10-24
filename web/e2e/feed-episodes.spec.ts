@@ -19,10 +19,20 @@ for (const prefix of ['', '/abs']) {
 				})
 				await expect(
 					row.getByRole('button', { name: 'Play Feed-only fixture episode' }),
-				).toBeDisabled()
+				).toHaveCount(0)
 				await expect(
-					row.getByRole('button', { name: 'Play Feed-only fixture episode' }),
-				).toHaveText('Not downloaded')
+					row.getByRole('button', {
+						name: /player queue|Mark finished|Mark unfinished/,
+					}),
+				).toHaveCount(0)
+				await expect(
+					row.getByRole('button', {
+						name: 'Download Feed-only fixture episode',
+					}),
+				).toHaveText('Download')
+				await expect(
+					row.getByText('Not downloaded', { exact: true }),
+				).toBeVisible()
 				await expect(
 					page.getByText('Downloaded', { exact: true }).first(),
 				).toBeVisible()
@@ -32,12 +42,26 @@ for (const prefix of ['', '/abs']) {
 					path: `/private/tmp/opencode/feed-episodes/latest-${name}.png`,
 					fullPage: false,
 				})
+				let posts = 0
+				page.on('request', (request) => {
+					if (
+						request.method() === 'POST' &&
+						request.url().endsWith('/download-episodes')
+					)
+						posts++
+				})
 				await row
 					.getByRole('button', { name: 'Download Feed-only fixture episode' })
 					.click()
 				await expect(
 					row.getByText('Downloading', { exact: true }),
 				).toBeVisible()
+				await expect(row.getByRole('button')).toHaveCount(0)
+				await expect(row.getByRole('status')).toHaveAttribute(
+					'aria-live',
+					'polite',
+				)
+				expect(posts).toBe(1)
 				await page.screenshot({
 					path: `/private/tmp/opencode/feed-episodes/downloading-${name}.png`,
 					fullPage: false,
@@ -72,8 +96,8 @@ for (const prefix of ['', '/abs']) {
 			`${prefix}/new/item/podcast-1`,
 		)
 		await expect(
-			card.getByRole('button', { name: 'Not downloaded', exact: true }),
-		).toBeDisabled()
+			card.getByRole('button', { name: 'Play', exact: true }),
+		).toHaveCount(0)
 		await expect(
 			card.getByRole('button', { name: 'Download Feed-only fixture episode' }),
 		).toBeEnabled()
@@ -85,7 +109,10 @@ for (const prefix of ['', '/abs']) {
 		await page.goto(`${prefix}/new/library/podcasts/podcast/latest`)
 		await expect(
 			page.getByRole('button', { name: 'Play Feed-only fixture episode' }),
-		).toBeDisabled()
+		).toHaveCount(0)
+		await expect(
+			page.getByText('Not downloaded', { exact: true }),
+		).toBeVisible()
 		await expect(
 			page.getByRole('button', { name: 'Download Feed-only fixture episode' }),
 		).toHaveCount(0)

@@ -582,27 +582,24 @@ export function EntryCard({
 
 					{episode && downloads && (
 						<div className="flex flex-wrap items-center gap-2">
-							<Button
-								size="sm"
-								disabled={episode.downloaded === false}
-								title={
-									episode.downloaded === false
-										? 'Not downloaded'
-										: 'Play episode'
-								}
-								onClick={() =>
-									void playEpisode(item.id, episode.id).catch(
-										(error: unknown) =>
-											setShelfError(
-												error instanceof Error
-													? error.message
-													: 'Playback failed',
-											),
-									)
-								}
-							>
-								{episode.downloaded === false ? 'Not downloaded' : 'Play'}
-							</Button>
+							{episode.downloaded !== false && (
+								<Button
+									size="sm"
+									title="Play episode"
+									onClick={() =>
+										void playEpisode(item.id, episode.id).catch(
+											(error: unknown) =>
+												setShelfError(
+													error instanceof Error
+														? error.message
+														: 'Playback failed',
+												),
+										)
+									}
+								>
+									Play
+								</Button>
+							)}
 							{episode.downloaded === false && (
 								<FeedDownloadAction
 									episode={{ ...episode, libraryItemId: item.id }}
