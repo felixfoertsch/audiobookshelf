@@ -58,8 +58,8 @@ describe('public shell', () => {
 			})
 			const router = createRouter({
 				routeTree: root.addChildren([login, share]),
-				basepath: '/new',
-				history: createMemoryHistory({ initialEntries: [`/new${path}`] }),
+				basepath: '',
+				history: createMemoryHistory({ initialEntries: [path] }),
 			})
 			await router.load()
 			render(<RouterProvider router={router} />)

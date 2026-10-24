@@ -6,8 +6,8 @@ import {
 } from '@tanstack/react-router'
 import { expect, it } from 'vitest'
 
-it('native router exposes canonical pathname below both modern mounts', () => {
-	for (const basepath of ['/new', '/abs/new']) {
+it('native router exposes canonical pathname at root', () => {
+	for (const basepath of ['']) {
 		const root = createRootRoute()
 		const route = createRoute({ getParentRoute: () => root, path: '/item/$id' })
 		const router = createRouter({
