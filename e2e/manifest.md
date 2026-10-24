@@ -76,10 +76,16 @@ Baseline Playwright manifest: **54 specs**. All retained by filename. Adaptation
 - `proxy-contract.spec.ts`: validates contract-shaped `{ episodes: record }` response, auth, ACL and proxy prefix.
 - Remaining specs: root `/` SPA and root deep links; native ABS APIs stay under their stock routes. Any per-test request overrides remain local to that spec.
 
-Latest container gate on ffunraid: **170 passed, 28 failed, 7 skipped / 205 tests**. Four launches used: rounds 1 and 3 failed discovery (AppleDouble archive files; missing JSON import attribute); round 2 ran 177/21/7; round 4 ran 170/28/7. No further rounds run. Gate remains failed; do not merge.
+Latest fresh-image container gate on ffunraid: **198 passed, 0 failed, 7 skipped / 205 tests**. Round 5 ran 195/3/7; round 6 closed all remaining failures. JSON: `/private/tmp/opencode/standalone-gate-round6.json`.
 
-Final runtime image: `sha256:62129769b83b49a3ce60665242292740c836f1eba8b6474cea7c9bcf534a79ed`. JSON: `/private/tmp/opencode/standalone-gate-round4.json`; exact failed assertions and stack locations: `/private/tmp/opencode/standalone-gate-remaining.txt`. Unit suite: 437 passed; typecheck, Biome and build passed.
+Final runtime image: `sha256:9838b2d6a41eac4541df07c2a4bda8864e35376a6c245d0d3cce7997eb369e2e`, built from `702e9067`. Unit suite: **437 passed**; typecheck, Biome and build passed. No assertions dropped during gate repair; PDF canvas test passes in headless Linux after fixing `.mjs` worker MIME type.
 
-Remaining failures: analysis completion icon count (1); audiobook observations still sent through production proxy (1); audit feed count missing (1); book download/table ownership regression (7); feed-only download/shelf/permission rendering (6); HLS marker absent (1); shared socket connection/auth counts (2); library selection missing (1); missing-asset cache header absent (1); PDF canvas unpainted (1); disposed shelf response intercepts (3); shell and stale fixture links absent (2); local timeline marker geometry absent (1). Counts total 28. These are observed failure boundaries; unresolved root causes are not certified.
+Repair causes: feed mock omitted enclosure and podcast metadata; sign-in helper returned before auth completed; analysis completion assertion expired before 30-second poll; audit mock confused unplayed with finished count; audio-file filtering removed native file actions; duplicate React sibling keys orphaned book tables after updates; HLS analysis used wrong episode ID; geometry test searched wrong ancestor before sidecar result; observations used SPA proxy instead of mock control; absent cache header is valid for missing asset. Other round-4 socket/shelf/navigation failures did not recur after fixture/auth alignment.
 
-Cleanup proof: `/private/tmp/opencode/standalone-gate-cleanup-proof.txt`. All seven test containers, tagged/superseded test images and isolated network removed. Stable and experiment container IDs/image digests match `/private/tmp/opencode/standalone-gate-before.txt`. No push or deployment.
+## Recorded skips
+
+- `parity-contracts.spec.ts`: generated Classic leaf-route comparison requires separately generated Classic artifact (1).
+- `parity-contracts.spec.ts`: R08.book, R08.podcast, R04.account need Classic fixture adapter; not runtime parity evidence (3).
+- `real-playback.spec.ts`: real-low, real-end-world, full book require `REAL_PLAYBACK=1` plus local ignored media cache; tests never download media (3).
+
+Cleanup proof: `/private/tmp/opencode/standalone-gate-cleanup6.txt`. Four named test containers, four final tagged images, four superseded images and isolated network removed. Frontend bound only to `127.0.0.1:43810`; no Traefik labels, no `traefik` or `vpn-egress` membership. Stable and experiment container IDs/image digests unchanged before/after. Transfer used `git archive`, with no AppleDouble files. No push or deployment.
