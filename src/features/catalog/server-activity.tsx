@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { z } from 'zod'
 import { create } from 'zustand'
-import serverPackage from '../../../../package.json'
+import serverPackage from '../../../package.json'
 import { useAuth } from '../../api'
 
 const onlineUser = z.object({ id: z.string(), username: z.string() })

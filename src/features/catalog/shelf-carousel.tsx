@@ -68,7 +68,7 @@ export function ShelfCarousel({
 				// biome-ignore lint/a11y/noNoninteractiveTabindex: Scroll region must support keyboard scrolling, including swipe-only devices.
 				tabIndex={0}
 				aria-label={label}
-				className={`flex w-screen -ml-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] snap-x snap-mandatory gap-4 overflow-x-auto pl-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] pr-[var(--shelf-gutter)] scroll-pl-[calc(var(--shelf-sidebar)+var(--shelf-gutter))] scroll-pr-[var(--shelf-gutter)] pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>article]:shrink-0 [&>article]:snap-start ${hero ? '[&>article]:w-[240px] sm:[&>article]:w-[280px]' : '[&>article]:w-[140px] sm:[&>article]:w-[160px]'}`}
+				className={`flex w-[calc(100vw-var(--shelf-sidebar)-var(--shelf-gutter))] snap-x snap-mandatory gap-4 overflow-x-auto pr-[var(--shelf-gutter)] scroll-pr-[var(--shelf-gutter)] pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>article]:shrink-0 [&>article]:snap-start ${hero ? '[&>article]:w-[240px] sm:[&>article]:w-[280px]' : '[&>article]:w-[140px] sm:[&>article]:w-[160px]'}`}
 			>
 				{children}
 			</section>

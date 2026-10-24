@@ -862,7 +862,9 @@ export function HomePage({
 										to="/library/$library/podcast/latest"
 										params={{ library }}
 									>
-										{shelf.label}
+										{feedEpisodes.length
+											? shelf.label
+											: 'Recently added downloads'}
 										<ChevronRight
 											aria-hidden="true"
 											className="size-4 text-muted-foreground"

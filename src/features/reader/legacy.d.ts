@@ -12,19 +12,19 @@ declare module 'libarchive.js/src/compressed-file' {
 		extract(): Promise<File>
 	}
 }
-declare module '*client/assets/ebooks/mobi.js' {
+declare module '*legacy/mobi.js' {
 	export default class MobiParser {
 		constructor(data: ArrayBuffer)
 		render(): Promise<HTMLElement>
 	}
 }
-declare module '*client/assets/ebooks/htmlParser.js' {
+declare module '*legacy/htmlParser.js' {
 	export default class HtmlParser {
 		constructor(document: Document)
 		getAnchoredDoc(): Document
 	}
 }
-declare module '*client/assets/ebooks/basic.js' {
+declare module '*legacy/basic.js' {
 	const css: string
 	export default css
 }

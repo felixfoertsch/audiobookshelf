@@ -65,3 +65,17 @@ it('hides controls without overflow, rechecks changed content and resize', () =>
 	fireEvent(window, new Event('resize'))
 	expect(screen.queryByRole('button', { name: 'Next Shows' })).toBeNull()
 })
+
+it('clips carousel at left content inset while retaining right bleed', () => {
+	render(
+		<ShelfCarousel label="Newest Episodes" hero={false}>
+			<article>Episode</article>
+		</ShelfCarousel>,
+	)
+	const region = screen.getByRole('region', { name: 'Newest Episodes' })
+	expect(region.className).not.toContain('-ml-')
+	expect(region.className).toContain(
+		'w-[calc(100vw-var(--shelf-sidebar)-var(--shelf-gutter))]',
+	)
+	expect(region.className).not.toContain('pl-[calc(')
+})

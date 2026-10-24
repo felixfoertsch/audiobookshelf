@@ -33,7 +33,6 @@ import {
 } from '../features/catalog/browse'
 import { ServerActivityObserver } from '../features/catalog/server-activity'
 import { DebugMenu, RouteDebugOverlay } from '../features/debug'
-import { useT } from '../features/i18n'
 import { PodcastSearchModal } from '../features/podcast/PodcastSearchModal'
 import { Player } from '../player'
 import { Button } from '../shared/components/ui/button'
@@ -76,27 +75,6 @@ function ShellSidebarTrigger() {
 	)
 }
 
-export function AlphaNotice() {
-	const t = useT()
-	return (
-		<aside
-			aria-label="Alpha frontend"
-			className="border-b bg-card px-5 py-3 text-sm"
-		>
-			{t(
-				'Modern UI · Classic available for legacy access.',
-				[],
-				'Modern UI · Classic available for legacy access.',
-			)}{' '}
-			<a
-				href={`${window.__ABS_WEB_CONFIG__?.apiBasePath || ''}/?classic=1`}
-				className="underline"
-			>
-				Open Classic
-			</a>
-		</aside>
-	)
-}
 export function RouteError({ error }: ErrorComponentProps) {
 	return (
 		<section role="alert" className="space-y-4">
@@ -234,12 +212,9 @@ export function Layout({
 	}, [user, blank])
 	if (!user || blank)
 		return (
-			<>
-				<AlphaNotice />
-				<main id="content" className="mx-auto max-w-6xl px-5 py-8">
-					{routeError ? <RouteError {...routeError} /> : <Outlet />}
-				</main>
-			</>
+			<main id="content" className="mx-auto max-w-6xl px-5 py-8">
+				{routeError ? <RouteError {...routeError} /> : <Outlet />}
+			</main>
 		)
 	const admin = user.type === 'admin' || user.type === 'root'
 	const permissions = user.permissions as { upload?: boolean } | undefined
@@ -421,7 +396,6 @@ export function Layout({
 				</Sidebar>
 				<ServerActivityObserver />
 				<SidebarInset className="min-w-0 md:peer-data-[state=collapsed]:[--sidebar-width:0px]">
-					<AlphaNotice />
 					<header className="flex items-center gap-2 border-b px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] md:contents">
 						<ShellSidebarTrigger />
 						<span className="truncate text-sm font-medium md:hidden">

@@ -124,7 +124,7 @@ describe('authentication settings', () => {
 		})
 		await setServerLanguage('de')
 		render(<AuthenticationPage />)
-		const german = await import('../../../../client/strings/de.json')
+		const german = await import('../i18n/strings/de.json')
 		await screen.findByLabelText(german.HeaderPasswordAuthentication)
 		expect(
 			screen.getByLabelText(german.HeaderCustomMessageOnLogin),

@@ -67,9 +67,7 @@ describe('PDF page boundary', () => {
 
 it('propagates malformed MOBI image failure to visible reader error', async () => {
 	const { Mobi } = await import('./Mobi')
-	const { default: Parser } = await import(
-		'../../../../client/assets/ebooks/mobi.js'
-	)
+	const { default: Parser } = await import('./legacy/mobi.js')
 	const prototype = Parser.prototype as unknown as {
 		load(): void
 		read_text(): string

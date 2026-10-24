@@ -9,7 +9,9 @@
 			"!test-results",
 			"!e2e/media/real",
 			"!e2e/media/local",
-			"!src/shared/components/ui"
+			"!src/shared/components/ui",
+			"!src/features/reader/legacy",
+			"!src/features/i18n/strings"
 		]
 	},
 	"formatter": { "indentStyle": "tab" },

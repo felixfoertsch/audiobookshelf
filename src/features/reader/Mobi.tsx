@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import defaultCss from '../../../../client/assets/ebooks/basic.js'
-import HtmlParser from '../../../../client/assets/ebooks/htmlParser.js'
-import MobiParser from '../../../../client/assets/ebooks/mobi.js'
+import defaultCss from './legacy/basic.js'
+import HtmlParser from './legacy/htmlParser.js'
+import MobiParser from './legacy/mobi.js'
 import type { EngineProps } from './types'
 
 const blocked = new Set([

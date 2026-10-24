@@ -1,10 +1,9 @@
 import { useSyncExternalStore } from 'react'
-import english from '../../../../client/strings/en-us.json'
+import english from './strings/en-us.json'
 
-const loaders = import.meta.glob<Record<string, string>>(
-	'../../../../client/strings/*.json',
-	{ import: 'default' },
-)
+const loaders = import.meta.glob<Record<string, string>>('./strings/*.json', {
+	import: 'default',
+})
 let language = 'en-us'
 let strings: Record<string, string> = english
 let serverLanguage = 'en-us'
@@ -15,7 +14,7 @@ const emit = () => {
 }
 export async function setLanguage(code: string, local = true) {
 	const normalized = code.toLowerCase()
-	const key = `../../../../client/strings/${normalized}.json`
+	const key = `./strings/${normalized}.json`
 	const selected = normalized === 'en-us' || loaders[key] ? normalized : 'en-us'
 	const current = ++revision
 	let loaded: Record<string, string> = english

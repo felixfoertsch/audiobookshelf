@@ -445,7 +445,7 @@ export function ItemActions({
 									void run(async () => {
 										await itemActions.deleteItem(item.id, hard)
 										window.location.assign(
-											`${window.__ABS_WEB_CONFIG__?.basePath || '/new'}/`,
+											`${window.__ABS_WEB_CONFIG__?.basePath || ''}/`,
 										)
 									})
 							}}
