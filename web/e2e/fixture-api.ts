@@ -1010,18 +1010,16 @@ export async function fixtureApi(
 		return json({ total: 120, unplayed: 117, source: 'feed' })
 	}
 	if (path === '/api/search/podcast' && method === 'GET') {
-		return json(
-			realRecords
-				.filter((r) => r.kind === 'podcast')
-				.map((record) => ({
-					id: record.id,
-					title: record.title,
-					artistId: null,
-					artistName: record.author,
-					feedUrl: record.feedUrl,
-					cover: null,
-				})),
-		)
+		return json([
+			{
+				id: 'search-show',
+				title: 'Search show',
+				artistId: null,
+				artistName: 'Fixture publisher',
+				feedUrl: 'https://example.test/search-show.xml',
+				cover: null,
+			},
+		])
 	}
 	if (path === '/api/podcasts/feed' && method === 'POST') {
 		if (!admin) return json({ error: 'Forbidden' }, 403)
@@ -1029,6 +1027,13 @@ export async function fixtureApi(
 			.object({ rssFeed: z.string().url() })
 			.safeParse(await body())
 		if (!input.success) return json({ error: 'Invalid rssFeed' }, 400)
+		if (input.data.rssFeed === 'https://example.test/search-show.xml')
+			return json({
+				podcast: {
+					metadata: { title: 'Search show', feedUrl: input.data.rssFeed },
+					episodes: [],
+				},
+			})
 		const record = realRecords.find(
 			(r) => r.kind === 'podcast' && r.feedUrl === input.data.rssFeed,
 		)
