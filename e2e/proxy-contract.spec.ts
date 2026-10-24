@@ -124,6 +124,11 @@ test('reserved routes fail closed and SPA deep links stay root-based', async ({
 	const manifest = await request.get(`${base}/manifest.webmanifest`)
 	expect(manifest.status()).toBe(200)
 	expect(manifest.headers()['cache-control']).toContain('no-store')
+	const html = await deep.text()
+	const entry = html.match(/src="([^"]+\.js)"/)?.[1]
+	expect(entry).toBeTruthy()
+	const script = await request.get(`${base}${entry}`)
+	expect(script.headers()['content-type']).toContain('javascript')
 	const missingAsset = await request.get(`${base}/assets/plain.js`)
 	expect(missingAsset.status()).toBe(404)
 	expect(missingAsset.headers()['cache-control'] ?? '').not.toContain(

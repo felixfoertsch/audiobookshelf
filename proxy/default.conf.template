@@ -3,6 +3,9 @@ server {
 	server_name _;
 	root /usr/share/nginx/html;
 	index index.html;
+	# Preserve nginx's standard MIME map while adding PDF.js module workers.
+	include /etc/nginx/mime.types;
+	types { application/javascript mjs; }
 
 	location = /health { access_log off; return 200 "ok\\n"; }
 	location = /psb { return 404; }
