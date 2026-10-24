@@ -54,6 +54,7 @@ for (const prefix of ['']) {
 		await page
 			.getByLabel('Audio playback')
 			.evaluate((audio: HTMLAudioElement) => audio.pause())
+		await expect(page.getByTestId('segment-marker')).toBeVisible()
 		for (const expanded of [false, true]) {
 			if (expanded) await openPlayerOptions(page)
 			for (const width of [390, 1280]) {
@@ -63,7 +64,7 @@ for (const prefix of ['']) {
 					.evaluate((slider) => {
 						const root = slider.closest('[data-slot="slider"]')
 						const track = root?.querySelector('[data-slot="slider-track"]')
-						const marker = slider.parentElement?.parentElement?.querySelector(
+						const marker = root?.parentElement?.querySelector(
 							'[data-testid="segment-marker"]',
 						)
 						if (!track || !marker)
